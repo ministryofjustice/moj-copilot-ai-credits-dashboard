@@ -1,0 +1,43 @@
+{% from "govuk_frontend_jinja/components/input/macro.html" import govukInput %}
+{% from "govuk_frontend_jinja/components/select/macro.html" import govukSelect %}
+{% from "govuk_frontend_jinja/components/textarea/macro.html" import govukTextarea %}
+{% from "govuk_frontend_jinja/components/inset-text/macro.html" import govukInsetText %}
+
+{% extends "components/base.html" %}
+
+{% block pageTitle %}
+   Operations Engineering Template Page
+{% endblock %}
+
+{% block content %}
+  <h1 class="govuk-heading-l">Hello, Operations Engineering!</h1>
+
+  <p class="govuk-body">
+    Welcome to the Operations Engineering Template. This template is designed to help you get started quickly with building Flask apps using the GOV.UK Design System.
+  </p>
+
+  {{ govukInsetText({
+    "text": "This is a sample page to demonstrate the template's structure and components. You can extend this template and add more components as needed."
+  }) }}
+
+  <form method="POST" action="/">
+    {{ govukInput({
+      "id": "name",
+      "name": "name",
+      "label": {
+        "text": "Your Name"
+      }
+    }) }}
+
+    {{ govukTextarea({
+      "id": "message",
+      "name": "message",
+      "label": {
+        "text": "Your Message"
+      }
+    }) }}
+
+    <button type="submit" class="govuk-button">Submit</button>
+  </form>
+{% endblock %}
+

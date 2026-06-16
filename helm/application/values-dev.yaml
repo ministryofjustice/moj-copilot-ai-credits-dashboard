@@ -1,0 +1,9 @@
+app:
+  ingress:
+    host: "application-dev.cloud-platform.service.justice.gov.uk" # This should be changed as appropriate
+
+  deployment:
+    replicaCount: 1
+    env:
+      SENTRY_ENV: "development"
+      FLASK_DEBUG: true

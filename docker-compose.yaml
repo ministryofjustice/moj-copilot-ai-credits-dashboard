@@ -1,0 +1,22 @@
+version: "3.9"
+services:
+  app:
+    build: .
+    image: "operations-engineering-flask-application"
+    container_name: "operations-engineering-flask-application"
+    environment:
+      # GitHub
+      ADMIN_GITHUB_TOKEN: fake
+
+      # Flask
+      APP_SECRET_KEY: dev
+      FLASK_DEBUG: true
+
+      # Sentry
+      # SENTRY_DSN_KEY:
+      SENTRY_ENV: local
+
+      # App
+      LOGGING_LEVEL: "DEBUG"
+    ports:
+      - "4567:4567"

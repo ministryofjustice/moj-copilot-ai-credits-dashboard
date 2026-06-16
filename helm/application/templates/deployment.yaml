@@ -1,0 +1,34 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "application.fullname" . }}
+  labels:
+    {{- include "application.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.app.deployment.replicaCount }}
+  selector:
+    matchLabels: {{- include "application.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "application.selectorLabels" . | nindent 8 }}
+    spec:
+      # serviceAccountName created by the Cloud Platform environment
+      serviceAccountName: cd-serviceaccount
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.app.deployment.image.repository }}:{{ .Values.app.deployment.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: APP_SECRET_KEY
+              value: {{ .Values.app.deployment.env.APP_SECRET_KEY | quote }}
+            - name: FLASK_DEBUG
+              value: {{ .Values.app.deployment.env.FLASK_DEBUG | quote }}
+            - name: SENTRY_DSN_KEY
+              value: {{ .Values.app.deployment.env.SENTRY_DSN_KEY }}
+            - name: SENTRY_ENV
+              value: {{ .Values.app.deployment.env.SENTRY_ENV }}
+
+          ports:
+            - name: http
+              containerPort: 80

@@ -1,0 +1,12 @@
+schemaVersion: "2.0.0"
+commandTests:
+  - name: "python"
+    command: "which"
+    args: ["python"]
+    expectedOutput: ["/usr/local/bin/python"]
+metadataTest:
+  envVars:
+  exposedPorts: ["4567"]
+containerRunOptions:
+  user: "appuser"
+  privileged: false

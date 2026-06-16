@@ -1,0 +1,23 @@
+name: "♻️ Test Dockerfile"
+on: pull_request
+
+jobs:
+  dockerfile-test:
+    name: container-structure-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4.1.1
+        with:
+          fetch-depth: 0
+
+      - name: Build
+        run: docker build -t image-test .
+      - name: Check it exists
+        run: docker images
+
+      - name: Run docker tests
+        uses: docker://ghcr.io/googlecontainertools/container-structure-test:1.19.1@sha256:e991491408e7e5f76b97a5a8efc99513e535c96f15cf1c00ac80327dd4d034cb
+        with:
+          args: "test --image image-test --config docker-test.yaml"

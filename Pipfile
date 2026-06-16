@@ -1,0 +1,27 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[scripts]
+list_outdated = "pip list --outdated"
+tests = "coverage run -m unittest discover -s test -v"
+tests_report = "coverage report --omit=./test/** --sort=cover --show-missing --skip-empty"
+
+[packages]
+email-validator = "==2.1.0.post1"
+flask = "==3.0.2"
+flask-cors = "==5.0.0"
+flask-limiter = "==3.5.0"
+govuk-frontend-jinja = "==3.0.0"
+gunicorn = "==22.0.0"
+requests = "==2.32.0"
+sentry-sdk = "==2.8.0"
+freezegun = "==1.5.1"
+setuptools = "==70.0.0"
+
+[dev-packages]
+coverage = "==7.4.4"
+
+[requires]
+python_version = "3.12"

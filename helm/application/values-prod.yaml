@@ -1,0 +1,9 @@
+app:
+  ingress:
+    host: "application.service.justice.gov.uk" # This should be changed as appropriate
+
+  deployment:
+    replicaCount: 3
+    env:
+      SENTRY_ENV: "production"
+      FLASK_DEBUG: false
