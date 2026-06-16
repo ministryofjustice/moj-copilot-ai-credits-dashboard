@@ -1,0 +1,122 @@
+{% extends "components/base.html" %}
+{% from "govuk_frontend_jinja/components/input/macro.html" import govukInput %}
+{% from "govuk_frontend_jinja/components/select/macro.html" import govukSelect %}
+{% from "govuk_frontend_jinja/components/button/macro.html" import govukButton %}
+{% from "govuk_frontend_jinja/components/inset-text/macro.html" import govukInsetText %}
+{% from "govuk_frontend_jinja/components/tag/macro.html" import govukTag %}
+
+{% block pageTitle %}My Copilot AI-credit usage{% endblock %}
+
+{% block content %}
+{% set plan_items = [] %}
+{% for p in v.plans %}{{- plan_items.append({"value": p, "text": p, "selected": p == v.plan}) or "" -}}{% endfor %}
+
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-two-thirds">
+    <h1 class="govuk-heading-l">My Copilot AI-credit usage</h1>
+    <p class="govuk-body">
+      Enter your GitHub username to see your AI-credit usage for the current week.
+    </p>
+
+    <form method="get" action="/">
+      {{ govukInput({
+        "id": "user", "name": "user",
+        "label": {"text": "GitHub username"},
+        "value": v.login,
+        "classes": "govuk-input--width-20"
+      }) }}
+      {{ govukSelect({
+        "id": "plan", "name": "plan",
+        "label": {"text": "Plan budget (per seat)"},
+        "items": plan_items
+      }) }}
+      {{ govukButton({"text": "View usage"}) }}
+    </form>
+  </div>
+</div>
+
+{% if v.searched %}
+  {% if v.found %}
+  {% set week_items = [] %}
+  {% for w in v.weeks %}{{- week_items.append({"value": w, "text": w, "selected": w == v.week}) or "" -}}{% endfor %}
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-full">
+
+      {# ---- Week selector (first) ---- #}
+      <form method="get" action="/" class="govuk-!-margin-bottom-4">
+        <input type="hidden" name="user" value="{{ v.login }}">
+        <input type="hidden" name="plan" value="{{ v.plan }}">
+        <div class="govuk-grid-row">
+          <div class="govuk-grid-column-one-third">
+            {{ govukSelect({"id": "week", "name": "week", "label": {"text": "Week"}, "items": week_items}) }}
+          </div>
+          <div class="govuk-grid-column-two-thirds">
+            <div class="govuk-!-padding-top-6">{{ govukButton({"text": "View week", "classes": "govuk-button--secondary"}) }}</div>
+          </div>
+        </div>
+      </form>
+
+      {# ---- Selected-week detail (top) ---- #}
+      <h3 class="govuk-heading-s">{{ v.week }} · {{ v.span }} (resets Monday) · {{ v.day_count }} active day(s)</h3>
+      <div class="govuk-grid-row">
+        {% set cards = [
+          ("Credits used", "%.1f"|format(v.used)),
+          ("Credits remaining", "%.1f"|format(v.remaining)),
+          ("% of allowance", "%.0f%%"|format(v.pct * 100))
+        ] %}
+        {% for label, value in cards %}
+        <div class="govuk-grid-column-one-third">
+          <div style="border:1px solid #b1b4b6; padding:15px; margin-bottom:15px;">
+            <span class="govuk-caption-m">{{ label }}</span>
+            <span class="govuk-heading-l govuk-!-margin-bottom-0">{{ value }}</span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if v.pct >= 1.0 %}
+        {{ govukInsetText({"text": "Over the weekly allowance by " ~ "%.1f"|format(-v.remaining) ~ " credits."}) }}
+      {% endif %}
+
+      {# ---- Per-week usage vs the weekly limit ---- #}
+      <h2 class="govuk-heading-m">{{ v.login }} — weekly usage</h2>
+      <p class="govuk-body-s">
+        Credits used per ISO week against the {{ "%.0f"|format(v.limits.weekly) }}-credit weekly allowance ({{ v.plan }}).
+      </p>
+      <div style="height:340px;"><canvas data-chart="userWeekly"></canvas></div>
+
+      <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+      {# ---- Daily breakdown for the selected week ---- #}
+      <h3 class="govuk-heading-s">Daily usage in {{ v.week }}</h3>
+      <div style="height:300px;"><canvas data-chart="userDaily"></canvas></div>
+
+      {# ---- Month-to-date ---- #}
+      <h3 class="govuk-heading-s govuk-!-margin-top-6">Month-to-date ({{ v.mtd.month }})</h3>
+      <p class="govuk-body-s">Total this month: <strong>{{ "%.1f"|format(v.mtd.total_credits) }}</strong> credits.</p>
+      <div style="max-width:760px; height:300px;"><canvas data-chart="userMTD"></canvas></div>
+
+      {% set charts = {
+        "userWeekly": {"type": "bar", "labels": v.weekly_chart.labels,
+          "datasets": [{"label": "Credits / week", "data": v.weekly_chart.credits}],
+          "limit": {"value": v.limits.weekly | round(1), "label": "Weekly allowance"}},
+        "userDaily": {"type": "bar", "labels": v.daily_chart.labels,
+          "datasets": [{"label": "Credits / day", "data": v.daily_chart.credits}],
+          "limit": {"value": v.limits.daily | round(1), "label": "Daily allowance"}},
+        "userMTD": {"type": "line", "labels": v.mtd.chart.labels,
+          "datasets": [{"label": "Cumulative credits", "data": v.mtd.chart.cumulative}],
+          "limit": {"value": v.limits.monthly | round(1), "label": "Monthly allowance"}}
+      } %}
+      <script type="application/json" id="chart-data">{{ charts | tojson }}</script>
+    </div>
+  </div>
+  {% else %}
+    {{ govukInsetText({"text": "No usage captured for " ~ v.login ~ ((" in " ~ v.week) if v.week else "") ~ ". Check the spelling of the GitHub username."}) }}
+  {% endif %}
+{% endif %}
+{% endblock %}
+
+{% block bodyEnd %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='javascript/chart.umd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='javascript/charts.js') }}"></script>
+{% endblock %}
