@@ -40,15 +40,13 @@ jobs:
   deploy-to-dev:
     needs: build-push
     runs-on: ubuntu-latest
-    container: alpine/k8s:1.23.17
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Authenticate to the cluster
         run: |
-          printf '%s' "${DEV_KUBE_CERT}" > ca.crt
-          openssl x509 -in ca.crt -text -noout
+          echo "${DEV_KUBE_CERT}" > ca.crt
           kubectl config set-cluster ${KUBE_CLUSTER} --certificate-authority=./ca.crt --server=https://${KUBE_CLUSTER}
           kubectl config set-credentials deploy-user --token=${DEV_KUBE_TOKEN}
           kubectl config set-context ${KUBE_CLUSTER} --cluster=${KUBE_CLUSTER} --user=deploy-user --namespace=${DEV_KUBE_NAMESPACE}
