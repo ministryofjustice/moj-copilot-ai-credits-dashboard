@@ -13,7 +13,7 @@ env:
 
   IMAGE_TAG: ${{ github.sha }}
   ECR_REGISTRY: ${{ secrets.ECR_REGISTRY_URL }}
-  ECR_REPOSITORY: ${{ vars.DEV_ECR_REPOSITORY }}
+  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
   # FLASK_APP_SECRET: ${{ secrets.DEV_FLASK_APP_SECRET }}
   # SENTRY_DSN_KEY: ${{ secrets.SENTRY_DSN_KEY }}
 
