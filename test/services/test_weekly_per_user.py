@@ -140,8 +140,8 @@ def test_load_weekly_records_reads_and_sums_per_model(tmp_path):
 
 def test_assign_tiers_bins_users_by_spend_rank():
     # 20 distinct spenders, descending credits.
-    credits = {f"u{i:02d}": float(100 - i) for i in range(20)}
-    tiers = wpu.assign_tiers(credits)
+    spend = {f"u{i:02d}": float(100 - i) for i in range(20)}
+    tiers = wpu.assign_tiers(spend)
     counts = {t: 0 for t in wpu.TIER_ORDER}
     for t in tiers.values():
         counts[t] += 1
@@ -153,11 +153,11 @@ def test_assign_tiers_bins_users_by_spend_rank():
 
 
 def test_assign_tiers_empty_input():
-    assert wpu.assign_tiers({}) == {}
+    assert not wpu.assign_tiers({})
 
 
 def test_assign_tiers_assigns_every_user():
-    credits = {"a": 5.0, "b": 5.0, "c": 1.0}
-    tiers = wpu.assign_tiers(credits)
+    spend = {"a": 5.0, "b": 5.0, "c": 1.0}
+    tiers = wpu.assign_tiers(spend)
     assert set(tiers) == {"a", "b", "c"}
     assert all(t in wpu.TIER_ORDER for t in tiers.values())

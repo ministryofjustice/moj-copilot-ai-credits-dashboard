@@ -208,8 +208,8 @@ def _period_text(key: str, period: str) -> str:
     return wpu.format_month_label(key)
 
 
-def pooled_view(source: ReportsSource, period: str | None, key: str | None,
-                plan: str | None, seats) -> dict:  # pylint: disable=too-many-locals
+def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # pylint: disable=too-many-locals
+                plan: str | None, seats) -> dict:
     """Pooled-billing treemap data for one ISO week or calendar month.
 
     pool = seats * per-seat allowance for the period; covered usage is split by
@@ -283,7 +283,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,
     }
 
 
-def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> dict:
+def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> dict:  # pylint: disable=too-many-locals
     """Org weekly per-user allowance table for one ISO week."""
     all_rows = _weekly_rows(source)
     plan = resolve_plan(plan)
