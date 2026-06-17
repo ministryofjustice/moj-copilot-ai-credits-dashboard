@@ -22,6 +22,16 @@ WEEKS_PER_MONTH = 4.33
 # Selectable monthly per-seat AI-credit budgets (USD).
 PLAN_TIERS_USD_PER_MONTH = {"$70 / month": 70.0, "$39 / month": 39.0}
 DEFAULT_PLAN = "$70 / month"
+DEFAULT_SEATS = 405
+
+
+def resolve_seats(raw) -> int:
+    """Coerce a seat-count query value to a positive int, else DEFAULT_SEATS."""
+    try:
+        seats = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_SEATS
+    return seats if seats > 0 else DEFAULT_SEATS
 
 
 def plan_labels() -> list[str]:
