@@ -72,4 +72,10 @@ class S3ReportsSource(ReportsSource):
         return out
 
     def weekly_records(self) -> list[dict]:
-        raise NotImplementedError
+        records: list[dict] = []
+        for day in self.daily_docs():
+            for login, items in self.per_user_docs(day).items():
+                rec = wpu.record_from_items(day, login, items)
+                if rec is not None:
+                    records.append(rec)
+        return records

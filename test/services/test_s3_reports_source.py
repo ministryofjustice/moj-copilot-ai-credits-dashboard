@@ -69,3 +69,26 @@ def test_per_user_docs_keyed_by_login():
     assert set(docs) == {"alice", "bob"}
     assert docs["alice"] == [{"model": "Opus", "grossQuantity": 5.0}]
     assert docs["bob"] == []
+
+
+def test_weekly_records_built_from_all_days():
+    src = _source({
+        "reports/2026-06-01/billing/ai-credit-usage.json": {
+            "enterprise": "MoJ", "usageItems": []},
+        "reports/2026-06-02/billing/ai-credit-usage.json": {
+            "enterprise": "MoJ", "usageItems": []},
+        "reports/2026-06-01/billing/per-user/alice.json": {"usageItems": [
+            {"model": "Opus", "grossQuantity": 100.0, "grossAmount": 1.0},
+        ]},
+        "reports/2026-06-01/billing/per-user/empty.json": {"usageItems": []},
+        "reports/2026-06-02/billing/per-user/alice.json": {"usageItems": [
+            {"model": "Haiku", "grossQuantity": 10.0, "grossAmount": 0.1},
+        ]},
+    })
+    records = src.weekly_records()
+    assert {(r["day"], r["user"]) for r in records} == {
+        ("2026-06-01", "alice"), ("2026-06-02", "alice"),
+    }
+    day1 = next(r for r in records if r["day"] == "2026-06-01")
+    assert day1["credits"] == pytest.approx(100.0)
+    assert day1["per_model"] == {"Opus": pytest.approx(100.0)}
