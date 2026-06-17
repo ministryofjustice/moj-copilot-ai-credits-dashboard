@@ -24,6 +24,10 @@
   }
 
   function build(canvas, spec) {
+    if (spec.type === "treemap") {
+      buildTreemap(canvas, spec);
+      return;
+    }
     var type = spec.type || "bar";
     var labels = spec.labels || [];
     var datasets = (spec.datasets || []).map(function (ds, i) {
@@ -63,6 +67,75 @@
         maintainAspectRatio: false,
         plugins: { legend: { display: datasets.length > 1 } },
         scales: { y: { beginAtZero: true } },
+      },
+    });
+  }
+
+  function buildTreemap(canvas, spec) {
+    var tiles = spec.tiles || [];
+    var total =
+      spec.total ||
+      tiles.reduce(function (s, t) {
+        return s + t.amount;
+      }, 0);
+
+    function tileLine(i) {
+      var t = tiles[i];
+      var pct = total ? (t.amount / total) * 100 : 0;
+      var lines = [t.name];
+      if (t.users !== null && t.users !== undefined) {
+        lines.push(t.users + " users");
+      }
+      lines.push(
+        Math.round(t.amount).toLocaleString() +
+          " credits (" +
+          pct.toFixed(1) +
+          "%)"
+      );
+      return lines;
+    }
+
+    new Chart(canvas.getContext("2d"), {
+      type: "treemap",
+      data: {
+        datasets: [
+          {
+            tree: tiles,
+            key: "amount",
+            borderColor: "#ffffff",
+            borderWidth: 2,
+            spacing: 1,
+            backgroundColor: function (ctx) {
+              return ctx.type === "data" ? tiles[ctx.dataIndex].colour : "transparent";
+            },
+            labels: {
+              display: true,
+              color: "#ffffff",
+              font: { size: 14 },
+              formatter: function (ctx) {
+                return tileLine(ctx.dataIndex);
+              },
+            },
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          title: { display: !!spec.root, text: spec.root || "" },
+          tooltip: {
+            callbacks: {
+              title: function () {
+                return "";
+              },
+              label: function (ctx) {
+                return tileLine(ctx.dataIndex).join(" · ");
+              },
+            },
+          },
+        },
       },
     });
   }
