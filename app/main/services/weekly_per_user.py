@@ -76,6 +76,30 @@ def _day_from_per_user_path(path: str) -> str:
     return parts[parts.index("reports") + 1]
 
 
+def record_from_items(day: str, user: str, items: list[dict]) -> dict | None:
+    """One (day, user) record with usage summed per model.
+
+    Returns None when there are no items or no positive credit usage, so callers
+    can skip non-spenders. Mirrors the shape rollup_weekly expects.
+    """
+    if not items:
+        return None
+    per_model: dict[str, float] = defaultdict(float)
+    credits = 0.0
+    usd = 0.0
+    for it in items:
+        cr = it.get("grossQuantity", 0.0)
+        per_model[it["model"]] += cr
+        credits += cr
+        usd += it.get("grossAmount", 0.0)
+    if credits <= 0:
+        return None
+    return {
+        "day": day, "user": user,
+        "credits": credits, "usd": usd, "per_model": dict(per_model),
+    }
+
+
 def load_weekly_records(glob_pattern: str = PER_USER_GLOB) -> list[dict]:
     """One record per (day, user) with usage, summed per model. Skips empties."""
     records = []
@@ -83,20 +107,7 @@ def load_weekly_records(glob_pattern: str = PER_USER_GLOB) -> list[dict]:
         login = os.path.splitext(os.path.basename(path))[0]
         with open(path) as f:
             items = json.load(f).get("usageItems", [])
-        if not items:
-            continue
-        per_model: dict[str, float] = defaultdict(float)
-        credits = 0.0
-        usd = 0.0
-        for it in items:
-            cr = it.get("grossQuantity", 0.0)
-            per_model[it["model"]] += cr
-            credits += cr
-            usd += it.get("grossAmount", 0.0)
-        if credits <= 0:
-            continue
-        records.append({
-            "day": _day_from_per_user_path(path), "user": login,
-            "credits": credits, "usd": usd, "per_model": dict(per_model),
-        })
+        rec = record_from_items(_day_from_per_user_path(path), login, items)
+        if rec is not None:
+            records.append(rec)
     return records

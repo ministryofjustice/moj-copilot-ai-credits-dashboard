@@ -65,6 +65,26 @@ def test_rollup_weekly_empty_returns_empty_list():
     assert rows == []
 
 
+def test_record_from_items_sums_per_model():
+    rec = wpu.record_from_items("2026-06-01", "alice", [
+        {"model": "Opus", "grossQuantity": 100.0, "grossAmount": 1.0},
+        {"model": "Opus", "grossQuantity": 20.0, "grossAmount": 0.2},
+        {"model": "Haiku", "grossQuantity": 5.0, "grossAmount": 0.05},
+    ])
+    assert rec == {
+        "day": "2026-06-01", "user": "alice",
+        "credits": approx(125.0), "usd": approx(1.25),
+        "per_model": {"Opus": approx(120.0), "Haiku": approx(5.0)},
+    }
+
+
+def test_record_from_items_returns_none_when_no_usage():
+    assert wpu.record_from_items("2026-06-01", "empty", []) is None
+    assert wpu.record_from_items("2026-06-01", "zero", [
+        {"model": "Opus", "grossQuantity": 0.0, "grossAmount": 0.0},
+    ]) is None
+
+
 def _write_per_user(tmp_path, day, login, items):
     d = tmp_path / "reports" / day / "billing" / "per-user"
     d.mkdir(parents=True, exist_ok=True)
