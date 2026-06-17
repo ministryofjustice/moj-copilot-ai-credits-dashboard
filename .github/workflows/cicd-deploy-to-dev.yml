@@ -38,7 +38,7 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
   deploy-to-dev:
-    # needs: build-push
+    needs: build-push
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
