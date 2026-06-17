@@ -13,9 +13,9 @@ services:
       FLASK_DEBUG: true
 
       # Auth0
-      AUTH0_CLIENT_ID=dev
-      AUTH0_CLIENT_SECRET=dev
-      AUTH0_DOMAIN=check-your-co-pilot-usage-dev.eu.auth0.com
+      AUTH0_CLIENT_ID:dev
+      AUTH0_CLIENT_SECRET:dev
+      AUTH0_DOMAIN:check-your-co-pilot-usage-dev.eu.auth0.com
 
       # Sentry
       # SENTRY_DSN_KEY:
