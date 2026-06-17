@@ -15,10 +15,22 @@ spec:
     spec:
       # serviceAccountName created by the Cloud Platform environment
       serviceAccountName: cd-serviceaccount
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.app.deployment.image.repository }}:{{ .Values.app.deployment.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - "ALL"
+            runAsNonRoot: true
+            seccompProfile:
+              type: RuntimeDefault
           env:
             - name: APP_SECRET_KEY
               value: {{ .Values.app.deployment.env.APP_SECRET_KEY | quote }}

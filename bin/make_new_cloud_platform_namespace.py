@@ -9,7 +9,7 @@ from datetime import datetime
 REPO_URL = "git@github.com:ministryofjustice/cloud-platform-environments.git"
 REPO_DIR = "./cloud-platform-environments"
 NAMESPACE_DIR = "namespaces/live.cloud-platform.service.justice.gov.uk"
-SOURCE_NAMESPACE = "operations-engineering-flask-template"
+SOURCE_NAMESPACE = "moj-copilot-ai-credits-dashboard"
 BRANCH_PREFIX = "add-new-namespace"
 
 logging.basicConfig(
