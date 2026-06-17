@@ -36,6 +36,12 @@ spec:
               value: {{ .Values.app.deployment.env.APP_SECRET_KEY | quote }}
             - name: FLASK_DEBUG
               value: {{ .Values.app.deployment.env.FLASK_DEBUG | quote }}
+            - name: AUTH0_DOMAIN
+              value: {{ .Values.app.deployment.env.AUTH0_DOMAIN | quote }}
+            - name: AUTH0_CLIENT_ID
+              value: {{ .Values.app.deployment.env.AUTH0_CLIENT_ID | quote }}
+            - name: AUTH0_CLIENT_SECRET
+              value: {{ .Values.app.deployment.env.AUTH0_CLIENT_SECRET | quote }}
             - name: SENTRY_DSN_KEY
               value: {{ .Values.app.deployment.env.SENTRY_DSN_KEY }}
             - name: SENTRY_ENV

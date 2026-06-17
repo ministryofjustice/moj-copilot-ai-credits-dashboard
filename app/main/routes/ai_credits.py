@@ -15,11 +15,13 @@ from flask import Blueprint, render_template, request
 
 from app.main.services import ai_credits as ac
 from app.main.services.reports_source import get_reports_source
+from app.main.middleware.auth import requires_auth
 
 ai_credits = Blueprint("ai_credits", __name__)
 
 
 @ai_credits.route("/")
+@requires_auth
 def my_usage():
     view = ac.user_view(
         get_reports_source(),
@@ -31,12 +33,14 @@ def my_usage():
 
 
 @ai_credits.route("/admin")
+@requires_auth
 def admin_daily():
     view = ac.daily_view(get_reports_source(), request.args.get("day"))
     return render_template("pages/admin_daily.html", v=view)
 
 
 @ai_credits.route("/admin/weekly")
+@requires_auth
 def admin_weekly():
     view = ac.weekly_view(
         get_reports_source(), request.args.get("plan"), request.args.get("week")

@@ -5,6 +5,7 @@ app:
   deployment:
     replicaCount: 1
     env:
+      AUTH0_DOMAIN: "check-your-co-pilot-usage-dev.eu.auth0.com"
       SENTRY_ENV: "development"
       FLASK_DEBUG: true
       REPORTS_SOURCE: "s3"
