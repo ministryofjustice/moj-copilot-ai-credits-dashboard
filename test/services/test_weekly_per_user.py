@@ -22,8 +22,8 @@ def test_week_span_returns_monday_and_sunday():
     assert wpu.week_span(2026, 24) == (date(2026, 6, 8), date(2026, 6, 14))
 
 
-def _rec(day, user, credits, usd, per_model):
-    return {"day": day, "user": user, "credits": credits, "usd": usd,
+def _rec(day, user, credits_val, usd, per_model):
+    return {"day": day, "user": user, "credits": credits_val, "usd": usd,
             "per_model": per_model}
 
 
@@ -62,7 +62,7 @@ def test_rollup_weekly_splits_users_and_weeks():
 
 def test_rollup_weekly_empty_returns_empty_list():
     rows = wpu.rollup_weekly([])
-    assert rows == []
+    assert not rows
 
 
 def test_record_from_items_sums_per_model():

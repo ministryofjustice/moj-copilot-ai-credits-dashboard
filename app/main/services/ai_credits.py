@@ -54,8 +54,8 @@ def plan_limits(plan: str) -> dict:
 def _totals(items: list[dict]) -> tuple[float, float, float]:
     gross = sum(i.get("grossAmount", 0.0) for i in items)
     net = sum(i.get("netAmount", 0.0) for i in items)
-    credits = sum(i.get("grossQuantity", 0.0) for i in items)
-    return gross, net, credits
+    total_credits = sum(i.get("grossQuantity", 0.0) for i in items)
+    return gross, net, total_credits
 
 
 def _by_model(items: list[dict]) -> list[dict]:
@@ -70,7 +70,7 @@ def _by_model(items: list[dict]) -> list[dict]:
     return rows
 
 
-def daily_view(source: ReportsSource, day: str | None = None) -> dict:
+def daily_view(source: ReportsSource, day: str | None = None) -> dict:  # pylint: disable=too-many-locals
     """Everything the Daily admin page needs for one day, plus the MTD trend."""
     docs = source.daily_docs()
     if not docs:
@@ -81,7 +81,7 @@ def daily_view(source: ReportsSource, day: str | None = None) -> dict:
     doc = docs[day]
     scope = doc.get("organization") or doc.get("enterprise") or "?"
     items = doc.get("usageItems", [])
-    gross, net, credits = _totals(items)
+    gross, net, total_credits = _totals(items)
 
     by_model = _by_model(items)
     for r in by_model:
@@ -110,7 +110,7 @@ def daily_view(source: ReportsSource, day: str | None = None) -> dict:
         "day": day,
         "scope": scope,
         "metrics": {
-            "gross": gross, "net": net, "covered": gross - net, "credits": credits,
+            "gross": gross, "net": net, "covered": gross - net, "credits": total_credits,
         },
         "fully_covered": net == 0 and gross > 0,
         "by_model": by_model,
@@ -181,11 +181,11 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
 
     rows = []
     for r in wk:
-        credits = float(r["credits"])
+        credits_val = float(r["credits"])
         rows.append({
-            "user": r["user"], "credits": credits,
-            "pct": (credits / allowance) if allowance else 0.0,
-            "remaining": allowance - credits,
+            "user": r["user"], "credits": credits_val,
+            "pct": (credits_val / allowance) if allowance else 0.0,
+            "remaining": allowance - credits_val,
             "top_model": r["top_model"], "day_count": int(r["day_count"]),
         })
     rows.sort(key=lambda x: x["credits"], reverse=True)
@@ -201,7 +201,7 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
     }
 
 
-def user_view(
+def user_view(  # pylint: disable=too-many-locals
     source: ReportsSource,
     login: str | None,
     plan: str | None,
@@ -235,12 +235,12 @@ def user_view(
     all_rows = wpu.rollup_weekly(records)
     weekly_rows = []
     for r in (row for row in all_rows if row["user"] == login_str):
-        credits = float(r["credits"])
+        credits_val = float(r["credits"])
         mon, sun = wpu.week_span(int(r["iso_year"]), int(r["iso_week"]))
         weekly_rows.append({
-            "week_label": r["week_label"], "credits": credits,
-            "pct": (credits / allowance) if allowance else 0.0,
-            "remaining": allowance - credits, "day_count": int(r["day_count"]),
+            "week_label": r["week_label"], "credits": credits_val,
+            "pct": (credits_val / allowance) if allowance else 0.0,
+            "remaining": allowance - credits_val, "day_count": int(r["day_count"]),
             "top_model": r["top_model"], "span": f"{mon:%d %b} – {sun:%d %b}",
         })
     weekly_rows.sort(key=lambda x: x["week_label"])

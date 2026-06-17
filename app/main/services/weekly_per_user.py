@@ -85,18 +85,18 @@ def record_from_items(day: str, user: str, items: list[dict]) -> dict | None:
     if not items:
         return None
     per_model: dict[str, float] = defaultdict(float)
-    credits = 0.0
+    total_credits = 0.0
     usd = 0.0
     for it in items:
         cr = it.get("grossQuantity", 0.0)
         per_model[it["model"]] += cr
-        credits += cr
+        total_credits += cr
         usd += it.get("grossAmount", 0.0)
-    if credits <= 0:
+    if total_credits <= 0:
         return None
     return {
         "day": day, "user": user,
-        "credits": credits, "usd": usd, "per_model": dict(per_model),
+        "credits": total_credits, "usd": usd, "per_model": dict(per_model),
     }
 
 
@@ -105,7 +105,7 @@ def load_weekly_records(glob_pattern: str = PER_USER_GLOB) -> list[dict]:
     records = []
     for path in sorted(glob.glob(glob_pattern)):
         login = os.path.splitext(os.path.basename(path))[0]
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             items = json.load(f).get("usageItems", [])
         rec = record_from_items(_day_from_per_user_path(path), login, items)
         if rec is not None:

@@ -33,7 +33,7 @@ class S3ReportsSource(ReportsSource):
         if client is not None:
             self._client = client
         else:
-            import boto3
+            import boto3  # pylint: disable=import-outside-toplevel
 
             region = os.getenv("AWS_DEFAULT_REGION") or "eu-west-2"
             self._client = boto3.client("s3", region_name=region)
