@@ -46,10 +46,10 @@ jobs:
 
       - name: Authenticate to the cluster
         run: |
-          echo "${DEV_KUBE_CERT}" > ca.crt
+          echo "${KUBE_CERT}" > ca.crt
           kubectl config set-cluster ${KUBE_CLUSTER} --certificate-authority=./ca.crt --server=https://${KUBE_CLUSTER}
-          kubectl config set-credentials deploy-user --token=${DEV_KUBE_TOKEN}
-          kubectl config set-context ${KUBE_CLUSTER} --cluster=${KUBE_CLUSTER} --user=deploy-user --namespace=${DEV_KUBE_NAMESPACE}
+          kubectl config set-credentials deploy-user --token=${KUBE_TOKEN}
+          kubectl config set-context ${KUBE_CLUSTER} --cluster=${KUBE_CLUSTER} --user=deploy-user --namespace=${KUBE_NAMESPACE}
           kubectl config get-contexts
           kubectl config use-context ${KUBE_CLUSTER}
 
@@ -61,7 +61,7 @@ jobs:
             --force \
             --wait \
             --timeout 10m \
-            --namespace ${DEV_KUBE_NAMESPACE} \
+            --namespace ${KUBE_NAMESPACE} \
             --values=helm/application/values-dev.yaml \
             # --set app.deployment.env.APP_SECRET_KEY=${FLASK_APP_SECRET} \
             # --set app.deployment.env.SENTRY_DSN_KEY=${SENTRY_DSN_KEY} \
