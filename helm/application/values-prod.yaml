@@ -7,3 +7,11 @@ app:
     env:
       SENTRY_ENV: "production"
       FLASK_DEBUG: false
+      REPORTS_SOURCE: "s3"
+    s3:
+      # Confirm against `kubectl get secrets -n moj-copilot-ai-credits-dashboard-prod`.
+      # Defaults follow the standard Cloud Platform S3 module output secret.
+      secretName: "s3-bucket-output"
+      bucketNameKey: "bucket_name"
+      prefix: "reports"
+      region: "eu-west-2"
