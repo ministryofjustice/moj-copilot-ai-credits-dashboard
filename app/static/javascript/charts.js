@@ -93,7 +93,7 @@
       }
       lines.push(
         Math.round(t.amount).toLocaleString() +
-          " cr · $" +
+          " AI Credits · $" +
           Math.round(t.amount / 100).toLocaleString() +
           " (" +
           pct.toFixed(1) +
