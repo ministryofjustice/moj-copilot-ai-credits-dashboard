@@ -30,28 +30,28 @@ def fake_source():
     return _FakeSource
 
 
+def _build_record(day, user, amount):
+    return {
+        "day": day,
+        "user": user,
+        "credits": amount,
+        "usd": amount / 100.0,
+        "per_model": {"gpt": amount},
+    }
+
+
 @pytest.fixture
 def make_record():
     """Return a factory building one weekly report record."""
-
-    def _build(day, user, amount):
-        return {
-            "day": day,
-            "user": user,
-            "credits": amount,
-            "usd": amount / 100.0,
-            "per_model": {"gpt": amount},
-        }
-
-    return _build
+    return _build_record
 
 
 @pytest.fixture
-def week_records(make_record):
+def week_records():
     """Four weekly records inside ISO week 2026-W23 / month 2026-06."""
     return [
-        make_record("2026-06-01", "a", 2000.0),
-        make_record("2026-06-02", "b", 50.0),
-        make_record("2026-06-03", "c", 30.0),
-        make_record("2026-06-04", "d", 20.0),
+        _build_record("2026-06-01", "a", 2000.0),
+        _build_record("2026-06-02", "b", 50.0),
+        _build_record("2026-06-03", "c", 30.0),
+        _build_record("2026-06-04", "d", 20.0),
     ]
