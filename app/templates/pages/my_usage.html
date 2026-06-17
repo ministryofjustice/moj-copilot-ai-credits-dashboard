@@ -42,7 +42,62 @@
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-full">
 
-      {# ---- Week selector (first) ---- #}
+      {# ---- Usage heatmap (rolling window) — first, after the inputs ---- #}
+      <h3 class="govuk-heading-s">Daily usage heatmap (last {{ v.calendar.weeks | length }} weeks)</h3>
+      <p class="govuk-body-s">Each square is one day, shaded by credits used against the
+        {{ "%.1f"|format(v.limits.daily) }}-credit daily allowance. Blank = no usage captured.</p>
+
+      <style>
+        .heatmap-months { display: grid; grid-auto-flow: column;
+          grid-auto-columns: 14px; gap: 3px; width: max-content;
+          margin-left: 18px; margin-bottom: 2px;
+          font-size: 10px; line-height: 1; color: #505a5f; }
+        .heatmap-body { display: flex; align-items: flex-start; gap: 4px; }
+        .heatmap-grid { display: grid; grid-auto-flow: column;
+          grid-template-rows: repeat(7, 14px); grid-auto-columns: 14px; gap: 3px; }
+        .heatmap-cell { width: 14px; height: 14px; border-radius: 2px; }
+        .heatmap-weekdays { display: grid; grid-template-rows: repeat(7, 14px);
+          gap: 3px; width: 14px; text-align: right;
+          font-size: 10px; line-height: 14px; color: #505a5f; }
+        .heatmap-legend { display: flex; align-items: center; gap: 4px; margin-top: 8px; }
+        .heatmap-legend .heatmap-cell { display: inline-block; }
+      </style>
+
+      {% set month_at = {} %}
+      {% for ml in v.calendar.month_labels %}{{- month_at.update({ml.col: ml.text[0]}) or "" -}}{% endfor %}
+
+      <div class="heatmap-months" aria-hidden="true">
+        {% for col in range(v.calendar.weeks | length) %}<span>{{ month_at.get(col, "") }}</span>{% endfor %}
+      </div>
+
+      <div class="heatmap-body">
+        <div class="heatmap-weekdays" aria-hidden="true">
+          {% for d in ["M", "T", "W", "T", "F", "S", "S"] %}<span>{{ d }}</span>{% endfor %}
+        </div>
+        <div class="heatmap-grid" role="img" aria-label="Daily AI-credit usage over the last {{ v.calendar.weeks | length }} weeks">
+          {% for col in v.calendar.weeks %}{% for cell in col %}
+            {% set colour = v.calendar.levels[cell.level].colour %}
+            <span class="heatmap-cell" style="background:{{ colour }};"
+                  title="{{ cell.label }}" aria-label="{{ cell.label }}"></span>
+          {% endfor %}{% endfor %}
+        </div>
+      </div>
+
+      <div class="heatmap-legend govuk-body-s">
+        <span>Less</span>
+        {% for lvl in v.calendar.levels[:4] %}
+          <span class="heatmap-cell" style="background:{{ lvl.colour }};"></span>
+        {% endfor %}
+        <span>More</span>
+        <span class="govuk-!-margin-left-3">
+          <span class="heatmap-cell" style="background:{{ v.calendar.levels[4].colour }};"></span>
+          Over budget
+        </span>
+      </div>
+
+      <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+      {# ---- Week selector ---- #}
       <form method="get" action="/" class="govuk-!-margin-bottom-4">
         <input type="hidden" name="user" value="{{ v.login }}">
         <input type="hidden" name="plan" value="{{ v.plan }}">
@@ -56,7 +111,7 @@
         </div>
       </form>
 
-      {# ---- Selected-week detail (top) ---- #}
+      {# ---- Selected-week detail: credits used / remaining / % ---- #}
       <h3 class="govuk-heading-s">{{ v.week }} · {{ v.span }} (resets Monday) · {{ v.day_count }} active day(s)</h3>
       <div class="govuk-grid-row">
         {% set cards = [
@@ -77,15 +132,6 @@
         {{ govukInsetText({"text": "Over the weekly allowance by " ~ "%.1f"|format(-v.remaining) ~ " credits."}) }}
       {% endif %}
 
-      {# ---- Per-week usage vs the weekly limit ---- #}
-      <h2 class="govuk-heading-m">{{ v.login }} — weekly usage</h2>
-      <p class="govuk-body-s">
-        Credits used per ISO week against the {{ "%.0f"|format(v.limits.weekly) }}-credit weekly allowance ({{ v.plan }}).
-      </p>
-      <div style="height:340px;"><canvas data-chart="userWeekly"></canvas></div>
-
-      <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
-
       {# ---- Daily breakdown for the selected week ---- #}
       <h3 class="govuk-heading-s">Daily usage in {{ v.week }} ({{ v.week_ranges[v.week] }})</h3>
       <div style="height:300px;"><canvas data-chart="userDaily"></canvas></div>
@@ -94,6 +140,15 @@
       <h3 class="govuk-heading-s govuk-!-margin-top-6">Month-to-date ({{ v.mtd.month }})</h3>
       <p class="govuk-body-s">Total this month: <strong>{{ "%.1f"|format(v.mtd.total_credits) }}</strong> credits.</p>
       <div style="max-width:760px; height:300px;"><canvas data-chart="userMTD"></canvas></div>
+
+      <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+      {# ---- Per-week usage vs the weekly limit — kept at the bottom ---- #}
+      <h2 class="govuk-heading-m">{{ v.login }} — weekly usage</h2>
+      <p class="govuk-body-s">
+        Credits used per ISO week against the {{ "%.0f"|format(v.limits.weekly) }}-credit weekly allowance ({{ v.plan }}).
+      </p>
+      <div style="height:340px;"><canvas data-chart="userWeekly"></canvas></div>
 
       {% set charts = {
         "userWeekly": {"type": "bar", "labels": v.weekly_chart.labels,
