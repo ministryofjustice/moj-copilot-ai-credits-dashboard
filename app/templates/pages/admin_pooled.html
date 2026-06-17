@@ -44,7 +44,7 @@
 
 <p class="govuk-body-s">
   {{ v.span }} · {{ v.period }} pool · {{ v.seats }} seat(s) ·
-  per-seat allowance {{ "%.0f"|format(v.allowance) }} credits ·
+  per-seat allowance {{ "%.0f"|format(v.allowance) }} credits (${{ "%.0f"|format(v.allowance / 100) }}) ·
   {{ v.active_users }} active user(s)
 </p>
 
@@ -56,16 +56,17 @@
 
 <div class="govuk-grid-row">
   {% set cards = [
-    ("Included pool", "%.0f"|format(v.metrics.pool)),
-    ("Gross usage", "%.0f"|format(v.metrics.gross)),
-    ("Overage", "%.0f"|format(v.metrics.overage)),
-    ("Total bill", "%.0f"|format(v.metrics.total))
+    ("Included pool", "%.0f"|format(v.metrics.pool), "%.0f"|format(v.metrics.pool / 100)),
+    ("Gross usage", "%.0f"|format(v.metrics.gross), "%.0f"|format(v.metrics.gross / 100)),
+    ("Overage", "%.0f"|format(v.metrics.overage), "%.0f"|format(v.metrics.overage / 100)),
+    ("Total bill", "%.0f"|format(v.metrics.total), "%.0f"|format(v.metrics.total / 100))
   ] %}
-  {% for label, value in cards %}
+  {% for label, value, usd in cards %}
   <div class="govuk-grid-column-one-quarter">
     <div style="border:1px solid #b1b4b6; padding:15px; margin-bottom:15px;">
       <span class="govuk-caption-m">{{ label }}</span>
-      <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ value }}</span>
+      <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ value }} cr</span>
+      <span class="govuk-body-s govuk-!-margin-bottom-0">${{ usd }}</span>
     </div>
   </div>
   {% endfor %}

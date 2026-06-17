@@ -277,7 +277,8 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,
         "metrics": {"pool": pool, "gross": gross, "overage": overage,
                     "total": total, "headroom": headroom},
         "tiles": tiles,
-        "treemap": {"type": "treemap", "root": f"Total bill {total:,.0f} credits",
+        "treemap": {"type": "treemap",
+                    "root": f"Total bill {total:,.0f} credits (${total / 100:,.0f})",
                     "total": total, "tiles": tiles},
     }
 

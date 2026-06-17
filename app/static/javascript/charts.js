@@ -79,8 +79,13 @@
         return s + t.amount;
       }, 0);
 
-    function tileLine(i) {
-      var t = tiles[i];
+    // The treemap plugin sorts tiles by value, so ctx.dataIndex does NOT match
+    // the original `tiles` order — read the source object from ctx.raw._data.
+    function tileData(ctx) {
+      return ctx && ctx.raw && ctx.raw._data ? ctx.raw._data : null;
+    }
+
+    function tileLine(t) {
       var pct = total ? (t.amount / total) * 100 : 0;
       var lines = [t.name];
       if (t.users !== null && t.users !== undefined) {
@@ -88,7 +93,9 @@
       }
       lines.push(
         Math.round(t.amount).toLocaleString() +
-          " credits (" +
+          " cr · $" +
+          Math.round(t.amount / 100).toLocaleString() +
+          " (" +
           pct.toFixed(1) +
           "%)"
       );
@@ -106,14 +113,16 @@
             borderWidth: 2,
             spacing: 1,
             backgroundColor: function (ctx) {
-              return ctx.type === "data" ? tiles[ctx.dataIndex].colour : "transparent";
+              var t = tileData(ctx);
+              return ctx.type === "data" && t ? t.colour : "transparent";
             },
             labels: {
               display: true,
               color: "#ffffff",
               font: { size: 14 },
               formatter: function (ctx) {
-                return tileLine(ctx.dataIndex);
+                var t = tileData(ctx);
+                return t ? tileLine(t) : "";
               },
             },
           },
@@ -131,7 +140,8 @@
                 return "";
               },
               label: function (ctx) {
-                return tileLine(ctx.dataIndex).join(" · ");
+                var t = tileData(ctx);
+                return t ? tileLine(t).join(" · ") : "";
               },
             },
           },
