@@ -487,4 +487,5 @@ def user_view(  # pylint: disable=too-many-locals
         "top_model": current["top_model"],
         "daily": daily_rows, "daily_chart": daily_chart,
         "mtd": mtd,
+        "calendar": _usage_calendar(urecs, limits["daily"]),
     }
