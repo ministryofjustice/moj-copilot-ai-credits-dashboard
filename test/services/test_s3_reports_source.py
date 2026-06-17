@@ -92,3 +92,17 @@ def test_weekly_records_built_from_all_days():
     day1 = next(r for r in records if r["day"] == "2026-06-01")
     assert day1["credits"] == pytest.approx(100.0)
     assert day1["per_model"] == {"Opus": pytest.approx(100.0)}
+
+
+def test_custom_prefix_is_honoured():
+    src = _source({
+        "data/2026-06-01/billing/ai-credit-usage.json": {
+            "enterprise": "MoJ", "usageItems": [{"model": "Opus"}]},
+    }, prefix="data")
+    assert list(src.daily_docs()) == ["2026-06-01"]
+
+
+def test_missing_bucket_raises(monkeypatch):
+    monkeypatch.delenv("REPORTS_S3_BUCKET", raising=False)
+    with pytest.raises(ValueError, match="REPORTS_S3_BUCKET"):
+        S3ReportsSource(client=FakeS3Client({}))
