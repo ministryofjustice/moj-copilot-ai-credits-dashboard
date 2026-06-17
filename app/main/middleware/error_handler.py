@@ -22,7 +22,12 @@ def server_forbidden(err: Exception):
 
 def unknown_server_error(err: Exception):
     logger.info("An unknown server error occurred: %s", err)
-    return render_template("pages/errors/500.html"), 500
+    original = getattr(err, "original_exception", None) or err
+    error_detail = f"{type(original).__name__}: {original}"
+    return (
+        render_template("pages/errors/500.html", error_detail=error_detail),
+        500,
+    )
 
 
 def gateway_timeout(err: Exception):

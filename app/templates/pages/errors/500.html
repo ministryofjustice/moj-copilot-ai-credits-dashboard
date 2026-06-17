@@ -8,6 +8,12 @@
     <div class="govuk-grid-row">
         <div class="govuk-grid-column-two-thirds">
             <h1 class="govuk-heading-xl">Unknown server error (500 error)</h1>
+            {% if error_detail %}
+            <div class="govuk-inset-text govuk-!-margin-top-4">
+                <p class="govuk-body govuk-!-margin-bottom-1"><strong>Error detail:</strong></p>
+                <p class="govuk-body" style="word-break:break-word;"><code>{{ error_detail }}</code></p>
+            </div>
+            {% endif %}
         </div>
     </div>
 {% endblock %}
