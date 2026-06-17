@@ -6,6 +6,7 @@ replacement for Streamlit's reactive widgets):
     /              My usage   — ?user=<login>&plan=<plan>
     /admin         Org daily  — ?day=YYYY-MM-DD
     /admin/weekly  Org weekly — ?plan=<plan>&week=YYYY-Www
+    /admin/pooled  Org pooled — ?period=weekly|monthly&key=<key>&plan=<plan>&seats=<n>
 
 The data backend is resolved per request via `get_reports_source()` (local files
 today, S3/DB later) so these handlers never touch storage directly.
@@ -42,3 +43,15 @@ def admin_weekly():
         get_reports_source(), request.args.get("plan"), request.args.get("week")
     )
     return render_template("pages/admin_weekly.html", v=view)
+
+
+@ai_credits.route("/admin/pooled")
+def admin_pooled():
+    view = ac.pooled_view(
+        get_reports_source(),
+        request.args.get("period"),
+        request.args.get("key"),
+        request.args.get("plan"),
+        request.args.get("seats"),
+    )
+    return render_template("pages/admin_pooled.html", v=view)
