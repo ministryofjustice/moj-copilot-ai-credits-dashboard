@@ -46,6 +46,22 @@
   {{ govukInsetText({"text": "Net is $0 — fully covered by the monthly allowance so far. Watch the month-to-date gross below to see when the pool runs out."}) }}
 {% endif %}
 
+<h3 class="govuk-heading-s">Month-to-date trend</h3>
+{% if not v.trend %}
+  {{ govukInsetText({"text": "Only one day captured. The trend appears once you have 2+ days."}) }}
+{% else %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-one-half">
+    <p class="govuk-body-s">Daily gross vs net</p>
+    <div style="height:300px;"><canvas data-chart="trendGrossNet"></canvas></div>
+  </div>
+  <div class="govuk-grid-column-one-half">
+    <p class="govuk-body-s">Cumulative gross (allowance burn)</p>
+    <div style="height:300px;"><canvas data-chart="trendCumulative"></canvas></div>
+  </div>
+</div>
+{% endif %}
+
 {% if v.by_model %}
 <h3 class="govuk-heading-s">Spend by model (gross)</h3>
 <div class="govuk-grid-row">
@@ -73,22 +89,6 @@
   </div>
   <div class="govuk-grid-column-one-half">
     <div style="height:360px;"><canvas data-chart="model"></canvas></div>
-  </div>
-</div>
-{% endif %}
-
-<h3 class="govuk-heading-s">Month-to-date trend</h3>
-{% if not v.trend %}
-  {{ govukInsetText({"text": "Only one day captured. The trend appears once you have 2+ days."}) }}
-{% else %}
-<div class="govuk-grid-row">
-  <div class="govuk-grid-column-one-half">
-    <p class="govuk-body-s">Daily gross vs net</p>
-    <div style="height:300px;"><canvas data-chart="trendGrossNet"></canvas></div>
-  </div>
-  <div class="govuk-grid-column-one-half">
-    <p class="govuk-body-s">Cumulative gross (allowance burn)</p>
-    <div style="height:300px;"><canvas data-chart="trendCumulative"></canvas></div>
   </div>
 </div>
 {% endif %}
