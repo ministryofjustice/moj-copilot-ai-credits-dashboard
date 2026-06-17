@@ -84,15 +84,16 @@ class LocalFsReportsSource(ReportsSource):
 
 def get_reports_source() -> ReportsSource:
     """Pick the source from config. REPORTS_SOURCE = local (default) | s3 | db."""
+    # pylint: disable=import-outside-toplevel
     backend = (os.getenv("REPORTS_SOURCE") or "local").lower()
     if backend == "local":
         return LocalFsReportsSource(os.getenv("REPORTS_DIR") or "reports")
     if backend == "s3":
-        from app.main.services.s3_reports_source import S3ReportsSource  # pylint: disable=import-outside-toplevel
+        from app.main.services.s3_reports_source import S3ReportsSource
 
         return S3ReportsSource()
     if backend == "db":
-        from app.main.services.db_reports_source import DbReportsSource  # pylint: disable=import-outside-toplevel
+        from app.main.services.db_reports_source import DbReportsSource
 
         return DbReportsSource()
     raise ValueError(f"Unknown REPORTS_SOURCE: {backend!r} (expected local|s3|db)")
