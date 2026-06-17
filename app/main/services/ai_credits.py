@@ -164,6 +164,14 @@ def _week_labels(rows: list[dict]) -> list[str]:
     return list(dict.fromkeys(r["week_label"] for r in rows))
 
 
+def _week_ranges(rows: list[dict]) -> dict[str, str]:
+    """Map each ISO week label to its compact 'from–to' date range."""
+    return {
+        r["week_label"]: wpu.format_week_range(int(r["iso_year"]), int(r["iso_week"]))
+        for r in rows
+    }
+
+
 def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> dict:
     """Org weekly per-user allowance table for one ISO week."""
     all_rows = _weekly_rows(source)
@@ -178,6 +186,7 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
     wk = [r for r in all_rows if r["week_label"] == week]
     iso_year, iso_week = int(wk[0]["iso_year"]), int(wk[0]["iso_week"])
     mon, sun = wpu.week_span(iso_year, iso_week)
+    week_ranges = _week_ranges(all_rows)
 
     rows = []
     for r in wk:
@@ -195,6 +204,7 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
         "has_data": True,
         "plans": plan_labels(), "plan": plan, "allowance": allowance,
         "weeks": weeks, "week": week,
+        "week_ranges": week_ranges,
         "span": f"{mon:%a %d %b} – {sun:%a %d %b}",
         "active_users": len(rows),
         "rows": rows, "over": over,
@@ -245,8 +255,9 @@ def user_view(  # pylint: disable=too-many-locals
         })
     weekly_rows.sort(key=lambda x: x["week_label"])
     weeks = [w["week_label"] for w in weekly_rows]
+    week_ranges = _week_ranges(all_rows)
     weekly_chart = {
-        "labels": weeks,
+        "labels": [f"{w} ({week_ranges[w]})" for w in weeks],
         "credits": [round(w["credits"], 1) for w in weekly_rows],
     }
 
@@ -282,6 +293,7 @@ def user_view(  # pylint: disable=too-many-locals
         **base,
         "searched": True, "found": True,
         "weeks": weeks, "weekly": weekly_rows, "weekly_chart": weekly_chart,
+        "week_ranges": week_ranges,
         "week": selected, "span": current["span"],
         "used": current["credits"], "remaining": current["remaining"],
         "pct": current["pct"], "day_count": current["day_count"],

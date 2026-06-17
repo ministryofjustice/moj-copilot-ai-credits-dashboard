@@ -22,6 +22,20 @@ def test_week_span_returns_monday_and_sunday():
     assert wpu.week_span(2026, 24) == (date(2026, 6, 8), date(2026, 6, 14))
 
 
+def test_format_week_range_same_month():
+    assert wpu.format_week_range(2026, 23) == "1–7 Jun"
+
+
+def test_format_week_range_spanning_months():
+    # 2026-W27: Mon 29 Jun – Sun 5 Jul
+    assert wpu.format_week_range(2026, 27) == "29 Jun – 5 Jul"
+
+
+def test_format_week_range_spanning_years():
+    # 2026-W01: Mon 29 Dec 2025 – Sun 4 Jan 2026
+    assert wpu.format_week_range(2026, 1) == "29 Dec – 4 Jan"
+
+
 def _rec(day, user, credits_val, usd, per_model):
     return {"day": day, "user": user, "credits": credits_val, "usd": usd,
             "per_model": per_model}

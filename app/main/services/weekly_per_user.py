@@ -25,6 +25,19 @@ def week_span(iso_year: int, iso_week: int) -> tuple[date, date]:
     return monday, sunday
 
 
+def format_week_range(iso_year: int, iso_week: int) -> str:
+    """Compact 'from–to' range for an ISO week, e.g. '1–7 Jun'.
+
+    Drops the repeated month when the week stays within one (e.g. '1–7 Jun'),
+    and spells out both months when it straddles a boundary (e.g. '29 Jun – 5
+    Jul', '29 Dec – 4 Jan'). Years are omitted to keep it short.
+    """
+    monday, sunday = week_span(iso_year, iso_week)
+    if monday.month == sunday.month:
+        return f"{monday.day}–{sunday.day} {monday:%b}"
+    return f"{monday.day} {monday:%b} – {sunday.day} {sunday:%b}"
+
+
 def rollup_weekly(records: list[dict]) -> list[dict]:
     """Sum per-(week, user) credits/usd from per-day records.
 
