@@ -136,3 +136,28 @@ def test_load_weekly_records_reads_and_sums_per_model(tmp_path):
     assert rec["credits"] == approx(125.0)
     assert rec["usd"] == approx(1.25)
     assert rec["per_model"] == {"Opus": approx(120.0), "Haiku": approx(5.0)}
+
+
+def test_assign_tiers_bins_users_by_spend_rank():
+    # 20 distinct spenders, descending credits.
+    credits = {f"u{i:02d}": float(100 - i) for i in range(20)}
+    tiers = wpu.assign_tiers(credits)
+    counts = {t: 0 for t in wpu.TIER_ORDER}
+    for t in tiers.values():
+        counts[t] += 1
+    # frac = rank/20: Power<=.05 (1), Heavy<=.20 (3), Typical<=.75 (11), Light (5)
+    assert counts == {"Power": 1, "Heavy": 3, "Typical": 11, "Light": 5}
+    # Highest spender is Power, lowest is Light.
+    assert tiers["u00"] == "Power"
+    assert tiers["u19"] == "Light"
+
+
+def test_assign_tiers_empty_input():
+    assert wpu.assign_tiers({}) == {}
+
+
+def test_assign_tiers_assigns_every_user():
+    credits = {"a": 5.0, "b": 5.0, "c": 1.0}
+    tiers = wpu.assign_tiers(credits)
+    assert set(tiers) == {"a", "b", "c"}
+    assert all(t in wpu.TIER_ORDER for t in tiers.values())

@@ -49,6 +49,35 @@ def format_month_label(month_str: str) -> str:
     return f"{first:%b %Y}"
 
 
+TIER_ORDER = ["Power", "Heavy", "Typical", "Light"]
+
+
+def assign_tiers(user_credits: dict[str, float]) -> dict[str, str]:
+    """Label each user Power/Heavy/Typical/Light by their credit-share rank.
+
+    Mirrors the copilotquota treemap: rank users by credits (descending),
+    fraction = rank / n, then bin by [0, .05, .20, .75, 1] into Power (top 5%),
+    Heavy (next 15%), Typical (middle 55%), Light (bottom 25%). Ties keep input
+    order (Python's sort is stable). Empty input -> empty dict.
+    """
+    n = len(user_credits)
+    if n == 0:
+        return {}
+    ordered = sorted(user_credits, key=lambda u: user_credits[u], reverse=True)
+    tiers: dict[str, str] = {}
+    for i, user in enumerate(ordered):
+        frac = (i + 1) / n
+        if frac <= 0.05:
+            tiers[user] = "Power"
+        elif frac <= 0.20:
+            tiers[user] = "Heavy"
+        elif frac <= 0.75:
+            tiers[user] = "Typical"
+        else:
+            tiers[user] = "Light"
+    return tiers
+
+
 def rollup_weekly(records: list[dict]) -> list[dict]:
     """Sum per-(week, user) credits/usd from per-day records.
 
