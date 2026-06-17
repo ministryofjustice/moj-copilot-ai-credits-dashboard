@@ -38,6 +38,17 @@ def format_week_range(iso_year: int, iso_week: int) -> str:
     return f"{monday.day} {monday:%b} – {sunday.day} {sunday:%b}"
 
 
+def month_label(day_str: str) -> str:
+    """'2026-06-01' -> '2026-06' (calendar month)."""
+    return day_str[:7]
+
+
+def format_month_label(month_str: str) -> str:
+    """'2026-06' -> 'Jun 2026'."""
+    first = date.fromisoformat(f"{month_str}-01")
+    return f"{first:%b %Y}"
+
+
 def rollup_weekly(records: list[dict]) -> list[dict]:
     """Sum per-(week, user) credits/usd from per-day records.
 

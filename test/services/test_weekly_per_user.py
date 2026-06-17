@@ -36,6 +36,16 @@ def test_format_week_range_spanning_years():
     assert wpu.format_week_range(2026, 1) == "29 Dec – 4 Jan"
 
 
+def test_month_label_extracts_calendar_month():
+    assert wpu.month_label("2026-06-01") == "2026-06"
+    assert wpu.month_label("2026-12-31") == "2026-12"
+
+
+def test_format_month_label_is_human_readable():
+    assert wpu.format_month_label("2026-06") == "Jun 2026"
+    assert wpu.format_month_label("2026-01") == "Jan 2026"
+
+
 def _rec(day, user, credits_val, usd, per_model):
     return {"day": day, "user": user, "credits": credits_val, "usd": usd,
             "per_model": per_model}
