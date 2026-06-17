@@ -11,6 +11,8 @@ minus `@st.cache_data`.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from app.main.services import weekly_per_user as wpu
 from app.main.services.reports_source import ReportsSource
 
@@ -58,6 +60,80 @@ def plan_limits(plan: str) -> dict:
     weekly = weekly_allowance(plan)
     monthly = PLAN_TIERS_USD_PER_MONTH[plan] * CREDITS_PER_USD
     return {"daily": weekly / 7.0, "weekly": weekly, "monthly": monthly}
+
+
+# --------------------------------------------------------------- heatmap helpers
+HEATMAP_WEEKS = 9  # rolling window (~2 months) for the user usage heatmap
+
+# Colour ramp for the heatmap: grey (no usage) -> greens -> red (over budget).
+HEATMAP_LEVELS = [
+    {"level": 0, "colour": "#ebedee", "label": "None"},
+    {"level": 1, "colour": "#cce2d8", "label": "<25%"},
+    {"level": 2, "colour": "#85bfa3", "label": "25–50%"},
+    {"level": 3, "colour": "#00703c", "label": "50–100%"},
+    {"level": 4, "colour": "#d4351c", "label": "Over budget"},
+]
+
+
+def _heatmap_level(pct: float) -> int:
+    if pct <= 0:
+        return 0
+    if pct < 0.25:
+        return 1
+    if pct < 0.50:
+        return 2
+    if pct < 1.0:
+        return 3
+    return 4
+
+
+def _usage_calendar(urecs: list[dict], daily_allowance: float,
+                    weeks: int = HEATMAP_WEEKS) -> dict:
+    """Rolling-window day grid for the user heatmap (columns=ISO weeks, rows=Mon→Sun).
+
+    Anchored so the rightmost column is the latest record's ISO week. Days with no
+    record render as level 0 (no usage). Mapping is by calendar date, not index.
+    """
+    if not urecs:
+        return {"weeks": [], "month_labels": [], "max_credits": 0.0,
+                "levels": HEATMAP_LEVELS}
+
+    credits_by_day = {r["day"]: r["credits"] for r in urecs}
+    latest = date.fromisoformat(urecs[-1]["day"])
+    # Monday of the latest record's ISO week, then back (weeks-1) Mondays = grid start.
+    last_monday = latest - timedelta(days=latest.weekday())
+    start = last_monday - timedelta(weeks=weeks - 1)
+
+    grid, month_labels = [], []
+    seen_month = None
+    for col in range(weeks):
+        col_start = start + timedelta(weeks=col)
+        column = []
+        for row in range(7):
+            d = col_start + timedelta(days=row)
+            iso = d.isoformat()
+            credits_val = credits_by_day.get(iso, 0.0)
+            pct = (credits_val / daily_allowance) if daily_allowance else 0.0
+            column.append({
+                "day": iso,
+                "credits": round(credits_val, 1),
+                "pct": pct,
+                "level": _heatmap_level(pct),
+                "label": (f"{d:%-d %b %Y}: {credits_val:.1f} credits "
+                          f"({pct * 100:.0f}% of daily allowance)"
+                          if credits_val > 0 else f"{d:%-d %b %Y}: no usage"),
+            })
+        grid.append(column)
+        if col_start.month != seen_month:
+            month_labels.append({"col": col, "text": f"{col_start:%b}"})
+            seen_month = col_start.month
+
+    return {
+        "weeks": grid,
+        "month_labels": month_labels,
+        "max_credits": max(credits_by_day.values()),
+        "levels": HEATMAP_LEVELS,
+    }
 
 
 # ----------------------------------------------------------------- daily helpers
