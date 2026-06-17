@@ -62,7 +62,14 @@ class S3ReportsSource(ReportsSource):
         return dict(sorted(docs.items()))
 
     def per_user_docs(self, day: str) -> dict[str, list]:
-        raise NotImplementedError
+        prefix = f"{self.prefix}/{day}/billing/per-user/"
+        out: dict[str, list] = {}
+        for key in self._list_keys(prefix):
+            if not key.endswith(".json"):
+                continue
+            login = os.path.splitext(os.path.basename(key))[0]
+            out[login] = self._get_json(key).get("usageItems", [])
+        return out
 
     def weekly_records(self) -> list[dict]:
         raise NotImplementedError

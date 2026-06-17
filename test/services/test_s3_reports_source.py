@@ -55,3 +55,17 @@ def test_daily_docs_keyed_by_date_sorted():
     docs = src.daily_docs()
     assert list(docs) == ["2026-06-01", "2026-06-02"]
     assert docs["2026-06-02"]["usageItems"] == [{"model": "Opus"}]
+
+
+def test_per_user_docs_keyed_by_login():
+    src = _source({
+        "reports/2026-06-01/billing/per-user/alice.json": {
+            "usageItems": [{"model": "Opus", "grossQuantity": 5.0}]},
+        "reports/2026-06-01/billing/per-user/bob.json": {"usageItems": []},
+        "reports/2026-06-02/billing/per-user/carol.json": {
+            "usageItems": [{"model": "Haiku"}]},
+    })
+    docs = src.per_user_docs("2026-06-01")
+    assert set(docs) == {"alice", "bob"}
+    assert docs["alice"] == [{"model": "Opus", "grossQuantity": 5.0}]
+    assert docs["bob"] == []
