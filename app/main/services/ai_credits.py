@@ -182,6 +182,106 @@ def _week_ranges(rows: list[dict]) -> dict[str, str]:
     }
 
 
+# ----------------------------------------------------------------- pooled helpers
+TIER_COLOURS = {
+    "Power": "#d4351c",
+    "Heavy": "#f47738",
+    "Typical": "#1d70b8",
+    "Light": "#00703c",
+    "Overage (billed extra)": "#85230c",
+    "Unused pool": "#b1b4b6",
+}
+
+
+def _record_period_key(day: str, period: str) -> str:
+    """ISO-week label or calendar-month label for a day, per the period type."""
+    if period == "weekly":
+        return wpu.iso_week_label(day)[0]
+    return wpu.month_label(day)
+
+
+def _period_text(key: str, period: str) -> str:
+    """Selector/headline text: '2026-W23 (1–7 Jun)' or 'Jun 2026'."""
+    if period == "weekly":
+        iso_year, iso_week = key.split("-W")
+        return f"{key} ({wpu.format_week_range(int(iso_year), int(iso_week))})"
+    return wpu.format_month_label(key)
+
+
+def pooled_view(source: ReportsSource, period: str | None, key: str | None,
+                plan: str | None, seats) -> dict:  # pylint: disable=too-many-locals
+    """Pooled-billing treemap data for one ISO week or calendar month.
+
+    pool = seats * per-seat allowance for the period; covered usage is split by
+    user spend-tier and scaled to min(gross, pool); the remainder is an
+    'Unused pool' tile (within budget) or an 'Overage' tile (over budget). All
+    figures are AI credits.
+    """
+    period = "weekly" if period == "weekly" else "monthly"
+    plan = resolve_plan(plan)
+    seats = resolve_seats(seats)
+    records = source.weekly_records()
+    keys = sorted({_record_period_key(r["day"], period) for r in records})
+
+    base = {
+        "period": period, "plans": plan_labels(), "plan": plan, "seats": seats,
+        "periods": keys,
+    }
+    if not keys:
+        return {**base, "has_data": False, "key": None}
+
+    key = key if key in keys else keys[-1]
+    user_credits: dict[str, float] = {}
+    for r in records:
+        if _record_period_key(r["day"], period) == key:
+            user_credits[r["user"]] = user_credits.get(r["user"], 0.0) + float(r["credits"])
+
+    allowance = plan_limits(plan)[period]
+    pool = seats * allowance
+    gross = sum(user_credits.values())
+    overage = max(0.0, gross - pool)
+    headroom = pool - gross
+    total = max(pool, gross)
+    covered_scale = (min(gross, pool) / gross) if gross else 0.0
+
+    tiers = wpu.assign_tiers(user_credits)
+    tier_gross = {t: 0.0 for t in wpu.TIER_ORDER}
+    tier_users = {t: 0 for t in wpu.TIER_ORDER}
+    for user, credits_val in user_credits.items():
+        tier_gross[tiers[user]] += credits_val
+        tier_users[tiers[user]] += 1
+
+    tiles = [
+        {"label": f"{t} users", "name": t,
+         "amount": round(tier_gross[t] * covered_scale, 1),
+         "users": tier_users[t], "colour": TIER_COLOURS[t]}
+        for t in wpu.TIER_ORDER
+    ]
+    if overage > 0:
+        tiles.append({"label": "Overage (billed extra)", "name": "Overage",
+                      "amount": round(overage, 1), "users": None,
+                      "colour": TIER_COLOURS["Overage (billed extra)"]})
+    elif headroom > 0:
+        tiles.append({"label": "Unused pool", "name": "Unused pool",
+                      "amount": round(headroom, 1), "users": None,
+                      "colour": TIER_COLOURS["Unused pool"]})
+
+    return {
+        **base,
+        "has_data": True,
+        "key": key,
+        "span": _period_text(key, period),
+        "period_options": [{"value": k, "text": _period_text(k, period)} for k in keys],
+        "allowance": allowance,
+        "active_users": len(user_credits),
+        "metrics": {"pool": pool, "gross": gross, "overage": overage,
+                    "total": total, "headroom": headroom},
+        "tiles": tiles,
+        "treemap": {"type": "treemap", "root": f"Total bill {total:,.0f} credits",
+                    "total": total, "tiles": tiles},
+    }
+
+
 def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> dict:
     """Org weekly per-user allowance table for one ISO week."""
     all_rows = _weekly_rows(source)
