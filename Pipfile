@@ -10,6 +10,7 @@ tests_report = "coverage report --omit=./test/** --sort=cover --show-missing --s
 
 [packages]
 email-validator = "==2.1.0.post1"
+authlib= "==1.6.11"
 flask = "==3.0.2"
 flask-cors = "==5.0.0"
 flask-limiter = "==3.5.0"

@@ -10,6 +10,7 @@
 
 # ---- runtime (matches Pipfile [packages]) ----
 email-validator==2.1.0.post1
+authlib==1.6.11
 Flask==3.0.2
 Flask-Cors==5.0.0
 Flask-Limiter==3.5.0
