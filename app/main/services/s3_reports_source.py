@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 from app.main.services import weekly_per_user as wpu
 from app.main.services.reports_source import ReportsSource
@@ -43,7 +44,6 @@ class S3ReportsSource(ReportsSource):
         keys: list[str] = []
         for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
             keys.extend(obj["Key"] for obj in page.get("Contents", []))
-            break
         return keys
 
     def _get_json(self, key: str) -> dict:
@@ -62,21 +62,62 @@ class S3ReportsSource(ReportsSource):
                 docs[self._day_from_key(key)] = self._get_json(key)
         return dict(sorted(docs.items()))
 
-    def per_user_docs(self, day: str) -> dict[str, list]:
-        prefix = f"{self.prefix}/{day}/billing/per-user/"
-        out: dict[str, list] = {}
-        for key in self._list_keys(prefix):
-            if not key.endswith(".json"):
-                continue
-            login = os.path.splitext(os.path.basename(key))[0]
-            out[login] = self._get_json(key).get("usageItems", [])
+    # def per_user_docs(self, day: str) -> dict[str, list]:
+    #     prefix = f"{self.prefix}/{day}/billing/per-user/"
+    #     out: dict[str, list] = {}
+    #     for key in self._list_keys(prefix):
+    #         if not key.endswith(".json"):
+    #             continue
+    #         login = os.path.splitext(os.path.basename(key))[0]
+    #         out[login] = self._get_json(key).get("usageItems", [])
+    #     return out
+    
+    def per_user_docs(self, day):
+        keys = self._get_all_keys_for_day(day) # or however you grab keys
+        out = {}
+        
+        def fetch_data(key):
+            # Extract user login from key name structure if necessary
+            login = self._extract_login_from_key(key) 
+            try:
+                data = self._get_json(key).get("usageItems", [])
+                return login, data
+            except Exception:
+                return login, []
+
+        # Pull 15 objects simultaneously instead of 1 at a time
+        with ThreadPoolExecutor(max_workers=15) as executor:
+            results = executor.map(fetch_data, keys)
+            
+        for login, items in results:
+            if login:
+                out[login] = items
+                
         return out
 
-    def weekly_records(self) -> list[dict]:
-        records: list[dict] = []
-        for day in self.daily_docs():
-            for login, items in self.per_user_docs(day).items():
-                rec = wpu.record_from_items(day, login, items)
-                if rec is not None:
-                    records.append(rec)
-        return records
+    # def weekly_records(self) -> list[dict]:
+    #     records: list[dict] = []
+    #     for day in self.daily_docs():
+    #         for login, items in self.per_user_docs(day).items():
+    #             rec = wpu.record_from_items(day, login, items)
+    #             if rec is not None:
+    #                 records.append(rec)
+    #     return records
+
+    def weekly_records(self):
+        days = self._get_days_for_tracked_week() # assuming this returns a list of days
+        weekly_data = {}
+
+        # Thread pool to fetch all days concurrently
+        with ThreadPoolExecutor(max_workers=7) as executor:
+            # This maps self.per_user_docs across all days in parallel
+            results = executor.map(self.per_user_docs, days)
+
+        # Merge the results back together
+        for day_data in results:
+            for login, items in day_data.items():
+                if login not in weekly_data:
+                    weekly_data[login] = []
+                weekly_data[login].extend(items)
+
+        return weekly_data
