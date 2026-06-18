@@ -91,13 +91,11 @@
       if (t.users !== null && t.users !== undefined) {
         lines.push(t.users + " users");
       }
+      lines.push(pct.toFixed(1) + "%");
       lines.push(
         Math.round(t.amount).toLocaleString() +
           " AI Credits · $" +
-          Math.round(t.amount / 100).toLocaleString() +
-          " (" +
-          pct.toFixed(1) +
-          "%)"
+          Math.round(t.amount / 100).toLocaleString()
       );
       return lines;
     }

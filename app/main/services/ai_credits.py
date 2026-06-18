@@ -65,13 +65,16 @@ def plan_limits(plan: str) -> dict:
 # --------------------------------------------------------------- heatmap helpers
 HEATMAP_WEEKS = 9  # rolling window (~2 months) for the user usage heatmap
 
-# Colour ramp for the heatmap: grey (no usage) -> greens -> red (over budget).
+# Colour ramp for the heatmap: grey (no usage) -> greens (within budget) ->
+# graduated reds (over budget), so a day at 108% reads lighter than one at 600%.
 HEATMAP_LEVELS = [
     {"level": 0, "colour": "#ebedee", "label": "None"},
     {"level": 1, "colour": "#cce2d8", "label": "<25%"},
     {"level": 2, "colour": "#85bfa3", "label": "25–50%"},
     {"level": 3, "colour": "#00703c", "label": "50–100%"},
-    {"level": 4, "colour": "#d4351c", "label": "Over budget"},
+    {"level": 4, "colour": "#f4a18f", "label": "100–150%"},
+    {"level": 5, "colour": "#d4351c", "label": "150–300%"},
+    {"level": 6, "colour": "#8e1b0e", "label": "≥300%"},
 ]
 
 
@@ -84,7 +87,11 @@ def _heatmap_level(pct: float) -> int:
         return 2
     if pct < 1.0:
         return 3
-    return 4
+    if pct < 1.5:
+        return 4
+    if pct < 3.0:
+        return 5
+    return 6
 
 
 def _usage_calendar(urecs: list[dict], daily_allowance: float,
