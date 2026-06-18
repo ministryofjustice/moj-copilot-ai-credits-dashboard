@@ -1,12 +1,13 @@
 import logging
 from functools import wraps
+from time import time
 
 from flask import (
     redirect,
     session,
     request,
 )
-from time import time
+
 from app.main.config.app_config import app_config
 
 logger = logging.getLogger(__name__)
