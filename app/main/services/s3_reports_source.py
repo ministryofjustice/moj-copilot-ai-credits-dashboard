@@ -43,6 +43,7 @@ class S3ReportsSource(ReportsSource):
         keys: list[str] = []
         for page in paginator.paginate(Bucket=self.bucket, Prefix=prefix):
             keys.extend(obj["Key"] for obj in page.get("Contents", []))
+            break
         return keys
 
     def _get_json(self, key: str) -> dict:
