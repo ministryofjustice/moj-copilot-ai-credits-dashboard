@@ -11,7 +11,7 @@ class _FakeSource:
     def daily_docs(self):
         return {}
 
-    def per_user_docs(self, day):
+    def per_user_docs(self, _day):
         return {}
 
 

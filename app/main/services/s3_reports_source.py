@@ -61,7 +61,7 @@ class S3ReportsSource(ReportsSource):
             if key.endswith(_DAILY_SUFFIX):
                 docs[self._day_from_key(key)] = self._get_json(key)
         return dict(sorted(docs.items()))
-    
+
     def per_user_docs(self, day):
         prefix = f"{self.prefix}/{day}/billing/per-user/"
         keys = [key for key in self._list_keys(prefix) if key.endswith(".json")]
@@ -71,7 +71,7 @@ class S3ReportsSource(ReportsSource):
             try:
                 data = self._get_json(key).get("usageItems", [])
                 return login, data
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught
                 return login, []
 
         out: dict[str, list] = {}

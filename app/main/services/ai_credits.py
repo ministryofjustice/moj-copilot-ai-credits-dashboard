@@ -78,23 +78,19 @@ HEATMAP_LEVELS = [
 ]
 
 
+_HEATMAP_THRESHOLDS = [(0.25, 1), (0.50, 2), (1.0, 3), (1.5, 4), (3.0, 5)]
+
+
 def _heatmap_level(pct: float) -> int:
     if pct <= 0:
         return 0
-    if pct < 0.25:
-        return 1
-    if pct < 0.50:
-        return 2
-    if pct < 1.0:
-        return 3
-    if pct < 1.5:
-        return 4
-    if pct < 3.0:
-        return 5
+    for threshold, level in _HEATMAP_THRESHOLDS:
+        if pct < threshold:
+            return level
     return 6
 
 
-def _usage_calendar(urecs: list[dict], daily_allowance: float,
+def _usage_calendar(urecs: list[dict], daily_allowance: float,  # pylint: disable=too-many-locals
                     weeks: int = HEATMAP_WEEKS) -> dict:
     """Rolling-window day grid for the user heatmap (columns=ISO weeks, rows=Mon→Sun).
 

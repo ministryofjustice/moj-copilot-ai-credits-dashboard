@@ -1,5 +1,7 @@
 import app.main.services.ai_credits as ac
 
+# pylint: disable=protected-access
+
 
 def _recs(pairs):
     return [{"day": d, "credits": c, "usd": c / 100} for d, c in pairs]
@@ -75,5 +77,5 @@ def test_cells_are_mapped_to_correct_weekday_row():
 
 def test_empty_records_returns_empty_grid():
     cal = ac._usage_calendar([], daily_allowance=10.0, weeks=9)
-    assert cal["weeks"] == []
+    assert not cal["weeks"]
     assert cal["max_credits"] == 0.0
