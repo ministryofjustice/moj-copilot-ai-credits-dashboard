@@ -14,7 +14,7 @@ spec:
         {{- include "application.selectorLabels" . | nindent 8 }}
     spec:
       # serviceAccountName created by the Cloud Platform environment
-      serviceAccountName: cd-serviceaccount
+      serviceAccountName: moj-copilot-ai-credits-dashboard-dev
       securityContext:
         runAsNonRoot: true
         seccompProfile:
