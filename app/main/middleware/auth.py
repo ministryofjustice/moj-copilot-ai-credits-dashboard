@@ -15,6 +15,8 @@ logger = logging.getLogger(__name__)
 def requires_auth(function_f):
     @wraps(function_f)
     def decorated(*args, **kwargs):
+        if app_config.auth_disabled:
+            return function_f(*args, **kwargs)
         if "user" not in session or session["user"].get("expires_at", 0) < time():
             session.pop("user", None)
             session["post_auth_redirect_path"] = request.full_path

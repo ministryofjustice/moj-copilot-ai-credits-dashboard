@@ -5,9 +5,16 @@ individual test modules don't each redefine them (avoids duplicate-code) and
 don't shadow the `credits` builtin.
 """
 
+import os
+
 import pytest
 
 from app.main.services.reports_source import ReportsSource
+
+# Disable Auth0 for the whole test session so auth-protected routes are
+# reachable without a live tenant. `app_config` reads this when create_app
+# first runs (after collection), so setting it here is early enough.
+os.environ.setdefault("AUTH_DISABLED", "true")
 
 
 class _FakeSource(ReportsSource):
