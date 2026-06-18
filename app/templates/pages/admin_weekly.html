@@ -1,0 +1,98 @@
+{% extends "components/base.html" %}
+{% from "govuk_frontend_jinja/components/select/macro.html" import govukSelect %}
+{% from "govuk_frontend_jinja/components/button/macro.html" import govukButton %}
+{% from "govuk_frontend_jinja/components/inset-text/macro.html" import govukInsetText %}
+{% from "govuk_frontend_jinja/components/warning-text/macro.html" import govukWarningText %}
+
+{% block pageTitle %}Copilot AI Credits — Weekly per-user{% endblock %}
+
+{% block content %}
+<h1 class="govuk-heading-l">GitHub Copilot — AI Credit Usage</h1>
+{% include "components/admin_nav.html" with context %}
+
+{% if not v.has_data %}
+  {{ govukInsetText({"text": "No per-user files found. Populate reports/<date>/billing/per-user/ first."}) }}
+{% else %}
+
+{% set plan_items = [] %}
+{% for p in v.plans %}{{- plan_items.append({"value": p, "text": p, "selected": p == v.plan}) or "" -}}{% endfor %}
+{% set week_items = [] %}
+{% for w in v.weeks %}{{- week_items.append({"value": w, "text": w, "selected": w == v.week}) or "" -}}{% endfor %}
+
+<form method="get" action="/admin/weekly" class="govuk-!-margin-bottom-4">
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-one-third">
+      {{ govukSelect({"id": "plan", "name": "plan", "label": {"text": "Plan budget"}, "items": plan_items}) }}
+    </div>
+    <div class="govuk-grid-column-one-third">
+      {{ govukSelect({"id": "week", "name": "week", "label": {"text": "ISO week"}, "items": week_items}) }}
+    </div>
+    <div class="govuk-grid-column-one-third">
+      <div class="govuk-!-padding-top-6">{{ govukButton({"text": "Apply", "classes": "govuk-button--secondary"}) }}</div>
+    </div>
+  </div>
+</form>
+
+<p class="govuk-body-s">
+  {{ v.week }} · {{ v.span }} (resets Monday) · {{ v.active_users }} active user(s) ·
+  weekly allowance {{ "%.0f"|format(v.allowance) }} credits/seat
+</p>
+
+{% if v.over %}
+  {{ govukWarningText({"text": v.over ~ " user(s) at or over 100% of the weekly allowance.", "iconFallbackText": "Warning"}) }}
+{% endif %}
+
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">User</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Credits used</th>
+      <th scope="col" class="govuk-table__header">% of allowance</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Remaining</th>
+      <th scope="col" class="govuk-table__header">Top model</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Days</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for r in v.rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ r.user }}</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.1f"|format(r.credits) }}</td>
+      <td class="govuk-table__cell">
+        {% set pct = (r.pct * 100) %}
+        {% set width = 100 if pct > 100 else pct %}
+        {% set bar = "#d4351c" if pct >= 100 else "#1d70b8" %}
+        <div style="background:#f3f2f1; width:120px; height:16px; display:inline-block; vertical-align:middle;">
+          <div style="background:{{ bar }}; width:{{ width }}%; height:16px;"></div>
+        </div>
+        <span class="govuk-body-s govuk-!-margin-left-2">{{ "%.0f%%"|format(pct) }}</span>
+      </td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.1f"|format(r.remaining) }}</td>
+      <td class="govuk-table__cell">{{ r.top_model }}</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ r.day_count }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 class="govuk-heading-s">Top users by credits</h3>
+<div style="height:360px;"><canvas data-chart="topUsers"></canvas></div>
+
+{% set top = v.rows[:15] %}
+{% set charts = {
+  "topUsers": {
+    "type": "bar",
+    "labels": top | map(attribute="user") | list,
+    "datasets": [{"label": "Credits used", "data": top | map(attribute="credits") | map("round", 1) | list}],
+    "limit": {"value": v.allowance | round(1), "label": "Weekly allowance"}
+  }
+} %}
+<script type="application/json" id="chart-data">{{ charts | tojson }}</script>
+{% endif %}
+{% endblock %}
+
+{% block bodyEnd %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='javascript/chart.umd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='javascript/charts.js') }}"></script>
+{% endblock %}

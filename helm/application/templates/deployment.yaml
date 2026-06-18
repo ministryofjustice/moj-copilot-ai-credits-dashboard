@@ -14,7 +14,7 @@ spec:
         {{- include "application.selectorLabels" . | nindent 8 }}
     spec:
       # serviceAccountName created by the Cloud Platform environment
-      serviceAccountName: cd-serviceaccount
+      serviceAccountName: moj-copilot-ai-credits-dashboard-dev
       securityContext:
         runAsNonRoot: true
         seccompProfile:
@@ -36,10 +36,29 @@ spec:
               value: {{ .Values.app.deployment.env.APP_SECRET_KEY | quote }}
             - name: FLASK_DEBUG
               value: {{ .Values.app.deployment.env.FLASK_DEBUG | quote }}
+            - name: AUTH0_DOMAIN
+              value: {{ .Values.app.deployment.env.AUTH0_DOMAIN | quote }}
+            - name: AUTH0_CLIENT_ID
+              value: {{ .Values.app.deployment.env.AUTH0_CLIENT_ID | quote }}
+            - name: AUTH0_CLIENT_SECRET
+              value: {{ .Values.app.deployment.env.AUTH0_CLIENT_SECRET | quote }}
             - name: SENTRY_DSN_KEY
               value: {{ .Values.app.deployment.env.SENTRY_DSN_KEY }}
             - name: SENTRY_ENV
               value: {{ .Values.app.deployment.env.SENTRY_ENV }}
+            - name: REPORTS_SOURCE
+              value: {{ .Values.app.deployment.env.REPORTS_SOURCE | default "local" | quote }}
+            {{- if eq (.Values.app.deployment.env.REPORTS_SOURCE | default "local") "s3" }}
+            - name: REPORTS_S3_BUCKET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.deployment.s3.secretName }}
+                  key: {{ .Values.app.deployment.s3.bucketNameKey }}
+            - name: REPORTS_S3_PREFIX
+              value: {{ .Values.app.deployment.s3.prefix | default "reports" | quote }}
+            - name: AWS_DEFAULT_REGION
+              value: {{ .Values.app.deployment.s3.region | default "eu-west-2" | quote }}
+            {{- end }}
 
           ports:
             - name: http

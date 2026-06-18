@@ -1,0 +1,139 @@
+{% extends "components/base.html" %}
+{% from "govuk_frontend_jinja/components/select/macro.html" import govukSelect %}
+{% from "govuk_frontend_jinja/components/button/macro.html" import govukButton %}
+{% from "govuk_frontend_jinja/components/inset-text/macro.html" import govukInsetText %}
+
+{% block pageTitle %}Copilot AI Credits — Daily{% endblock %}
+
+{% block content %}
+<h1 class="govuk-heading-l">GitHub Copilot — AI Credit Usage</h1>
+{% include "components/admin_nav.html" with context %}
+
+{% if not v.has_data %}
+  {{ govukInsetText({"text": "No data found. Populate reports/<date>/billing/ai-credit-usage.json first."}) }}
+{% else %}
+
+{% set day_items = [] %}
+{% for d in v.days %}{{- day_items.append({"value": d, "text": d, "selected": d == v.day}) or "" -}}{% endfor %}
+
+<p class="govuk-body-s">Scope: <strong>{{ v.scope }}</strong> · {{ v.days | length }} day(s) captured</p>
+
+<form method="get" action="/admin" class="govuk-!-margin-bottom-6">
+  {{ govukSelect({"id": "day", "name": "day", "label": {"text": "Day"}, "items": day_items}) }}
+  {{ govukButton({"text": "View day", "classes": "govuk-button--secondary"}) }}
+</form>
+
+<h2 class="govuk-heading-m">{{ v.day }}</h2>
+<div class="govuk-grid-row">
+  {% set cards = [
+    ("Gross (consumed)", "$%.2f"|format(v.metrics.gross)),
+    ("Net (billed)", "$%.2f"|format(v.metrics.net)),
+    ("Covered by allowance", "$%.2f"|format(v.metrics.covered)),
+    ("AI Credits", "%.0f"|format(v.metrics.credits))
+  ] %}
+  {% for label, value in cards %}
+  <div class="govuk-grid-column-one-quarter">
+    <div style="border:1px solid #b1b4b6; padding:15px; margin-bottom:15px;">
+      <span class="govuk-caption-m">{{ label }}</span>
+      <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ value }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+{% if v.fully_covered %}
+  {{ govukInsetText({"text": "Net is $0 — fully covered by the monthly allowance so far. Watch the month-to-date gross below to see when the pool runs out."}) }}
+{% endif %}
+
+{% if v.by_model %}
+<h3 class="govuk-heading-s">Spend by model (gross)</h3>
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-one-half">
+    <table class="govuk-table">
+      <thead class="govuk-table__head">
+        <tr class="govuk-table__row">
+          <th scope="col" class="govuk-table__header">Model</th>
+          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Gross</th>
+          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Net</th>
+          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Share</th>
+        </tr>
+      </thead>
+      <tbody class="govuk-table__body">
+        {% for r in v.by_model %}
+        <tr class="govuk-table__row">
+          <td class="govuk-table__cell">{{ r.model }}</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric">${{ "%.2f"|format(r.gross) }}</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric">${{ "%.2f"|format(r.net) }}</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.0f%%"|format(r.share * 100) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="govuk-grid-column-one-half">
+    <div style="height:360px;"><canvas data-chart="model"></canvas></div>
+  </div>
+</div>
+{% endif %}
+
+<h3 class="govuk-heading-s">Month-to-date trend</h3>
+{% if not v.trend %}
+  {{ govukInsetText({"text": "Only one day captured. The trend appears once you have 2+ days."}) }}
+{% else %}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-one-half">
+    <p class="govuk-body-s">Daily gross vs net</p>
+    <div style="height:300px;"><canvas data-chart="trendGrossNet"></canvas></div>
+  </div>
+  <div class="govuk-grid-column-one-half">
+    <p class="govuk-body-s">Cumulative gross (allowance burn)</p>
+    <div style="height:300px;"><canvas data-chart="trendCumulative"></canvas></div>
+  </div>
+</div>
+{% endif %}
+
+{% if v.per_user.with_spend %}
+<h3 class="govuk-heading-s">Per-user spend (gross)</h3>
+<p class="govuk-body-s">
+  {{ v.per_user.with_spend }} of {{ v.per_user.queried }} queried users had spend ·
+  top {{ v.per_user.top_n }} account for {{ "%.0f%%"|format(v.per_user.concentration * 100) }} of the day's gross.
+</p>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">User</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Gross</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Net</th>
+      <th scope="col" class="govuk-table__header">Top model</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Share</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for r in v.per_user.rows %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ r.user }}</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">${{ "%.2f"|format(r.gross) }}</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">${{ "%.2f"|format(r.net) }}</td>
+      <td class="govuk-table__cell">{{ r.top_model }}</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.0f%%"|format(r.share * 100) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+
+{% set charts = {} %}
+{% if v.by_model %}{{- charts.update({"model": {"type": "bar", "labels": v.model_chart.labels, "datasets": [{"label": "Gross $", "data": v.model_chart.gross}]}}) or "" -}}{% endif %}
+{% if v.trend %}
+  {{- charts.update({"trendGrossNet": {"type": "line", "labels": v.trend.labels, "datasets": [{"label": "Gross", "data": v.trend.gross}, {"label": "Net", "data": v.trend.net}]}}) or "" -}}
+  {{- charts.update({"trendCumulative": {"type": "line", "labels": v.trend.labels, "datasets": [{"label": "Cumulative gross", "data": v.trend.cumulative}]}}) or "" -}}
+{% endif %}
+<script type="application/json" id="chart-data">{{ charts | tojson }}</script>
+{% endif %}
+{% endblock %}
+
+{% block bodyEnd %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='javascript/chart.umd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='javascript/charts.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,108 @@
+import json
+
+import pytest
+
+from app.main.services.s3_reports_source import S3ReportsSource
+
+
+class _Body:
+    def __init__(self, data: bytes):
+        self._data = data
+
+    def read(self) -> bytes:
+        return self._data
+
+
+class _Paginator:
+    def __init__(self, store: dict):
+        self._store = store
+
+    def paginate(self, Bucket, Prefix):  # noqa: N803 (boto3 kwarg names)
+        contents = [
+            {"Key": k} for k in sorted(self._store) if k.startswith(Prefix)
+        ]
+        yield {"Contents": contents}
+
+
+class FakeS3Client:
+    """Minimal in-memory stand-in for a boto3 S3 client."""
+
+    def __init__(self, objects: dict[str, dict]):
+        self._store = {k: json.dumps(v).encode("utf-8") for k, v in objects.items()}
+
+    def get_paginator(self, name):
+        assert name == "list_objects_v2"
+        return _Paginator(self._store)
+
+    def get_object(self, Bucket, Key):  # noqa: N803
+        return {"Body": _Body(self._store[Key])}
+
+
+def _source(objects, prefix="reports"):
+    return S3ReportsSource(
+        bucket="test-bucket", prefix=prefix, client=FakeS3Client(objects)
+    )
+
+
+def test_daily_docs_keyed_by_date_sorted():
+    src = _source({
+        "reports/2026-06-02/billing/ai-credit-usage.json": {
+            "enterprise": "MoJ", "usageItems": [{"model": "Opus"}]},
+        "reports/2026-06-01/billing/ai-credit-usage.json": {
+            "enterprise": "MoJ", "usageItems": []},
+        "reports/2026-06-01/billing/per-user/alice.json": {"usageItems": []},
+    })
+    docs = src.daily_docs()
+    assert list(docs) == ["2026-06-01", "2026-06-02"]
+    assert docs["2026-06-02"]["usageItems"] == [{"model": "Opus"}]
+
+
+def test_per_user_docs_keyed_by_login():
+    src = _source({
+        "reports/2026-06-01/billing/per-user/alice.json": {
+            "usageItems": [{"model": "Opus", "grossQuantity": 5.0}]},
+        "reports/2026-06-01/billing/per-user/bob.json": {"usageItems": []},
+        "reports/2026-06-02/billing/per-user/carol.json": {
+            "usageItems": [{"model": "Haiku"}]},
+    })
+    docs = src.per_user_docs("2026-06-01")
+    assert set(docs) == {"alice", "bob"}
+    assert docs["alice"] == [{"model": "Opus", "grossQuantity": 5.0}]
+    assert docs["bob"] == []
+
+
+def test_weekly_records_built_from_all_days():
+    src = _source({
+        "reports/2026-06-01/billing/ai-credit-usage.json": {
+            "enterprise": "MoJ", "usageItems": []},
+        "reports/2026-06-02/billing/ai-credit-usage.json": {
+            "enterprise": "MoJ", "usageItems": []},
+        "reports/2026-06-01/billing/per-user/alice.json": {"usageItems": [
+            {"model": "Opus", "grossQuantity": 100.0, "grossAmount": 1.0},
+        ]},
+        "reports/2026-06-01/billing/per-user/empty.json": {"usageItems": []},
+        "reports/2026-06-02/billing/per-user/alice.json": {"usageItems": [
+            {"model": "Haiku", "grossQuantity": 10.0, "grossAmount": 0.1},
+        ]},
+    })
+    records = src.weekly_records()
+    assert {(r["day"], r["user"]) for r in records} == {
+        ("2026-06-01", "alice"), ("2026-06-02", "alice"),
+    }
+    day1 = next(r for r in records if r["day"] == "2026-06-01")
+    assert day1["credits"] == pytest.approx(100.0)
+    assert day1["per_model"] == {"Opus": pytest.approx(100.0)}
+
+
+def test_custom_prefix_is_honoured():
+    src = _source({
+        "data/2026-06-01/billing/ai-credit-usage.json": {
+            "enterprise": "MoJ", "usageItems": [{"model": "Opus"}]},
+    }, prefix="data")
+    assert list(src.daily_docs()) == ["2026-06-01"]
+
+
+def test_missing_bucket_raises(monkeypatch):
+    monkeypatch.delenv("REPORTS_S3_BUCKET", raising=False)
+    with pytest.raises(ValueError, match="REPORTS_S3_BUCKET"):
+        S3ReportsSource(client=FakeS3Client({}))

@@ -14,4 +14,9 @@ app_config = SimpleNamespace(
     sentry=SimpleNamespace(
         dsn_key=__get_env_var("SENTRY_DSN_KEY"), environment=__get_env_var("SENTRY_ENV")
     ),
+    auth0=SimpleNamespace(
+        domain=__get_env_var("AUTH0_DOMAIN"),
+        client_id=__get_env_var("AUTH0_CLIENT_ID"),
+        client_secret=__get_env_var("AUTH0_CLIENT_SECRET"),
+    ),
 )

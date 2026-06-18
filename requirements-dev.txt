@@ -1,0 +1,27 @@
+# Local development dependencies for running this app without pipenv.
+#
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install -r requirements-dev.txt
+#   APP_SECRET_KEY=dev python -m app.run     # http://127.0.0.1:4567
+#
+# Versions mirror the Pipfile's pinned runtime deps, plus pytest for the tests.
+# Local report data is read from ./reports (override with REPORTS_DIR).
+
+# ---- runtime (matches Pipfile [packages]) ----
+email-validator==2.1.0.post1
+authlib==1.6.11
+Flask==3.0.2
+Flask-Cors==5.0.0
+Flask-Limiter==3.5.0
+govuk-frontend-jinja==3.0.0
+gunicorn==22.0.0
+boto3==1.35.0
+requests==2.32.0
+sentry-sdk==2.8.0
+freezegun==1.5.1
+setuptools==70.0.0
+
+# ---- tests / dev tooling ----
+pytest==9.1.0
+coverage==7.4.4
