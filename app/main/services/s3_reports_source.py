@@ -61,16 +61,6 @@ class S3ReportsSource(ReportsSource):
             if key.endswith(_DAILY_SUFFIX):
                 docs[self._day_from_key(key)] = self._get_json(key)
         return dict(sorted(docs.items()))
-
-    # def per_user_docs(self, day: str) -> dict[str, list]:
-    #     prefix = f"{self.prefix}/{day}/billing/per-user/"
-    #     out: dict[str, list] = {}
-    #     for key in self._list_keys(prefix):
-    #         if not key.endswith(".json"):
-    #             continue
-    #         login = os.path.splitext(os.path.basename(key))[0]
-    #         out[login] = self._get_json(key).get("usageItems", [])
-    #     return out
     
     def per_user_docs(self, day):
         prefix = f"{self.prefix}/{day}/billing/per-user/"
@@ -90,15 +80,6 @@ class S3ReportsSource(ReportsSource):
             for login, items in results:
                 out[login] = items
         return out
-
-    # def weekly_records(self) -> list[dict]:
-    #     records: list[dict] = []
-    #     for day in self.daily_docs():
-    #         for login, items in self.per_user_docs(day).items():
-    #             rec = wpu.record_from_items(day, login, items)
-    #             if rec is not None:
-    #                 records.append(rec)
-    #     return records
 
     def weekly_records(self) -> list[dict]:
         records: list[dict] = []
