@@ -73,26 +73,22 @@ class S3ReportsSource(ReportsSource):
     #     return out
     
     def per_user_docs(self, day):
-        keys = self._get_all_keys_for_day(day) # or however you grab keys
-        out = {}
-        
-        def fetch_data(key):
-            # Extract user login from key name structure if necessary
-            login = self._extract_login_from_key(key) 
+        prefix = f"{self.prefix}/{day}/billing/per-user/"
+        keys = [key for key in self._list_keys(prefix) if key.endswith(".json")]
+
+        def fetch_data(key: str) -> tuple[str, list]:
+            login = os.path.splitext(os.path.basename(key))[0]
             try:
                 data = self._get_json(key).get("usageItems", [])
                 return login, data
             except Exception:
                 return login, []
 
-        # Pull 15 objects simultaneously instead of 1 at a time
-        with ThreadPoolExecutor(max_workers=15) as executor:
+        out: dict[str, list] = {}
+        with ThreadPoolExecutor(max_workers=min(15, max(1, len(keys)))) as executor:
             results = executor.map(fetch_data, keys)
-            
-        for login, items in results:
-            if login:
+            for login, items in results:
                 out[login] = items
-                
         return out
 
     # def weekly_records(self) -> list[dict]:
@@ -104,20 +100,14 @@ class S3ReportsSource(ReportsSource):
     #                 records.append(rec)
     #     return records
 
-    def weekly_records(self):
-        days = self._get_days_for_tracked_week() # assuming this returns a list of days
-        weekly_data = {}
-
-        # Thread pool to fetch all days concurrently
-        with ThreadPoolExecutor(max_workers=7) as executor:
-            # This maps self.per_user_docs across all days in parallel
-            results = executor.map(self.per_user_docs, days)
-
-        # Merge the results back together
-        for day_data in results:
-            for login, items in day_data.items():
-                if login not in weekly_data:
-                    weekly_data[login] = []
-                weekly_data[login].extend(items)
-
-        return weekly_data
+    def weekly_records(self) -> list[dict]:
+        records: list[dict] = []
+        days = list(self.daily_docs())
+        with ThreadPoolExecutor(max_workers=min(7, max(1, len(days)))) as executor:
+            per_day_results = executor.map(self.per_user_docs, days)
+            for day, day_docs in zip(days, per_day_results):
+                for login, items in day_docs.items():
+                    rec = wpu.record_from_items(day, login, items)
+                    if rec is not None:
+                        records.append(rec)
+        return records
