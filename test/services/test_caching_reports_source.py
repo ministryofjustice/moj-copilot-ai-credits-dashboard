@@ -8,7 +8,7 @@ from app.main.services.caching_reports_source import CachingReportsSource
 from app.main.services.reports_source import ReportsSource
 
 
-class FakeClock:
+class FakeClock:  # pylint: disable=too-few-public-methods
     def __init__(self, now: float = 0.0):
         self.now = now
 
