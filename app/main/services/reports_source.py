@@ -82,8 +82,8 @@ class LocalFsReportsSource(ReportsSource):
         return wpu.load_weekly_records(pattern)
 
 
-def get_reports_source() -> ReportsSource:
-    """Pick the source from config. REPORTS_SOURCE = local (default) | s3 | db."""
+def _build_source() -> ReportsSource:
+    """Pick the raw backend from config. REPORTS_SOURCE = local (default)|s3|db."""
     # pylint: disable=import-outside-toplevel
     backend = (os.getenv("REPORTS_SOURCE") or "local").lower()
     if backend == "local":
@@ -97,3 +97,21 @@ def get_reports_source() -> ReportsSource:
 
         return DbReportsSource()
     raise ValueError(f"Unknown REPORTS_SOURCE: {backend!r} (expected local|s3|db)")
+
+
+def get_reports_source() -> ReportsSource:
+    """The configured backend, wrapped in a TTL cache unless disabled.
+
+    The data changes ~once a day but each request otherwise re-fetches it (the
+    S3 backend does one GetObject per file ~= 15s), so by default the source is
+    memoised for REPORTS_CACHE_TTL seconds (default 300). Set REPORTS_CACHE_TTL=0
+    to disable caching (e.g. local dev where you want to see file edits at once).
+    """
+    # pylint: disable=import-outside-toplevel
+    source = _build_source()
+    ttl = float(os.getenv("REPORTS_CACHE_TTL") or 300)
+    if ttl <= 0:
+        return source
+    from app.main.services.caching_reports_source import CachingReportsSource
+
+    return CachingReportsSource(source, ttl_seconds=ttl)

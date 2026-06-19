@@ -23,5 +23,6 @@ services:
 
       # App
       LOGGING_LEVEL: "DEBUG"
+      REPORTS_CACHE_TTL: 0 # local dev reads on-disk files; don't cache so edits show at once
     ports:
       - "4567:4567"

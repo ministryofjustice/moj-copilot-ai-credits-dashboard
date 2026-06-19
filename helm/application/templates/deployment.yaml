@@ -48,6 +48,8 @@ spec:
               value: {{ .Values.app.deployment.env.SENTRY_ENV }}
             - name: REPORTS_SOURCE
               value: {{ .Values.app.deployment.env.REPORTS_SOURCE | default "local" | quote }}
+            - name: REPORTS_CACHE_TTL
+              value: {{ .Values.app.deployment.env.REPORTS_CACHE_TTL | default 300 | quote }}
             {{- if eq (.Values.app.deployment.env.REPORTS_SOURCE | default "local") "s3" }}
             - name: REPORTS_S3_BUCKET
               valueFrom:
