@@ -7,6 +7,7 @@
 {% block pageTitle %}Copilot AI Credits — Weekly per-user{% endblock %}
 
 {% block content %}
+{% set active = 'weekly' %}
 <h1 class="govuk-heading-l">GitHub Copilot — AI Credit Usage</h1>
 {% include "components/admin_nav.html" with context %}
 
@@ -17,7 +18,7 @@
 {% set plan_items = [] %}
 {% for p in v.plans %}{{- plan_items.append({"value": p, "text": p, "selected": p == v.plan}) or "" -}}{% endfor %}
 {% set week_items = [] %}
-{% for w in v.weeks %}{{- week_items.append({"value": w, "text": w, "selected": w == v.week}) or "" -}}{% endfor %}
+{% for w in v.weeks %}{{- week_items.append({"value": w, "text": w ~ " (" ~ v.week_ranges[w] ~ ")", "selected": w == v.week}) or "" -}}{% endfor %}
 
 <form method="get" action="/admin/weekly" class="govuk-!-margin-bottom-4">
   <div class="govuk-grid-row">

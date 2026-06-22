@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import json
 import os
+from concurrent.futures import ThreadPoolExecutor
 
 from app.main.services import weekly_per_user as wpu
 from app.main.services.reports_source import ReportsSource
@@ -33,7 +34,7 @@ class S3ReportsSource(ReportsSource):
         if client is not None:
             self._client = client
         else:
-            import boto3
+            import boto3  # pylint: disable=import-outside-toplevel
 
             region = os.getenv("AWS_DEFAULT_REGION") or "eu-west-2"
             self._client = boto3.client("s3", region_name=region)
@@ -61,21 +62,33 @@ class S3ReportsSource(ReportsSource):
                 docs[self._day_from_key(key)] = self._get_json(key)
         return dict(sorted(docs.items()))
 
-    def per_user_docs(self, day: str) -> dict[str, list]:
+    def per_user_docs(self, day):
         prefix = f"{self.prefix}/{day}/billing/per-user/"
-        out: dict[str, list] = {}
-        for key in self._list_keys(prefix):
-            if not key.endswith(".json"):
-                continue
+        keys = [key for key in self._list_keys(prefix) if key.endswith(".json")]
+
+        def fetch_data(key: str) -> tuple[str, list]:
             login = os.path.splitext(os.path.basename(key))[0]
-            out[login] = self._get_json(key).get("usageItems", [])
+            try:
+                data = self._get_json(key).get("usageItems", [])
+                return login, data
+            except Exception:  # pylint: disable=broad-exception-caught
+                return login, []
+
+        out: dict[str, list] = {}
+        with ThreadPoolExecutor(max_workers=min(15, max(1, len(keys)))) as executor:
+            results = executor.map(fetch_data, keys)
+            for login, items in results:
+                out[login] = items
         return out
 
     def weekly_records(self) -> list[dict]:
         records: list[dict] = []
-        for day in self.daily_docs():
-            for login, items in self.per_user_docs(day).items():
-                rec = wpu.record_from_items(day, login, items)
-                if rec is not None:
-                    records.append(rec)
+        days = list(self.daily_docs())
+        with ThreadPoolExecutor(max_workers=min(7, max(1, len(days)))) as executor:
+            per_day_results = executor.map(self.per_user_docs, days)
+            for day, day_docs in zip(days, per_day_results):
+                for login, items in day_docs.items():
+                    rec = wpu.record_from_items(day, login, items)
+                    if rec is not None:
+                        records.append(rec)
         return records

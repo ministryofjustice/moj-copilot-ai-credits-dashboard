@@ -1,7 +1,4 @@
-from flask import (
-    Blueprint,
-    send_from_directory
-)
+from flask import Blueprint, send_from_directory
 
 robot_route = Blueprint("robot_route", __name__)
 

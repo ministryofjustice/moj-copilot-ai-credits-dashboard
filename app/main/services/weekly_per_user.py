@@ -25,6 +25,59 @@ def week_span(iso_year: int, iso_week: int) -> tuple[date, date]:
     return monday, sunday
 
 
+def format_week_range(iso_year: int, iso_week: int) -> str:
+    """Compact 'from–to' range for an ISO week, e.g. '1–7 Jun'.
+
+    Drops the repeated month when the week stays within one (e.g. '1–7 Jun'),
+    and spells out both months when it straddles a boundary (e.g. '29 Jun – 5
+    Jul', '29 Dec – 4 Jan'). Years are omitted to keep it short.
+    """
+    monday, sunday = week_span(iso_year, iso_week)
+    if monday.month == sunday.month:
+        return f"{monday.day}–{sunday.day} {monday:%b}"
+    return f"{monday.day} {monday:%b} – {sunday.day} {sunday:%b}"
+
+
+def month_label(day_str: str) -> str:
+    """'2026-06-01' -> '2026-06' (calendar month)."""
+    return day_str[:7]
+
+
+def format_month_label(month_str: str) -> str:
+    """'2026-06' -> 'Jun 2026'."""
+    first = date.fromisoformat(f"{month_str}-01")
+    return f"{first:%b %Y}"
+
+
+TIER_ORDER = ["Power", "Heavy", "Typical", "Light"]
+
+
+def assign_tiers(user_credits: dict[str, float]) -> dict[str, str]:
+    """Label each user Power/Heavy/Typical/Light by their credit-share rank.
+
+    Mirrors the copilotquota treemap: rank users by credits (descending),
+    fraction = rank / n, then bin by [0, .05, .20, .75, 1] into Power (top 5%),
+    Heavy (next 15%), Typical (middle 55%), Light (bottom 25%). Ties keep input
+    order (Python's sort is stable). Empty input -> empty dict.
+    """
+    n = len(user_credits)
+    if n == 0:
+        return {}
+    ordered = sorted(user_credits, key=lambda u: user_credits[u], reverse=True)
+    tiers: dict[str, str] = {}
+    for i, user in enumerate(ordered):
+        frac = (i + 1) / n
+        if frac <= 0.05:
+            tiers[user] = "Power"
+        elif frac <= 0.20:
+            tiers[user] = "Heavy"
+        elif frac <= 0.75:
+            tiers[user] = "Typical"
+        else:
+            tiers[user] = "Light"
+    return tiers
+
+
 def rollup_weekly(records: list[dict]) -> list[dict]:
     """Sum per-(week, user) credits/usd from per-day records.
 
@@ -85,18 +138,18 @@ def record_from_items(day: str, user: str, items: list[dict]) -> dict | None:
     if not items:
         return None
     per_model: dict[str, float] = defaultdict(float)
-    credits = 0.0
+    total_credits = 0.0
     usd = 0.0
     for it in items:
         cr = it.get("grossQuantity", 0.0)
         per_model[it["model"]] += cr
-        credits += cr
+        total_credits += cr
         usd += it.get("grossAmount", 0.0)
-    if credits <= 0:
+    if total_credits <= 0:
         return None
     return {
         "day": day, "user": user,
-        "credits": credits, "usd": usd, "per_model": dict(per_model),
+        "credits": total_credits, "usd": usd, "per_model": dict(per_model),
     }
 
 
@@ -105,7 +158,7 @@ def load_weekly_records(glob_pattern: str = PER_USER_GLOB) -> list[dict]:
     records = []
     for path in sorted(glob.glob(glob_pattern)):
         login = os.path.splitext(os.path.basename(path))[0]
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             items = json.load(f).get("usageItems", [])
         rec = record_from_items(_day_from_per_user_path(path), login, items)
         if rec is not None:

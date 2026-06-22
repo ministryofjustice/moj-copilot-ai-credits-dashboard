@@ -1,0 +1,95 @@
+{% extends "components/base.html" %}
+{% from "govuk_frontend_jinja/components/select/macro.html" import govukSelect %}
+{% from "govuk_frontend_jinja/components/input/macro.html" import govukInput %}
+{% from "govuk_frontend_jinja/components/button/macro.html" import govukButton %}
+{% from "govuk_frontend_jinja/components/inset-text/macro.html" import govukInsetText %}
+
+{% block pageTitle %}Copilot AI Credits — Pooled{% endblock %}
+
+{% block content %}
+{% set active = 'pooled' %}
+<h1 class="govuk-heading-l">GitHub Copilot — AI Credit Usage</h1>
+{% include "components/admin_nav.html" with context %}
+
+{% if not v.has_data %}
+  {{ govukInsetText({"text": "No per-user files found. Populate reports/<date>/billing/per-user/ first."}) }}
+{% else %}
+
+{% set period_items = [
+  {"value": "weekly", "text": "Weekly", "selected": v.period == "weekly"},
+  {"value": "monthly", "text": "Monthly", "selected": v.period == "monthly"}
+] %}
+{% set plan_items = [] %}
+{% for p in v.plans %}{{- plan_items.append({"value": p, "text": p, "selected": p == v.plan}) or "" -}}{% endfor %}
+{% set key_items = [] %}
+{% for o in v.period_options %}{{- key_items.append({"value": o.value, "text": o.text, "selected": o.value == v.key}) or "" -}}{% endfor %}
+
+<form method="get" action="/admin/pooled" class="govuk-!-margin-bottom-4">
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-one-quarter">
+      {{ govukSelect({"id": "period", "name": "period", "label": {"text": "Basis"}, "items": period_items}) }}
+    </div>
+    <div class="govuk-grid-column-one-quarter">
+      {{ govukSelect({"id": "key", "name": "key", "label": {"text": "Period"}, "items": key_items}) }}
+    </div>
+    <div class="govuk-grid-column-one-quarter">
+      {{ govukSelect({"id": "plan", "name": "plan", "label": {"text": "Plan budget"}, "items": plan_items}) }}
+    </div>
+    <div class="govuk-grid-column-one-quarter">
+      {{ govukInput({"id": "seats", "name": "seats", "label": {"text": "Licensed seats"}, "value": v.seats, "classes": "govuk-input--width-5", "inputmode": "numeric"}) }}
+    </div>
+  </div>
+  {{ govukButton({"text": "Apply", "classes": "govuk-button--secondary"}) }}
+</form>
+
+<p class="govuk-body-s">
+  {{ v.span }} · {{ v.period }} pool · {{ v.seats }} seat(s) ·
+  per-seat allowance {{ "%.0f"|format(v.allowance) }} credits (${{ "%.0f"|format(v.allowance / 100) }}) ·
+  {{ v.active_users }} active user(s)
+</p>
+
+{% if v.metrics.overage > 0 %}
+  {{ govukInsetText({"text": "Over the pool by " ~ "%.0f"|format(v.metrics.overage) ~ " credits — billed on top of the included pool."}) }}
+{% else %}
+  {{ govukInsetText({"text": "Within the pool by " ~ "%.0f"|format(v.metrics.headroom) ~ " credits — usage is covered, no overage."}) }}
+{% endif %}
+
+<div class="govuk-grid-row">
+  {% set cards = [
+    ("Included pool", "%.0f"|format(v.metrics.pool), "%.0f"|format(v.metrics.pool / 100)),
+    ("Gross usage", "%.0f"|format(v.metrics.gross), "%.0f"|format(v.metrics.gross / 100)),
+    ("Overage", "%.0f"|format(v.metrics.overage), "%.0f"|format(v.metrics.overage / 100)),
+    ("Total bill", "%.0f"|format(v.metrics.total), "%.0f"|format(v.metrics.total / 100))
+  ] %}
+  {% for label, value, usd in cards %}
+  <div class="govuk-grid-column-one-quarter">
+    <div style="border:1px solid #b1b4b6; padding:15px; margin-bottom:15px;">
+      <span class="govuk-caption-m">{{ label }}</span>
+      <span class="govuk-heading-m govuk-!-margin-bottom-0">${{ usd }}</span>
+      <span class="govuk-body-s govuk-!-margin-bottom-0">{{ value }} AI Credits</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<h3 class="govuk-heading-s">{{ v.span }} — pooled credits</h3>
+<div style="height:460px;"><canvas data-chart="pooledTree"></canvas></div>
+
+<p class="govuk-body-s govuk-!-margin-top-4">
+  Usage-based billing pools each seat's included credits across the whole org:
+  pool = seats × the per-seat {{ v.period }} allowance. You only pay overage when
+  total usage exceeds the pool. Tiles split covered usage by user spend-tier
+  (Power = top 5%, Heavy = next 15%, Typical = middle 55%, Light = bottom 25%).
+</p>
+
+{% set charts = {"pooledTree": v.treemap} %}
+<script type="application/json" id="chart-data">{{ charts | tojson }}</script>
+{% endif %}
+{% endblock %}
+
+{% block bodyEnd %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='javascript/chart.umd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='javascript/chartjs-chart-treemap.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='javascript/charts.js') }}"></script>
+{% endblock %}

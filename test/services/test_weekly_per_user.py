@@ -22,8 +22,32 @@ def test_week_span_returns_monday_and_sunday():
     assert wpu.week_span(2026, 24) == (date(2026, 6, 8), date(2026, 6, 14))
 
 
-def _rec(day, user, credits, usd, per_model):
-    return {"day": day, "user": user, "credits": credits, "usd": usd,
+def test_format_week_range_same_month():
+    assert wpu.format_week_range(2026, 23) == "1–7 Jun"
+
+
+def test_format_week_range_spanning_months():
+    # 2026-W27: Mon 29 Jun – Sun 5 Jul
+    assert wpu.format_week_range(2026, 27) == "29 Jun – 5 Jul"
+
+
+def test_format_week_range_spanning_years():
+    # 2026-W01: Mon 29 Dec 2025 – Sun 4 Jan 2026
+    assert wpu.format_week_range(2026, 1) == "29 Dec – 4 Jan"
+
+
+def test_month_label_extracts_calendar_month():
+    assert wpu.month_label("2026-06-01") == "2026-06"
+    assert wpu.month_label("2026-12-31") == "2026-12"
+
+
+def test_format_month_label_is_human_readable():
+    assert wpu.format_month_label("2026-06") == "Jun 2026"
+    assert wpu.format_month_label("2026-01") == "Jan 2026"
+
+
+def _rec(day, user, credits_val, usd, per_model):
+    return {"day": day, "user": user, "credits": credits_val, "usd": usd,
             "per_model": per_model}
 
 
@@ -62,7 +86,7 @@ def test_rollup_weekly_splits_users_and_weeks():
 
 def test_rollup_weekly_empty_returns_empty_list():
     rows = wpu.rollup_weekly([])
-    assert rows == []
+    assert not rows
 
 
 def test_record_from_items_sums_per_model():
@@ -112,3 +136,28 @@ def test_load_weekly_records_reads_and_sums_per_model(tmp_path):
     assert rec["credits"] == approx(125.0)
     assert rec["usd"] == approx(1.25)
     assert rec["per_model"] == {"Opus": approx(120.0), "Haiku": approx(5.0)}
+
+
+def test_assign_tiers_bins_users_by_spend_rank():
+    # 20 distinct spenders, descending credits.
+    spend = {f"u{i:02d}": float(100 - i) for i in range(20)}
+    tiers = wpu.assign_tiers(spend)
+    counts = {t: 0 for t in wpu.TIER_ORDER}
+    for t in tiers.values():
+        counts[t] += 1
+    # frac = rank/20: Power<=.05 (1), Heavy<=.20 (3), Typical<=.75 (11), Light (5)
+    assert counts == {"Power": 1, "Heavy": 3, "Typical": 11, "Light": 5}
+    # Highest spender is Power, lowest is Light.
+    assert tiers["u00"] == "Power"
+    assert tiers["u19"] == "Light"
+
+
+def test_assign_tiers_empty_input():
+    assert not wpu.assign_tiers({})
+
+
+def test_assign_tiers_assigns_every_user():
+    spend = {"a": 5.0, "b": 5.0, "c": 1.0}
+    tiers = wpu.assign_tiers(spend)
+    assert set(tiers) == {"a", "b", "c"}
+    assert all(t in wpu.TIER_ORDER for t in tiers.values())

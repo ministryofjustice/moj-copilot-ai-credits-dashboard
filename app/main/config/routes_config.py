@@ -1,3 +1,5 @@
+from flask import Flask
+
 from app.main.routes.ai_credits import ai_credits
 from app.main.routes.robots import robot_route
 from app.main.routes.auth import auth_route

@@ -4,6 +4,10 @@ import pytest
 
 from app.main.services.s3_reports_source import S3ReportsSource
 
+# These fakes mirror boto3's S3 client API, whose kwargs are PascalCase
+# (Bucket/Prefix/Key) and some of which the stubs deliberately ignore.
+# pylint: disable=too-few-public-methods,invalid-name,unused-argument
+
 
 class _Body:
     def __init__(self, data: bytes):

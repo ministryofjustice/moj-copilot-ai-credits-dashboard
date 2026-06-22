@@ -59,7 +59,9 @@ ignore-patterns=^\.#
 # (useful for modules/projects where namespaces are manipulated during runtime
 # and thus existing member attributes cannot be deduced by static analysis). It
 # supports qualified module names, as well as Unix pattern matching.
-ignored-modules=
+# Third-party runtime/test deps are pinned in the Pipfile but not installed in
+# the MegaLinter container, so tell pylint not to flag them as unresolved.
+ignored-modules=flask,boto3,pytest
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().
@@ -307,8 +309,8 @@ min-public-methods=2
 [EXCEPTIONS]
 
 # Exceptions that will emit a warning when caught.
-overgeneral-exceptions=BaseException,
-                       Exception
+overgeneral-exceptions=builtins.BaseException,
+                       builtins.Exception
 
 
 [FORMAT]
@@ -371,7 +373,7 @@ int-import-graph=
 known-standard-library=
 
 # Force import order to recognize a module as part of a third party library.
-known-third-party=enchant
+known-third-party=enchant,flask,boto3,pytest
 
 # Couples of modules and preferred modules, separated by a comma.
 preferred-modules=
@@ -419,7 +421,8 @@ disable=raw-checker-failed,
         missing-class-docstring,
         missing-module-docstring,
         missing-function-docstring,
-        line-too-long
+        line-too-long,
+        cyclic-import
 
 # Enable the message, report, category or checker with the given id(s). You can
 # either give multiple identifier separated by comma (,) or put this option

@@ -11,6 +11,8 @@ minus `@st.cache_data`.
 
 from __future__ import annotations
 
+from datetime import date, timedelta
+
 from app.main.services import weekly_per_user as wpu
 from app.main.services.reports_source import ReportsSource
 
@@ -22,6 +24,16 @@ WEEKS_PER_MONTH = 4.33
 # Selectable monthly per-seat AI-credit budgets (USD).
 PLAN_TIERS_USD_PER_MONTH = {"$70 / month": 70.0, "$39 / month": 39.0}
 DEFAULT_PLAN = "$70 / month"
+DEFAULT_SEATS = 405
+
+
+def resolve_seats(raw) -> int:
+    """Coerce a seat-count query value to a positive int, else DEFAULT_SEATS."""
+    try:
+        seats = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_SEATS
+    return seats if seats > 0 else DEFAULT_SEATS
 
 
 def plan_labels() -> list[str]:
@@ -50,12 +62,89 @@ def plan_limits(plan: str) -> dict:
     return {"daily": weekly / 7.0, "weekly": weekly, "monthly": monthly}
 
 
+# --------------------------------------------------------------- heatmap helpers
+HEATMAP_WEEKS = 9  # rolling window (~2 months) for the user usage heatmap
+
+# Colour ramp for the heatmap: grey (no usage) -> greens (within budget) ->
+# graduated reds (over budget), so a day at 108% reads lighter than one at 600%.
+HEATMAP_LEVELS = [
+    {"level": 0, "colour": "#ebedee", "label": "None"},
+    {"level": 1, "colour": "#cce2d8", "label": "<25%"},
+    {"level": 2, "colour": "#85bfa3", "label": "25–50%"},
+    {"level": 3, "colour": "#00703c", "label": "50–100%"},
+    {"level": 4, "colour": "#f4a18f", "label": "100–150%"},
+    {"level": 5, "colour": "#d4351c", "label": "150–300%"},
+    {"level": 6, "colour": "#8e1b0e", "label": "≥300%"},
+]
+
+
+_HEATMAP_THRESHOLDS = [(0.25, 1), (0.50, 2), (1.0, 3), (1.5, 4), (3.0, 5)]
+
+
+def _heatmap_level(pct: float) -> int:
+    if pct <= 0:
+        return 0
+    for threshold, level in _HEATMAP_THRESHOLDS:
+        if pct < threshold:
+            return level
+    return 6
+
+
+def _usage_calendar(urecs: list[dict], daily_allowance: float,  # pylint: disable=too-many-locals
+                    weeks: int = HEATMAP_WEEKS) -> dict:
+    """Rolling-window day grid for the user heatmap (columns=ISO weeks, rows=Mon→Sun).
+
+    Anchored so the rightmost column is the latest record's ISO week. Days with no
+    record render as level 0 (no usage). Mapping is by calendar date, not index.
+    """
+    if not urecs:
+        return {"weeks": [], "month_labels": [], "max_credits": 0.0,
+                "levels": HEATMAP_LEVELS}
+
+    credits_by_day = {r["day"]: r["credits"] for r in urecs}
+    latest = date.fromisoformat(urecs[-1]["day"])
+    # Monday of the latest record's ISO week, then back (weeks-1) Mondays = grid start.
+    last_monday = latest - timedelta(days=latest.weekday())
+    start = last_monday - timedelta(weeks=weeks - 1)
+
+    grid, month_labels = [], []
+    seen_month = None
+    for col in range(weeks):
+        col_start = start + timedelta(weeks=col)
+        column = []
+        for row in range(7):
+            d = col_start + timedelta(days=row)
+            iso = d.isoformat()
+            credits_val = credits_by_day.get(iso, 0.0)
+            pct = (credits_val / daily_allowance) if daily_allowance else 0.0
+            column.append({
+                "day": iso,
+                "credits": round(credits_val, 1),
+                "pct": pct,
+                "level": _heatmap_level(pct),
+                "label": (f"{d:%-d %b %Y}: {credits_val:.1f} credits "
+                          f"({pct * 100:.0f}% of daily allowance)"
+                          if credits_val > 0 else f"{d:%-d %b %Y}: no usage"),
+            })
+        grid.append(column)
+        if col_start.month != seen_month:
+            month_labels.append({"col": col, "text": f"{col_start:%b}"})
+            seen_month = col_start.month
+
+    return {
+        "weeks": grid,
+        "month_labels": month_labels,
+        "max_credits": max(credits_by_day.values()),
+        "levels": HEATMAP_LEVELS,
+    }
+
+
 # ----------------------------------------------------------------- daily helpers
 def _totals(items: list[dict]) -> tuple[float, float, float]:
     gross = sum(i.get("grossAmount", 0.0) for i in items)
     net = sum(i.get("netAmount", 0.0) for i in items)
-    credits = sum(i.get("grossQuantity", 0.0) for i in items)
-    return gross, net, credits
+    total_credits = sum(i.get("grossQuantity", 0.0) for i in items)
+    return gross, net, total_credits
 
 
 def _by_model(items: list[dict]) -> list[dict]:
@@ -70,7 +159,7 @@ def _by_model(items: list[dict]) -> list[dict]:
     return rows
 
 
-def daily_view(source: ReportsSource, day: str | None = None) -> dict:
+def daily_view(source: ReportsSource, day: str | None = None) -> dict:  # pylint: disable=too-many-locals
     """Everything the Daily admin page needs for one day, plus the MTD trend."""
     docs = source.daily_docs()
     if not docs:
@@ -81,7 +170,7 @@ def daily_view(source: ReportsSource, day: str | None = None) -> dict:
     doc = docs[day]
     scope = doc.get("organization") or doc.get("enterprise") or "?"
     items = doc.get("usageItems", [])
-    gross, net, credits = _totals(items)
+    gross, net, total_credits = _totals(items)
 
     by_model = _by_model(items)
     for r in by_model:
@@ -110,7 +199,7 @@ def daily_view(source: ReportsSource, day: str | None = None) -> dict:
         "day": day,
         "scope": scope,
         "metrics": {
-            "gross": gross, "net": net, "covered": gross - net, "credits": credits,
+            "gross": gross, "net": net, "covered": gross - net, "credits": total_credits,
         },
         "fully_covered": net == 0 and gross > 0,
         "by_model": by_model,
@@ -164,7 +253,116 @@ def _week_labels(rows: list[dict]) -> list[str]:
     return list(dict.fromkeys(r["week_label"] for r in rows))
 
 
-def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> dict:
+def _week_ranges(rows: list[dict]) -> dict[str, str]:
+    """Map each ISO week label to its compact 'from–to' date range."""
+    return {
+        r["week_label"]: wpu.format_week_range(int(r["iso_year"]), int(r["iso_week"]))
+        for r in rows
+    }
+
+
+# ----------------------------------------------------------------- pooled helpers
+TIER_COLOURS = {
+    "Power": "#d4351c",
+    "Heavy": "#f47738",
+    "Typical": "#1d70b8",
+    "Light": "#00703c",
+    "Overage (billed extra)": "#85230c",
+    "Unused pool": "#b1b4b6",
+}
+
+
+def _record_period_key(day: str, period: str) -> str:
+    """ISO-week label or calendar-month label for a day, per the period type."""
+    if period == "weekly":
+        return wpu.iso_week_label(day)[0]
+    return wpu.month_label(day)
+
+
+def _period_text(key: str, period: str) -> str:
+    """Selector/headline text: '2026-W23 (1–7 Jun)' or 'Jun 2026'."""
+    if period == "weekly":
+        iso_year, iso_week = key.split("-W")
+        return f"{key} ({wpu.format_week_range(int(iso_year), int(iso_week))})"
+    return wpu.format_month_label(key)
+
+
+def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # pylint: disable=too-many-locals
+                plan: str | None, seats) -> dict:
+    """Pooled-billing treemap data for one ISO week or calendar month.
+
+    pool = seats * per-seat allowance for the period; covered usage is split by
+    user spend-tier and scaled to min(gross, pool); the remainder is an
+    'Unused pool' tile (within budget) or an 'Overage' tile (over budget). All
+    figures are AI credits.
+    """
+    period = "weekly" if period == "weekly" else "monthly"
+    plan = resolve_plan(plan)
+    seats = resolve_seats(seats)
+    records = source.weekly_records()
+    keys = sorted({_record_period_key(r["day"], period) for r in records})
+
+    base = {
+        "period": period, "plans": plan_labels(), "plan": plan, "seats": seats,
+        "periods": keys,
+    }
+    if not keys:
+        return {**base, "has_data": False, "key": None}
+
+    key = key if key in keys else keys[-1]
+    user_credits: dict[str, float] = {}
+    for r in records:
+        if _record_period_key(r["day"], period) == key:
+            user_credits[r["user"]] = user_credits.get(r["user"], 0.0) + float(r["credits"])
+
+    allowance = plan_limits(plan)[period]
+    pool = seats * allowance
+    gross = sum(user_credits.values())
+    overage = max(0.0, gross - pool)
+    headroom = pool - gross
+    total = max(pool, gross)
+    covered_scale = (min(gross, pool) / gross) if gross else 0.0
+
+    tiers = wpu.assign_tiers(user_credits)
+    tier_gross = {t: 0.0 for t in wpu.TIER_ORDER}
+    tier_users = {t: 0 for t in wpu.TIER_ORDER}
+    for user, credits_val in user_credits.items():
+        tier_gross[tiers[user]] += credits_val
+        tier_users[tiers[user]] += 1
+
+    tiles = [
+        {"label": f"{t} users", "name": t,
+         "amount": round(tier_gross[t] * covered_scale, 1),
+         "users": tier_users[t], "colour": TIER_COLOURS[t]}
+        for t in wpu.TIER_ORDER
+    ]
+    if overage > 0:
+        tiles.append({"label": "Overage (billed extra)", "name": "Overage",
+                      "amount": round(overage, 1), "users": None,
+                      "colour": TIER_COLOURS["Overage (billed extra)"]})
+    elif headroom > 0:
+        tiles.append({"label": "Unused pool", "name": "Unused pool",
+                      "amount": round(headroom, 1), "users": None,
+                      "colour": TIER_COLOURS["Unused pool"]})
+
+    return {
+        **base,
+        "has_data": True,
+        "key": key,
+        "span": _period_text(key, period),
+        "period_options": [{"value": k, "text": _period_text(k, period)} for k in keys],
+        "allowance": allowance,
+        "active_users": len(user_credits),
+        "metrics": {"pool": pool, "gross": gross, "overage": overage,
+                    "total": total, "headroom": headroom},
+        "tiles": tiles,
+        "treemap": {"type": "treemap",
+                    "root": f"Total bill {total:,.0f} credits (${total / 100:,.0f})",
+                    "total": total, "tiles": tiles},
+    }
+
+
+def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> dict:  # pylint: disable=too-many-locals
     """Org weekly per-user allowance table for one ISO week."""
     all_rows = _weekly_rows(source)
     plan = resolve_plan(plan)
@@ -178,14 +376,15 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
     wk = [r for r in all_rows if r["week_label"] == week]
     iso_year, iso_week = int(wk[0]["iso_year"]), int(wk[0]["iso_week"])
     mon, sun = wpu.week_span(iso_year, iso_week)
+    week_ranges = _week_ranges(all_rows)
 
     rows = []
     for r in wk:
-        credits = float(r["credits"])
+        credits_val = float(r["credits"])
         rows.append({
-            "user": r["user"], "credits": credits,
-            "pct": (credits / allowance) if allowance else 0.0,
-            "remaining": allowance - credits,
+            "user": r["user"], "credits": credits_val,
+            "pct": (credits_val / allowance) if allowance else 0.0,
+            "remaining": allowance - credits_val,
             "top_model": r["top_model"], "day_count": int(r["day_count"]),
         })
     rows.sort(key=lambda x: x["credits"], reverse=True)
@@ -195,13 +394,14 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
         "has_data": True,
         "plans": plan_labels(), "plan": plan, "allowance": allowance,
         "weeks": weeks, "week": week,
+        "week_ranges": week_ranges,
         "span": f"{mon:%a %d %b} – {sun:%a %d %b}",
         "active_users": len(rows),
         "rows": rows, "over": over,
     }
 
 
-def user_view(
+def user_view(  # pylint: disable=too-many-locals
     source: ReportsSource,
     login: str | None,
     plan: str | None,
@@ -235,18 +435,19 @@ def user_view(
     all_rows = wpu.rollup_weekly(records)
     weekly_rows = []
     for r in (row for row in all_rows if row["user"] == login_str):
-        credits = float(r["credits"])
+        credits_val = float(r["credits"])
         mon, sun = wpu.week_span(int(r["iso_year"]), int(r["iso_week"]))
         weekly_rows.append({
-            "week_label": r["week_label"], "credits": credits,
-            "pct": (credits / allowance) if allowance else 0.0,
-            "remaining": allowance - credits, "day_count": int(r["day_count"]),
+            "week_label": r["week_label"], "credits": credits_val,
+            "pct": (credits_val / allowance) if allowance else 0.0,
+            "remaining": allowance - credits_val, "day_count": int(r["day_count"]),
             "top_model": r["top_model"], "span": f"{mon:%d %b} – {sun:%d %b}",
         })
     weekly_rows.sort(key=lambda x: x["week_label"])
     weeks = [w["week_label"] for w in weekly_rows]
+    week_ranges = _week_ranges(all_rows)
     weekly_chart = {
-        "labels": weeks,
+        "labels": [f"{w} ({week_ranges[w]})" for w in weeks],
         "credits": [round(w["credits"], 1) for w in weekly_rows],
     }
 
@@ -282,10 +483,12 @@ def user_view(
         **base,
         "searched": True, "found": True,
         "weeks": weeks, "weekly": weekly_rows, "weekly_chart": weekly_chart,
+        "week_ranges": week_ranges,
         "week": selected, "span": current["span"],
         "used": current["credits"], "remaining": current["remaining"],
         "pct": current["pct"], "day_count": current["day_count"],
         "top_model": current["top_model"],
         "daily": daily_rows, "daily_chart": daily_chart,
         "mtd": mtd,
+        "calendar": _usage_calendar(urecs, limits["daily"]),
     }
