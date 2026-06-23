@@ -13,7 +13,7 @@ env:
 
   IMAGE_TAG: ${{ github.sha }}
   ECR_REGISTRY: ${{ secrets.ECR_REGISTRY_URL }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  ECR_REPOSITORY: ${{ vars.DEV_ECR_REPOSITORY }}
   FLASK_APP_SECRET: ${{ secrets.DEV_FLASK_APP_SECRET }}
 
   AUTH0_CLIENT_ID: ${{ secrets.DEV_AUTH0_CLIENT_ID }}
@@ -30,7 +30,7 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          role-to-assume: ${{ secrets.ECR_ROLE_TO_ASSUME }}
+          role-to-assume: ${{ secrets.DEV_ECR_ROLE_TO_ASSUME }}
           aws-region: "eu-west-2"
 
       - uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
