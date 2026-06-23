@@ -6,6 +6,7 @@ app:
     replicaCount: 1
     serviceAccountName: "moj-copilot-ai-credits-dashboard-prod"
     env:
+      AUTH0_DOMAIN: "check-your-co-pilot-usage-prod.uk.auth0.com"
       SENTRY_ENV: "production"
       FLASK_DEBUG: false
       REPORTS_SOURCE: "s3"
