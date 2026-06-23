@@ -4,6 +4,7 @@ app:
 
   deployment:
     replicaCount: 1
+    serviceAccountName: "moj-copilot-ai-credits-dashboard-prod"
     env:
       SENTRY_ENV: "production"
       FLASK_DEBUG: false
