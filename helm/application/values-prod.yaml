@@ -1,9 +1,9 @@
 app:
   ingress:
-    host: "application.service.justice.gov.uk" # This should be changed as appropriate
+    host: "moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk" # This should be changed as appropriate
 
   deployment:
-    replicaCount: 3
+    replicaCount: 1
     env:
       SENTRY_ENV: "production"
       FLASK_DEBUG: false
