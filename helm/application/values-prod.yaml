@@ -3,7 +3,7 @@ app:
     host: "moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk" # This should be changed as appropriate
 
   deployment:
-    replicaCount: 1
+    replicaCount: 3
     serviceAccountName: "moj-copilot-ai-credits-dashboard-prod"
     env:
       AUTH0_DOMAIN: "check-your-co-pilot-usage-prod.uk.auth0.com"
