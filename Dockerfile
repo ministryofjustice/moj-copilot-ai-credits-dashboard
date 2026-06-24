@@ -9,6 +9,7 @@ RUN apk add --no-cache --no-progress \
   curl \
   groff \
   less \
+  jq \
   && apk update \
   && apk upgrade --no-cache --available
 
