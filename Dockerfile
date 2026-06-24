@@ -7,11 +7,13 @@ RUN apk add --no-cache --no-progress \
   libffi-dev \
   build-base \
   curl \
+  groff \
+  less \
   && apk update \
   && apk upgrade --no-cache --available
 
 # Install pipenv
-RUN pip install --no-cache-dir pipenv
+RUN pip install --no-cache-dir pipenv awscli
 
 # Create user and group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup -u 1051
