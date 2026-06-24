@@ -165,7 +165,7 @@ def test_weekly_records_skips_zero_credit_users():
         [["2026", "6", "1", "idle", "AI Credits", "0", "0.0"]],
     )
     src = _source(rows)
-    assert src.weekly_records() == []
+    assert not src.weekly_records()
 
 
 def test_daily_docs_grouped_by_day_sorted():

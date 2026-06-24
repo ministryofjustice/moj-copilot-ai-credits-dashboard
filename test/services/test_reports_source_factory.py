@@ -3,6 +3,7 @@
 import pytest
 
 from app.main.services.caching_reports_source import CachingReportsSource
+from app.main.services.db_reports_source import DbReportsSource
 from app.main.services.reports_source import LocalFsReportsSource, get_reports_source
 
 
@@ -36,8 +37,6 @@ def test_unknown_backend_raises(monkeypatch):
 
 
 def test_db_backend_builds_db_source(monkeypatch):
-    from app.main.services.db_reports_source import DbReportsSource
-
     monkeypatch.setenv("REPORTS_SOURCE", "db")
     monkeypatch.setenv("REPORTS_CACHE_TTL", "0")  # bare source, easier to assert
     monkeypatch.setenv("AWS_DEFAULT_REGION", "eu-west-2")
