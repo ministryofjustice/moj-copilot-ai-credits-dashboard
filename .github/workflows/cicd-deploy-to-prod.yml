@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - "v*" # Push events to matching v*, i.e. v1.0, v20.15.10
+      - "*" # Push events to matching v*, i.e. v1.0, v20.15.10
 env:
   # A majority of the secrets generated here come from the cloud-platform-environments repository.
   KUBE_CLUSTER: ${{ secrets.KUBE_CLUSTER }}
@@ -12,11 +12,14 @@ env:
   KUBE_CERT: ${{ secrets.PROD_KUBE_CERT }}
   KUBE_TOKEN: ${{ secrets.PROD_KUBE_TOKEN }}
 
-  IMAGE_TAG: ${{ github.ref_name }}
+  IMAGE_TAG: ${{ github.ref_name || github.sha }}
   ECR_REGISTRY: ${{ secrets.ECR_REGISTRY_URL }}
   ECR_REPOSITORY: ${{ vars.PROD_ECR_REPOSITORY }}
+
   FLASK_APP_SECRET: ${{ secrets.PROD_FLASK_APP_SECRET }}
-  SENTRY_DSN_KEY: ${{secrets.SENTRY_DSN_KEY }}
+
+  AUTH0_CLIENT_ID: ${{ secrets.PROD_AUTH0_CLIENT_ID }}
+  AUTH0_CLIENT_SECRET: ${{ secrets.PROD_AUTH0_CLIENT_SECRET }}
 
 jobs:
   build-push:
@@ -26,11 +29,6 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Release
-        uses: softprops/action-gh-release@vc062e08bd532815e2082a85e87e3ef29c3e6d191 #v2.0.8
-        with:
-          generate_release_notes: true
 
       - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
@@ -46,7 +44,6 @@ jobs:
   deploy-to-prod:
     needs: build-push
     runs-on: ubuntu-latest
-    container: alpine/k8s:1.23.17
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -70,7 +67,8 @@ jobs:
             --wait \
             --namespace ${KUBE_NAMESPACE} \
             --values=helm/application/values-prod.yaml \
-            --set app.deployment.env.APP_SECRET_KEY=${FLASK_APP_SECRET} \
-            --set app.deployment.env.SENTRY_DSN_KEY=${SENTRY_DSN_KEY} \
+            --set app.deployment.env.AUTH0_CLIENT_ID="${AUTH0_CLIENT_ID}" \
+            --set app.deployment.env.AUTH0_CLIENT_SECRET="${AUTH0_CLIENT_SECRET}" \
             --set app.deployment.image.repository=${ECR_REGISTRY}/${ECR_REPOSITORY} \
-            --set app.deployment.image.tag=${IMAGE_TAG}
+            --set app.deployment.image.tag=$IMAGE_TAG \
+            --set app.deployment.env.APP_SECRET_KEY=${FLASK_APP_SECRET}

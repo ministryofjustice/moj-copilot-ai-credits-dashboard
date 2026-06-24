@@ -4,6 +4,7 @@ app:
 
   deployment:
     replicaCount: 1
+    serviceAccountName: "moj-copilot-ai-credits-dashboard-dev"
     env:
       AUTH0_DOMAIN: "check-your-co-pilot-usage-dev.uk.auth0.com"
       SENTRY_ENV: "development"
