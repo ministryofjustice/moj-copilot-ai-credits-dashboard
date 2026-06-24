@@ -22,15 +22,27 @@ def _result_set(header, data_rows):
     return {"ResultSet": {"Rows": rows}}
 
 
+class FakePaginator:
+    """Stand-in for a boto3 paginator: yields the configured pages in order."""
+
+    def __init__(self, pages):
+        self._pages = pages
+
+    def paginate(self, **kw):
+        return iter(self._pages)
+
+
 class FakeAthenaClient:
     """In-memory stand-in for a boto3 'athena' client.
 
-    `states` drives the poll loop (last value repeats); `result_set` is what
-    get_query_results returns. Captured SQL is exposed via `.queries`.
+    `states` drives the poll loop (last value repeats). Results come back via a
+    paginator (as in real boto3): `pages` is the list of GetQueryResults payloads,
+    defaulting to a single page built from `result_set`. Captured SQL via `.queries`.
     """
 
-    def __init__(self, result_set=None, states=("SUCCEEDED",)):
-        self._result_set = result_set or _result_set([], [])
+    def __init__(self, result_set=None, states=("SUCCEEDED",), pages=None):
+        self._pages = pages if pages is not None else [
+            result_set or _result_set([], [])]
         self._states = list(states)
         self.queries = []
 
@@ -43,8 +55,8 @@ class FakeAthenaClient:
         return {"QueryExecution": {"Status": {
             "State": state, "StateChangeReason": "boom"}}}
 
-    def get_query_results(self, **kw):
-        return self._result_set
+    def get_paginator(self, name):
+        return FakePaginator(self._pages)
 
 
 def _source(result_set=None, states=("SUCCEEDED",)):
@@ -59,6 +71,24 @@ def test_run_query_maps_rows_to_dicts():
     assert src._run_query("SELECT a, b FROM t") == [
         {"a": "1", "b": "x"}, {"a": "2", "b": "y"},
     ]
+
+
+def test_run_query_concatenates_paginated_pages():
+    # Real Athena puts the header only on the first page; later pages are data-only.
+    page1 = _result_set(["a"], [["1"]])
+    page2 = {"ResultSet": {"Rows": [_row(["2"])]}}
+    client = FakeAthenaClient(pages=[page1, page2])
+    src = DbReportsSource(database="db", table="t", output_location="s3://x/",
+                          client=client, sleep=lambda _s: None)
+    assert src._run_query("SELECT a FROM t") == [{"a": "1"}, {"a": "2"}]
+
+
+def test_run_query_handles_empty_page():
+    # A page with no Rows at all must not IndexError into the (absent) header.
+    client = FakeAthenaClient(pages=[{"ResultSet": {"Rows": []}}])
+    src = DbReportsSource(database="db", table="t", output_location="s3://x/",
+                          client=client, sleep=lambda _s: None)
+    assert src._run_query("SELECT a FROM t") == []
 
 
 def test_run_query_polls_until_succeeded():

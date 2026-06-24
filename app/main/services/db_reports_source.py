@@ -86,22 +86,17 @@ class DbReportsSource(ReportsSource):
     def _collect_results(self, qid: str) -> list[dict]:
         rows: list[dict] = []
         header: list[str] | None = None
-        token = None
-        while True:
-            kwargs = {"QueryExecutionId": qid}
-            if token:
-                kwargs["NextToken"] = token
-            resp = self._client.get_query_results(**kwargs)
+        paginator = self._client.get_paginator("get_query_results")
+        for resp in paginator.paginate(QueryExecutionId=qid):
             result_rows = resp["ResultSet"]["Rows"]
             if header is None:
+                if not result_rows:  # no header => no data
+                    continue
                 header = [c.get("VarCharValue") for c in result_rows[0]["Data"]]
                 result_rows = result_rows[1:]
             for r in result_rows:
                 values = [c.get("VarCharValue") for c in r["Data"]]
                 rows.append(dict(zip(header, values)))
-            token = resp.get("NextToken")
-            if not token:
-                break
         return rows
 
     def daily_docs(self) -> dict[str, dict]:
