@@ -88,7 +88,7 @@ def test_run_query_handles_empty_page():
     client = FakeAthenaClient(pages=[{"ResultSet": {"Rows": []}}])
     src = DbReportsSource(database="db", table="t", output_location="s3://x/",
                           client=client, sleep=lambda _s: None)
-    assert src._run_query("SELECT a FROM t") == []
+    assert not src._run_query("SELECT a FROM t")
 
 
 def test_run_query_polls_until_succeeded():
