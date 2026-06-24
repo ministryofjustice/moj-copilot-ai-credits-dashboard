@@ -41,8 +41,8 @@ def _item(row: dict) -> dict:
 
 
 class DbReportsSource(ReportsSource):
-    def __init__(self, database=None, table=None, output_location=None,
-                 workgroup=None, client=None, sleep=None) -> None:
+    def __init__(self, database=None, table=None, output_location=None,  # pylint: disable=too-many-arguments
+                 *, workgroup=None, client=None, sleep=None) -> None:
         self.database = database or os.getenv("ATHENA_DATABASE")
         if not self.database:
             raise ValueError("ATHENA_DATABASE is required when REPORTS_SOURCE=db")
