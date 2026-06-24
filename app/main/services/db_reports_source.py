@@ -120,4 +120,25 @@ class DbReportsSource(ReportsSource):
         return out
 
     def weekly_records(self) -> list[dict]:
-        raise NotImplementedError  # Task 3
+        sql = (
+            'SELECT year, month, day, "user", model, '
+            "SUM(gross_quantity) AS credits, SUM(gross_amount) AS usd "
+            f"FROM {self.table} "
+            'GROUP BY year, month, day, "user", model'
+        )
+        grouped: dict[tuple[str, str], list] = {}
+        for row in self._run_query(sql):
+            day = (f'{int(row["year"]):04d}-'
+                   f'{int(row["month"]):02d}-{int(row["day"]):02d}')
+            item = {
+                "model": row["model"],
+                "grossQuantity": float(row["credits"]),
+                "grossAmount": float(row["usd"]),
+            }
+            grouped.setdefault((day, row["user"]), []).append(item)
+        records: list[dict] = []
+        for (day, user), items in grouped.items():
+            rec = wpu.record_from_items(day, user, items)
+            if rec is not None:
+                records.append(rec)
+        return records

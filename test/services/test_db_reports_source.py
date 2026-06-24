@@ -132,3 +132,37 @@ def test_per_user_docs_rejects_bad_day():
     src = _source()
     with pytest.raises(ValueError):
         src.per_user_docs("not-a-date")
+
+
+def test_weekly_records_shape_and_per_model():
+    rows = _result_set(
+        ["year", "month", "day", "user", "model", "credits", "usd"],
+        [["2026", "6", "1", "alice", "AI Credits", "100", "1.0"],
+         ["2026", "6", "2", "alice", "AI Credits", "10", "0.1"]],
+    )
+    src = _source(rows)
+    records = src.weekly_records()
+    assert {(r["day"], r["user"]) for r in records} == {
+        ("2026-06-01", "alice"), ("2026-06-02", "alice")}
+    day1 = next(r for r in records if r["day"] == "2026-06-01")
+    assert day1["credits"] == pytest.approx(100.0)
+    assert day1["usd"] == pytest.approx(1.0)
+    assert day1["per_model"] == {"AI Credits": pytest.approx(100.0)}
+
+
+def test_weekly_records_uses_group_by():
+    client = FakeAthenaClient(_result_set(
+        ["year", "month", "day", "user", "model", "credits", "usd"], []))
+    src = DbReportsSource(database="db", table="t", output_location="s3://x/",
+                          client=client, sleep=lambda _s: None)
+    src.weekly_records()
+    assert "GROUP BY" in client.queries[0]
+
+
+def test_weekly_records_skips_zero_credit_users():
+    rows = _result_set(
+        ["year", "month", "day", "user", "model", "credits", "usd"],
+        [["2026", "6", "1", "idle", "AI Credits", "0", "0.0"]],
+    )
+    src = _source(rows)
+    assert src.weekly_records() == []
