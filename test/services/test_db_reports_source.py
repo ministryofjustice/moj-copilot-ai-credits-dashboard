@@ -166,3 +166,23 @@ def test_weekly_records_skips_zero_credit_users():
     )
     src = _source(rows)
     assert src.weekly_records() == []
+
+
+def test_daily_docs_grouped_by_day_sorted():
+    rows = _result_set(
+        ["year", "month", "day", "enterprise", "user",
+         "model", "gross_quantity", "gross_amount"],
+        [["2026", "6", "2", "MoJ", "alice", "AI Credits", "5", "0.05"],
+         ["2026", "6", "1", "MoJ", "bob", "AI Credits", "3", "0.03"],
+         ["2026", "6", "1", "MoJ", "carol", "AI Credits", "2", "0.02"]],
+    )
+    src = _source(rows)
+    docs = src.daily_docs()
+    assert list(docs) == ["2026-06-01", "2026-06-02"]
+    assert docs["2026-06-01"]["enterprise"] == "MoJ"
+    assert docs["2026-06-01"]["usageItems"] == [
+        {"model": "AI Credits", "grossQuantity": 3.0, "grossAmount": 0.03},
+        {"model": "AI Credits", "grossQuantity": 2.0, "grossAmount": 0.02},
+    ]
+    assert docs["2026-06-02"]["usageItems"] == [
+        {"model": "AI Credits", "grossQuantity": 5.0, "grossAmount": 0.05}]

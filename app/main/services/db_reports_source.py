@@ -105,7 +105,19 @@ class DbReportsSource(ReportsSource):
         return rows
 
     def daily_docs(self) -> dict[str, dict]:
-        raise NotImplementedError  # Task 4
+        sql = (
+            'SELECT year, month, day, enterprise, "user", model, '
+            "gross_quantity, gross_amount "
+            f"FROM {self.table}"
+        )
+        docs: dict[str, dict] = {}
+        for row in self._run_query(sql):
+            day = (f'{int(row["year"]):04d}-'
+                   f'{int(row["month"]):02d}-{int(row["day"]):02d}')
+            doc = docs.setdefault(
+                day, {"enterprise": row["enterprise"], "usageItems": []})
+            doc["usageItems"].append(_item(row))
+        return dict(sorted(docs.items()))
 
     def per_user_docs(self, day: str) -> dict[str, list]:
         d = date.fromisoformat(day)  # raises ValueError on bad input
