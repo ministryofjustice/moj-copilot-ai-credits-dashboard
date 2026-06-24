@@ -101,3 +101,34 @@ def test_start_query_passes_database_and_output_location():
                           workgroup="wg", client=client, sleep=lambda _s: None)
     src._run_query("SELECT a FROM t")
     assert client.queries == ["SELECT a FROM t"]
+
+
+def test_per_user_docs_groups_by_login_and_casts():
+    rows = _result_set(
+        ["user", "model", "gross_quantity", "gross_amount"],
+        [["alice", "AI Credits", "5", "0.05"],
+         ["bob", "AI Credits", "3", "0.03"]],
+    )
+    src = _source(rows)
+    docs = src.per_user_docs("2026-06-01")
+    assert docs == {
+        "alice": [{"model": "AI Credits", "grossQuantity": 5.0, "grossAmount": 0.05}],
+        "bob": [{"model": "AI Credits", "grossQuantity": 3.0, "grossAmount": 0.03}],
+    }
+
+
+def test_per_user_docs_partition_filters_by_date():
+    client = FakeAthenaClient(_result_set(
+        ["user", "model", "gross_quantity", "gross_amount"], []))
+    src = DbReportsSource(database="db", table="t", output_location="s3://x/",
+                          client=client, sleep=lambda _s: None)
+    src.per_user_docs("2026-06-04")
+    sql = client.queries[0]
+    assert "year = 2026" in sql and "month = 6" in sql and "day = 4" in sql
+    assert '"user"' in sql  # reserved word is quoted
+
+
+def test_per_user_docs_rejects_bad_day():
+    src = _source()
+    with pytest.raises(ValueError):
+        src.per_user_docs("not-a-date")

@@ -108,7 +108,16 @@ class DbReportsSource(ReportsSource):
         raise NotImplementedError  # Task 4
 
     def per_user_docs(self, day: str) -> dict[str, list]:
-        raise NotImplementedError  # Task 2
+        d = date.fromisoformat(day)  # raises ValueError on bad input
+        sql = (
+            'SELECT "user", model, gross_quantity, gross_amount '
+            f"FROM {self.table} "
+            f"WHERE year = {d.year} AND month = {d.month} AND day = {d.day}"
+        )
+        out: dict[str, list] = {}
+        for row in self._run_query(sql):
+            out.setdefault(row["user"], []).append(_item(row))
+        return out
 
     def weekly_records(self) -> list[dict]:
         raise NotImplementedError  # Task 3
