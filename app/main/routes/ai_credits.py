@@ -44,26 +44,45 @@ def my_usage():
 @ai_credits.route("/admin")
 @requires_auth
 def admin_daily():
-    view = ac.daily_view(get_reports_source(), request.args.get("day"))
-    return render_template("pages/admin_daily.html", v=view)
+    role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
+    print(f"User role: {role}")
+
+    if role == "admin":
+        view = ac.daily_view(get_reports_source(), request.args.get("day"))
+        return render_template("pages/admin_daily.html", v=view)
+    else:
+        return render_template("pages/errors/403.html", v=view)
 
 
 @ai_credits.route("/admin/weekly")
 @requires_auth
 def admin_weekly():
-    view = ac.weekly_view(
-        get_reports_source(), request.args.get("plan"), request.args.get("week")
-    )
-    return render_template("pages/admin_weekly.html", v=view)
+    role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
+    print(f"User role: {role}")
+
+    if role == "admin":
+        view = ac.weekly_view(
+            get_reports_source(), request.args.get("plan"), request.args.get("week")
+        )
+        return render_template("pages/admin_weekly.html", v=view)
+    else:
+        return render_template("pages/errors/403.html", v=view)
 
 
 @ai_credits.route("/admin/pooled")
 def admin_pooled():
-    view = ac.pooled_view(
-        get_reports_source(),
-        request.args.get("period"),
-        request.args.get("key"),
-        request.args.get("plan"),
-        request.args.get("seats"),
-    )
-    return render_template("pages/admin_pooled.html", v=view)
+    role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
+    print(f"User role: {role}")
+    
+    if role == "admin":
+        view = ac.pooled_view(
+            get_reports_source(),
+            request.args.get("period"),
+            request.args.get("key"),
+            request.args.get("plan"),
+            request.args.get("seats"),
+        )
+        return render_template("pages/admin_pooled.html", v=view)
+    else:
+        return render_template("pages/errors/403.html", v=view)
+
