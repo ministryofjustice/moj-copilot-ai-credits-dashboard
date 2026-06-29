@@ -27,7 +27,8 @@ ai_credits = Blueprint("ai_credits", __name__)
 @ai_credits.route("/")
 @requires_auth
 def my_usage():
-    username = session["user"].get("userinfo", {}).get("nickname", "")
+    # username = session["user"].get("userinfo", {}).get("nickname", "")
+    username = "lively-salmon"
     print(f"Username: {username}")
 
     view = ac.user_view(
