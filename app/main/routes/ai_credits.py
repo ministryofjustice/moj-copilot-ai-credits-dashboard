@@ -51,7 +51,7 @@ def admin_daily():
         view = ac.daily_view(get_reports_source(), request.args.get("day"))
         return render_template("pages/admin_daily.html", v=view)
     else:
-        return render_template("pages/errors/403.html", v=view)
+        return render_template("pages/errors/403.html")
 
 
 @ai_credits.route("/admin/weekly")
@@ -66,14 +66,14 @@ def admin_weekly():
         )
         return render_template("pages/admin_weekly.html", v=view)
     else:
-        return render_template("pages/errors/403.html", v=view)
+        return render_template("pages/errors/403.html")
 
 
 @ai_credits.route("/admin/pooled")
 def admin_pooled():
     role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
     print(f"User role: {role}")
-    
+
     if role == "admin":
         view = ac.pooled_view(
             get_reports_source(),
@@ -84,5 +84,5 @@ def admin_pooled():
         )
         return render_template("pages/admin_pooled.html", v=view)
     else:
-        return render_template("pages/errors/403.html", v=view)
+        return render_template("pages/errors/403.html")
 
