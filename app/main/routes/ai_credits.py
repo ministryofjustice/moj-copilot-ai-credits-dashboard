@@ -27,8 +27,8 @@ ai_credits = Blueprint("ai_credits", __name__)
 @ai_credits.route("/")
 @requires_auth
 def my_usage():
-    # username = session["user"].get("userinfo", {}).get("nickname", "")
-    username = "lively-salmon"
+    username = session["user"].get("userinfo", {}).get("nickname", "")
+
     print(f"Username: {username}")
 
     view = ac.user_view(
@@ -44,10 +44,9 @@ def my_usage():
 @ai_credits.route("/admin")
 @requires_auth
 def admin_daily():
-    # role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
-    # print(f"User role: {role}")
+    role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
 
-    role = "admin"
+    print(f"User role: {role}")
 
     if role == "admin":
         view = ac.daily_view(get_reports_source(), request.args.get("day"))
@@ -60,6 +59,7 @@ def admin_daily():
 @requires_auth
 def admin_weekly():
     role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
+
     print(f"User role: {role}")
 
     if role == "admin":
@@ -74,6 +74,7 @@ def admin_weekly():
 @ai_credits.route("/admin/pooled")
 def admin_pooled():
     role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
+    
     print(f"User role: {role}")
 
     if role == "admin":
