@@ -18,18 +18,24 @@ from app.main.services import ai_credits as ac
 from app.main.services.reports_source import get_reports_source
 from app.main.middleware.auth import requires_auth
 
+from flask import session
+
+
 ai_credits = Blueprint("ai_credits", __name__)
 
 
 @ai_credits.route("/")
 @requires_auth
 def my_usage():
+    print(f"Username: {session["user"].get("nickname", "")}")
+
     view = ac.user_view(
         get_reports_source(),
-        request.args.get("user"),
+        session["user"].get("nickname", ""),
         request.args.get("plan"),
         request.args.get("week"),
     )
+
     return render_template("pages/my_usage.html", v=view)
 
 
