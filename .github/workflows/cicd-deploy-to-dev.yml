@@ -75,6 +75,6 @@ jobs:
             --set app.deployment.image.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
             --set app.deployment.image.tag=$IMAGE_TAG \
             --set app.deployment.env.APP_SECRET_KEY=${FLASK_APP_SECRET} \
-            --set app.deployment.env.APP_SECRET_KEY=${ATHENA_DATABASE} \
-            --set app.deployment.env.APP_SECRET_KEY=${ATHENA_TABLE} \
-            --set app.deployment.env.APP_SECRET_KEY=${ATHENA_WORKGROUP}
+            --set app.deployment.env.ATHENA_DATABASE=${ATHENA_DATABASE} \
+            --set app.deployment.env.ATHENA_TABLE=${ATHENA_TABLE} \
+            --set app.deployment.env.ATHENA_WORKGROUP=${ATHENA_WORKGROUP}
