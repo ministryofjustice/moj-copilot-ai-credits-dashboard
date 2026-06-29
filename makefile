@@ -44,6 +44,9 @@ shell:
 new-namespace:
 	pipenv run python -m bin.make_new_cloud_platform_namespace $(REPOSITORY_NAME) $(ENVIRONMENT)
 
+decode-session-cookie:
+	pipenv run python -m bin.decode_cookie $(PAYLOAD)
+
 # Target to clean the pipenv environment
 clean:
 	pipenv --rm
