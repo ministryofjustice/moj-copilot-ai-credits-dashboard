@@ -16,7 +16,7 @@ from flask import Blueprint, render_template, request
 
 from app.main.services import ai_credits as ac
 from app.main.services.reports_source import get_reports_source
-from app.main.middleware.auth import requires_auth
+from app.main.middleware.auth import requires_auth, requires_admin
 
 from flask import session
 
@@ -43,49 +43,32 @@ def my_usage():
 
 @ai_credits.route("/admin")
 @requires_auth
+@requires_admin
 def admin_daily():
-    role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
-
-    print(f"User role: {role}")
-
-    if role == "admin":
-        view = ac.daily_view(get_reports_source(), request.args.get("day"))
-        return render_template("pages/admin_daily.html", v=view)
-    else:
-        return render_template("pages/errors/403.html")
+    view = ac.daily_view(get_reports_source(), request.args.get("day"))
+    return render_template("pages/admin_daily.html", v=view)
 
 
 @ai_credits.route("/admin/weekly")
 @requires_auth
+@requires_admin
 def admin_weekly():
-    role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
-
-    print(f"User role: {role}")
-
-    if role == "admin":
-        view = ac.weekly_view(
-            get_reports_source(), request.args.get("plan"), request.args.get("week")
-        )
-        return render_template("pages/admin_weekly.html", v=view)
-    else:
-        return render_template("pages/errors/403.html")
+    view = ac.weekly_view(
+        get_reports_source(), request.args.get("plan"), request.args.get("week")
+    )
+    return render_template("pages/admin_weekly.html", v=view)
 
 
 @ai_credits.route("/admin/pooled")
+@requires_auth
+@requires_admin
 def admin_pooled():
-    role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
-    
-    print(f"User role: {role}")
-
-    if role == "admin":
-        view = ac.pooled_view(
-            get_reports_source(),
-            request.args.get("period"),
-            request.args.get("key"),
-            request.args.get("plan"),
-            request.args.get("seats"),
-        )
-        return render_template("pages/admin_pooled.html", v=view)
-    else:
-        return render_template("pages/errors/403.html")
+    view = ac.pooled_view(
+        get_reports_source(),
+        request.args.get("period"),
+        request.args.get("key"),
+        request.args.get("plan"),
+        request.args.get("seats"),
+    )
+    return render_template("pages/admin_pooled.html", v=view)
 
