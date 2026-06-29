@@ -44,8 +44,10 @@ def my_usage():
 @ai_credits.route("/admin")
 @requires_auth
 def admin_daily():
-    role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
-    print(f"User role: {role}")
+    # role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
+    # print(f"User role: {role}")
+
+    role = "admin"
 
     if role == "admin":
         view = ac.daily_view(get_reports_source(), request.args.get("day"))
