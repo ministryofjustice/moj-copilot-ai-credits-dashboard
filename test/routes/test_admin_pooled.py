@@ -8,6 +8,7 @@ def test_admin_pooled_renders_chart_when_data_present(monkeypatch, fake_source, 
     source = fake_source(week_records)
     monkeypatch.setattr(routes, "get_reports_source", lambda: source)
     app = create_app(False)
+    app.config["SECRET_KEY"] = "test_flask"
     client = app.test_client()
     @app.before_request
     def inject_mock_session():
@@ -24,6 +25,7 @@ def test_admin_pooled_renders_chart_when_data_present(monkeypatch, fake_source, 
 def test_admin_pooled_shows_no_data_message_when_empty(monkeypatch, fake_source):
     monkeypatch.setattr(routes, "get_reports_source", lambda: fake_source([]))
     app = create_app(False)
+    app.config["SECRET_KEY"] = "test_flask"
     client = app.test_client()
     @app.before_request
     def inject_mock_session():
