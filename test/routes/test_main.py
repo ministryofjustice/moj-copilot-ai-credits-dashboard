@@ -10,6 +10,13 @@ class MainRouteTestCase(unittest.TestCase):
         self.client = self.app.test_client()
 
     def test_index(self):
+        with self.client.session_transaction() as sess:
+            sess["user"] = {
+                "userinfo": {
+                    "nickname": "test_user"
+                }
+            }
+
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)
 
