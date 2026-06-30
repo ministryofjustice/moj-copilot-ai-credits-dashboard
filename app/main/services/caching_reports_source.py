@@ -42,12 +42,8 @@ class CachingReportsSource(ReportsSource):
             self._cache[key] = (now, value)
         return value
 
-    def daily_docs(self) -> dict[str, dict]:
-        return self._cached("daily_docs", self._inner.daily_docs)
+    def model_rows(self) -> list[dict]:
+        return self._cached("model_rows", self._inner.model_rows)
 
-    def per_user_docs(self, day: str) -> dict[str, list]:
-        return self._cached(("per_user_docs", day),
-                            lambda: self._inner.per_user_docs(day))
-
-    def weekly_records(self) -> list[dict]:
-        return self._cached("weekly_records", self._inner.weekly_records)
+    def user_rows(self) -> list[dict]:
+        return self._cached("user_rows", self._inner.user_rows)

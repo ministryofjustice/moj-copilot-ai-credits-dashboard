@@ -20,72 +20,70 @@ class CountingSource(ReportsSource):
     """Records how many times each method runs and returns marker payloads."""
 
     def __init__(self):
-        self.daily_calls = 0
-        self.per_user_calls: list[str] = []
-        self.weekly_calls = 0
+        self.model_calls = 0
+        self.user_calls = 0
 
-    def daily_docs(self) -> dict[str, dict]:
-        self.daily_calls += 1
-        return {"2026-06-01": {"n": self.daily_calls}}
+    def model_rows(self) -> list[dict]:
+        self.model_calls += 1
+        return [{"day": "2026-06-01", "model": "Opus", "model_family": "Opus",
+                 "routed": False, "credits": float(self.model_calls)}]
 
-    def per_user_docs(self, day: str) -> dict[str, list]:
-        self.per_user_calls.append(day)
-        return {"alice": [{"day": day, "n": len(self.per_user_calls)}]}
-
-    def weekly_records(self) -> list[dict]:
-        self.weekly_calls += 1
-        return [{"n": self.weekly_calls}]
+    def user_rows(self) -> list[dict]:
+        self.user_calls += 1
+        return [{"day": "2026-06-01", "user_login": "a",
+                 "credits": float(self.user_calls)}]
 
 
 def _caching(inner, ttl=300.0, clock=None):
     return CachingReportsSource(inner, ttl_seconds=ttl, time_fn=clock or FakeClock())
 
 
-def test_daily_docs_calls_inner_once_within_ttl():
+def test_model_rows_calls_inner_once_within_ttl():
     inner = CountingSource()
     src = _caching(inner)
-    first = src.daily_docs()
-    second = src.daily_docs()
-    assert inner.daily_calls == 1
-    assert first == second == {"2026-06-01": {"n": 1}}
+    first = src.model_rows()
+    second = src.model_rows()
+    assert inner.model_calls == 1
+    assert first == second
+    assert first[0]["credits"] == 1.0
 
 
-def test_weekly_records_calls_inner_once_within_ttl():
+def test_user_rows_calls_inner_once_within_ttl():
     inner = CountingSource()
     src = _caching(inner)
-    assert src.weekly_records() == [{"n": 1}]
-    assert src.weekly_records() == [{"n": 1}]
-    assert inner.weekly_calls == 1
+    assert src.user_rows()[0]["credits"] == 1.0
+    assert src.user_rows()[0]["credits"] == 1.0
+    assert inner.user_calls == 1
 
 
-def test_per_user_docs_cached_per_day():
+def test_model_and_user_cached_independently():
     inner = CountingSource()
     src = _caching(inner)
-    src.per_user_docs("2026-06-01")
-    src.per_user_docs("2026-06-01")
-    src.per_user_docs("2026-06-02")
-    assert inner.per_user_calls == ["2026-06-01", "2026-06-02"]
+    src.model_rows()
+    src.user_rows()
+    assert inner.model_calls == 1
+    assert inner.user_calls == 1
 
 
 def test_cache_expires_after_ttl():
     inner = CountingSource()
     clock = FakeClock(now=1000.0)
     src = _caching(inner, ttl=300.0, clock=clock)
-    src.daily_docs()
+    src.model_rows()
     clock.now = 1000.0 + 299.0  # still inside the window
-    src.daily_docs()
-    assert inner.daily_calls == 1
+    src.model_rows()
+    assert inner.model_calls == 1
     clock.now = 1000.0 + 301.0  # past the TTL
-    assert src.daily_docs() == {"2026-06-01": {"n": 2}}
-    assert inner.daily_calls == 2
+    assert src.model_rows()[0]["credits"] == 2.0
+    assert inner.model_calls == 2
 
 
 def test_ttl_zero_disables_caching():
     inner = CountingSource()
     src = _caching(inner, ttl=0.0)
-    src.daily_docs()
-    src.daily_docs()
-    assert inner.daily_calls == 2
+    src.model_rows()
+    src.model_rows()
+    assert inner.model_calls == 2
 
 
 def test_is_a_reports_source():
