@@ -1,8 +1,12 @@
 """Shared pytest fixtures for the test suite.
 
-Provides a single in-memory `ReportsSource` stub and a report-record factory so
+Provides a single in-memory `ReportsSource` stub and a user-row factory so
 individual test modules don't each redefine them (avoids duplicate-code) and
 don't shadow the `credits` builtin.
+
+The stub serves the two-method contract: `model_rows()` (org per-model) and
+`user_rows()` ({day, user_login, credits}). `user_rows` is the first positional
+arg because most views (pooled/weekly/my-usage) only need per-user data.
 """
 
 import os
@@ -18,44 +22,37 @@ os.environ.setdefault("AUTH_DISABLED", "true")
 
 
 class _FakeSource(ReportsSource):
-    def __init__(self, records):
-        self._records = records
+    def __init__(self, user_rows=None, model_rows=None):
+        self._user_rows = list(user_rows or [])
+        self._model_rows = list(model_rows or [])
 
-    def daily_docs(self):
-        return {}
+    def model_rows(self):
+        return self._model_rows
 
-    def per_user_docs(self, day):
-        return {}
-
-    def weekly_records(self):
-        return self._records
+    def user_rows(self):
+        return self._user_rows
 
 
 @pytest.fixture
 def fake_source():
-    """Return a factory: records -> ReportsSource serving those weekly records."""
+    """Return a factory: (user_rows, model_rows=...) -> ReportsSource."""
     return _FakeSource
 
 
 def _build_record(day, user, amount):
-    return {
-        "day": day,
-        "user": user,
-        "credits": amount,
-        "usd": amount / 100.0,
-        "per_model": {"gpt": amount},
-    }
+    """One per-user daily row: {day, user_login, credits}."""
+    return {"day": day, "user_login": user, "credits": amount}
 
 
 @pytest.fixture
 def make_record():
-    """Return a factory building one weekly report record."""
+    """Return a factory building one per-user daily row."""
     return _build_record
 
 
 @pytest.fixture
 def week_records():
-    """Four weekly records inside ISO week 2026-W23 / month 2026-06."""
+    """Four user rows inside ISO week 2026-W23 / month 2026-06."""
     return [
         _build_record("2026-06-01", "a", 2000.0),
         _build_record("2026-06-02", "b", 50.0),
