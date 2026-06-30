@@ -50,7 +50,6 @@
       <th scope="col" class="govuk-table__header govuk-table__header--numeric">Credits used</th>
       <th scope="col" class="govuk-table__header">% of allowance</th>
       <th scope="col" class="govuk-table__header govuk-table__header--numeric">Remaining</th>
-      <th scope="col" class="govuk-table__header">Top model</th>
       <th scope="col" class="govuk-table__header govuk-table__header--numeric">Days</th>
     </tr>
   </thead>
@@ -69,7 +68,6 @@
         <span class="govuk-body-s govuk-!-margin-left-2">{{ "%.0f%%"|format(pct) }}</span>
       </td>
       <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.1f"|format(r.remaining) }}</td>
-      <td class="govuk-table__cell">{{ r.top_model }}</td>
       <td class="govuk-table__cell govuk-table__cell--numeric">{{ r.day_count }}</td>
     </tr>
     {% endfor %}
