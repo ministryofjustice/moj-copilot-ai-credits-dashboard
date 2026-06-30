@@ -21,7 +21,8 @@ env:
   AUTH0_CLIENT_SECRET: ${{ secrets.DEV_AUTH0_CLIENT_SECRET }}
 
   ATHENA_DATABASE: ${{ secrets.DEV_ATHENA_DATABASE }}
-  ATHENA_TABLE: ${{ secrets.DEV_ATHENA_TABLE }}
+  ATHENA_TABLE_USERS: ${{ secrets.DEV_ATHENA_TABLE_USERS }}
+  ATHENA_TABLE_MODELS: ${{ secrets.DEV_ATHENA_TABLE_MODELS }}
   ATHENA_WORKGROUP: ${{ secrets.DEV_ATHENA_WORKGROUP }}
 
 jobs:
@@ -76,5 +77,6 @@ jobs:
             --set app.deployment.image.tag=$IMAGE_TAG \
             --set app.deployment.env.APP_SECRET_KEY=${FLASK_APP_SECRET} \
             --set app.deployment.env.ATHENA_DATABASE=${ATHENA_DATABASE} \
-            --set app.deployment.env.ATHENA_TABLE=${ATHENA_TABLE} \
+            --set app.deployment.env.ATHENA_TABLE_USERS=${ATHENA_TABLE_USERS} \
+            --set app.deployment.env.ATHENA_TABLE_MODELS=${ATHENA_TABLE_MODELS} \
             --set app.deployment.env.ATHENA_WORKGROUP=${ATHENA_WORKGROUP}
