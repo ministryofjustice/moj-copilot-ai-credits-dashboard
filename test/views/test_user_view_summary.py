@@ -35,6 +35,20 @@ def test_summary_pct_against_allowances(fake_source):
     assert s["last_day"]["allowance"] == approx(weekly / 7.0)
 
 
+def test_example_login_picks_only_from_top_spenders(fake_source):
+    # 20 users, descending spend u00 (highest) .. u19 (lowest).
+    rows = [{"day": "2026-06-01", "user_login": f"u{i:02d}",
+             "credits": float(100 - i)} for i in range(20)]
+    src = fake_source(rows)
+    picks = {ac.example_login(src) for _ in range(80)}
+    assert picks  # never empty when data exists
+    assert picks <= {f"u{i:02d}" for i in range(10)}  # only the top 10 eligible
+
+
+def test_example_login_empty_when_no_data(fake_source):
+    assert ac.example_login(fake_source([])) == ""
+
+
 def test_user_view_drops_top_model(fake_source):
     v = ac.user_view(fake_source(_rows()), "a", "$70 / month", None)
     assert "top_model" not in v

@@ -11,11 +11,32 @@ minus `@st.cache_data`.
 
 from __future__ import annotations
 
+import random
 from collections import defaultdict
 from datetime import date, timedelta
 
 from app.main.services import weekly_per_user as wpu
 from app.main.services.reports_source import ReportsSource
+
+# How many of the biggest spenders the local-dev example user is drawn from.
+EXAMPLE_POOL_SIZE = 10
+
+
+def example_login(source: ReportsSource) -> str:
+    """A random login from the top spenders — a stand-in user for local dev.
+
+    No real login is hard-coded; one is picked at runtime from the biggest
+    `EXAMPLE_POOL_SIZE` spenders so the My usage page renders with real data.
+    Returns "" when there is no data.
+    """
+    totals: dict[str, float] = defaultdict(float)
+    for r in source.user_rows():
+        totals[r["user_login"]] += r["credits"]
+    if not totals:
+        return ""
+    top = sorted(totals, key=totals.get, reverse=True)[:EXAMPLE_POOL_SIZE]
+    return random.choice(top)
+
 
 # Per-seat allowance maths. Credits bill at $0.01 each ($1 == 100 credits). The
 # included allowance is monthly; spread across an average ISO week (month / 4.33)
