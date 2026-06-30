@@ -24,7 +24,7 @@
 {% set key_items = [] %}
 {% for o in v.period_options %}{{- key_items.append({"value": o.value, "text": o.text, "selected": o.value == v.key}) or "" -}}{% endfor %}
 
-<form method="get" action="/admin/pooled" class="govuk-!-margin-bottom-4">
+<form method="get" action="/admin/pooled" class="govuk-!-margin-bottom-4" data-auto-submit>
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-one-quarter">
       {{ govukSelect({"id": "period", "name": "period", "label": {"text": "Basis"}, "items": period_items}) }}

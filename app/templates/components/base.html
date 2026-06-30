@@ -52,6 +52,7 @@
     <!-- Manually set the govuk frontend version in the line below -->
     <script src="{{ url_for('static', filename='javascript/govuk-frontend-5.1.0.min.js') }}"></script>
     <script>window.GOVUKFrontend.initAll()</script>
+    <script src="{{ url_for('static', filename='javascript/auto-submit.js') }}" defer></script>
 {% endblock bodyEnd %}
 
 {% block content %}

@@ -270,6 +270,21 @@ def _per_user_day(source: ReportsSource, day: str, day_total: float) -> dict:
 
 
 # ---------------------------------------------------------------- weekly helpers
+def _resolve_label(selected: str | None, labels: list[str]) -> str:
+    """Pick a period label from `labels`, matching case-insensitively.
+
+    The govuk select macro lowercases every option `value`, so the browser
+    submits e.g. 'week=2026-w23' for the option labelled '2026-W23'. Match
+    ignoring case so the selection resolves to the real label; fall back to the
+    most recent label when there's no match (or nothing selected).
+    """
+    if selected:
+        for label in labels:
+            if label.lower() == selected.lower():
+                return label
+    return labels[-1]
+
+
 def _weekly_rows(source: ReportsSource) -> list[dict]:
     return wpu.rollup_weekly(_user_records(source))
 
@@ -335,7 +350,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     if not keys:
         return {**base, "has_data": False, "key": None}
 
-    key = key if key in keys else keys[-1]
+    key = _resolve_label(key, keys)
     user_credits: dict[str, float] = {}
     for r in records:
         if _record_period_key(r["day"], period) == key:
@@ -396,7 +411,7 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
         return {"has_data": False, "plans": plan_labels(), "plan": plan, "weeks": []}
 
     weeks = _week_labels(all_rows)
-    week = week if week in weeks else weeks[-1]
+    week = _resolve_label(week, weeks)
     allowance = weekly_allowance(plan)
 
     wk = [r for r in all_rows if r["week_label"] == week]

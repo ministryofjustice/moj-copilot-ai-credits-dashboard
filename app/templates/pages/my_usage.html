@@ -21,13 +21,13 @@
       GitHub username: <strong>{{ v.login }}</strong>
     </p>
 
-    <form method="get" action="/">
+    <form method="get" action="/" data-auto-submit>
       {{ govukSelect({
         "id": "plan", "name": "plan",
         "label": {"text": "Plan budget (per seat)"},
         "items": plan_items
       }) }}
-      {{ govukButton({"text": "View usage"}) }}
+      <span data-auto-submit-hide>{{ govukButton({"text": "View usage"}) }}</span>
     </form>
   </div>
 </div>
@@ -141,7 +141,7 @@
       <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
 
       {# ---- Month selector ---- #}
-      <form method="get" action="/" class="govuk-!-margin-bottom-4">
+      <form method="get" action="/" class="govuk-!-margin-bottom-4" data-auto-submit>
         <input type="hidden" name="user" value="{{ v.login }}">
         <input type="hidden" name="plan" value="{{ v.plan }}">
         <div class="govuk-grid-row">
@@ -149,7 +149,7 @@
             {{ govukSelect({"id": "month", "name": "month", "label": {"text": "Month"}, "items": month_items}) }}
           </div>
           <div class="govuk-grid-column-two-thirds">
-            <div class="govuk-!-padding-top-6">{{ govukButton({"text": "View month", "classes": "govuk-button--secondary"}) }}</div>
+            <div class="govuk-!-padding-top-6" data-auto-submit-hide>{{ govukButton({"text": "View month", "classes": "govuk-button--secondary"}) }}</div>
           </div>
         </div>
       </form>

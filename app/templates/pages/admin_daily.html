@@ -19,9 +19,9 @@
 
 <p class="govuk-body-s">Scope: <strong>{{ v.scope }}</strong> · {{ v.days | length }} day(s) captured</p>
 
-<form method="get" action="/admin" class="govuk-!-margin-bottom-6">
+<form method="get" action="/admin" class="govuk-!-margin-bottom-6" data-auto-submit>
   {{ govukSelect({"id": "day", "name": "day", "label": {"text": "Day"}, "items": day_items}) }}
-  {{ govukButton({"text": "View day", "classes": "govuk-button--secondary"}) }}
+  <div data-auto-submit-hide>{{ govukButton({"text": "View day", "classes": "govuk-button--secondary"}) }}</div>
 </form>
 
 <h2 class="govuk-heading-m">{{ v.day }}</h2>
