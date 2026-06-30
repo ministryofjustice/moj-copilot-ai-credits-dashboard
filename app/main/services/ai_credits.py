@@ -433,7 +433,7 @@ def user_view(  # pylint: disable=too-many-locals
         return {**base, "searched": False}
 
     login_str = base["login"]
-    records = source.weekly_records()
+    records = _user_records(source)
     urecs = sorted(
         (r for r in records if r["user"] == login_str), key=lambda r: r["day"]
     )
@@ -450,7 +450,7 @@ def user_view(  # pylint: disable=too-many-locals
             "week_label": r["week_label"], "credits": credits_val,
             "pct": (credits_val / allowance) if allowance else 0.0,
             "remaining": allowance - credits_val, "day_count": int(r["day_count"]),
-            "top_model": r["top_model"], "span": f"{mon:%d %b} – {sun:%d %b}",
+            "span": f"{mon:%d %b} – {sun:%d %b}",
         })
     weekly_rows.sort(key=lambda x: x["week_label"])
     weeks = [w["week_label"] for w in weekly_rows]
@@ -466,7 +466,7 @@ def user_view(  # pylint: disable=too-many-locals
 
     week_recs = [r for r in urecs if wpu.iso_week_label(r["day"])[0] == selected]
     daily_rows = [
-        {"day": r["day"], "credits": r["credits"], "usd": r["usd"]}
+        {"day": r["day"], "credits": r["credits"]}
         for r in week_recs
     ]
     daily_chart = {
@@ -488,6 +488,10 @@ def user_view(  # pylint: disable=too-many-locals
         "chart": {"labels": mtd_labels, "cumulative": mtd_cumulative},
     }
 
+    # ---- Last-day / Week-to-date / Month-to-date, anchored to the latest day.
+    # The plan is weekly limits, so WTD-vs-weekly-allowance is the teaching number.
+    summary = _user_summary(urecs, allowance, limits)
+
     return {
         **base,
         "searched": True, "found": True,
@@ -496,8 +500,35 @@ def user_view(  # pylint: disable=too-many-locals
         "week": selected, "span": current["span"],
         "used": current["credits"], "remaining": current["remaining"],
         "pct": current["pct"], "day_count": current["day_count"],
-        "top_model": current["top_model"],
         "daily": daily_rows, "daily_chart": daily_chart,
         "mtd": mtd,
+        "summary": summary,
         "calendar": _usage_calendar(urecs, limits["daily"]),
+    }
+
+
+def _user_summary(urecs: list[dict], allowance: float, limits: dict) -> dict:
+    """Last-day / WTD / MTD figures for a user, anchored to their latest day.
+
+    `urecs` is the user's per-day records sorted ascending by day. WTD/MTD are
+    running totals of the latest ISO week / calendar month (the data only runs to
+    the latest day, so "to date" falls straight out of summing those records).
+    """
+    as_of = urecs[-1]["day"]
+    last_day = sum(r["credits"] for r in urecs if r["day"] == as_of)
+    wtd_label = wpu.iso_week_label(as_of)[0]
+    wtd_recs = [r for r in urecs if wpu.iso_week_label(r["day"])[0] == wtd_label]
+    wtd = sum(r["credits"] for r in wtd_recs)
+    month = as_of[:7]
+    mtd = sum(r["credits"] for r in urecs if r["day"][:7] == month)
+    return {
+        "as_of": as_of,
+        "last_day": {"credits": last_day, "allowance": limits["daily"],
+                     "pct": (last_day / limits["daily"]) if limits["daily"] else 0.0},
+        "wtd": {"credits": wtd, "allowance": allowance,
+                "remaining": allowance - wtd, "week_label": wtd_label,
+                "days": len({r["day"] for r in wtd_recs}),
+                "pct": (wtd / allowance) if allowance else 0.0},
+        "mtd": {"credits": mtd, "allowance": limits["monthly"], "month": month,
+                "pct": (mtd / limits["monthly"]) if limits["monthly"] else 0.0},
     }
