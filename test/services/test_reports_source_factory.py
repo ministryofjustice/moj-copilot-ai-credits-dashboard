@@ -41,7 +41,8 @@ def test_db_backend_builds_db_source(monkeypatch):
     monkeypatch.setenv("REPORTS_CACHE_TTL", "0")  # bare source, easier to assert
     monkeypatch.setenv("AWS_DEFAULT_REGION", "eu-west-2")
     monkeypatch.setenv("ATHENA_DATABASE", "db")
-    monkeypatch.setenv("ATHENA_TABLE", "t")
+    monkeypatch.setenv("ATHENA_TABLE_MODELS", "cbm")
+    monkeypatch.setenv("ATHENA_TABLE_USERS", "cbu")
     monkeypatch.setenv("ATHENA_OUTPUT_LOCATION", "s3://staging/")
     src = get_reports_source()
     assert isinstance(src, DbReportsSource)

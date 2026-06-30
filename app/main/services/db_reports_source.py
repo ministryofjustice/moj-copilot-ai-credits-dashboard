@@ -6,8 +6,8 @@ Selected when REPORTS_SOURCE=db.
 
 Config (env):
 * ATHENA_DATABASE        - Glue database (required).
-* ATHENA_MODEL_TABLE     - per-model table name (default "credits_by_model").
-* ATHENA_USER_TABLE      - per-user table name (default "credits_by_user").
+* ATHENA_TABLE_MODELS    - per-model table name (default "credits_by_model").
+* ATHENA_TABLE_USERS     - per-user table name (default "credits_by_user").
 * ATHENA_OUTPUT_LOCATION - s3://.../ results staging dir (required).
 * ATHENA_WORKGROUP       - workgroup (default "primary").
 * AWS_DEFAULT_REGION     - region for the boto3 client (default "eu-west-2").
@@ -34,9 +34,9 @@ class DbReportsSource(ReportsSource):
         self.database = database or os.getenv("ATHENA_DATABASE")
         if not self.database:
             raise ValueError("ATHENA_DATABASE is required when REPORTS_SOURCE=db")
-        self.model_table = (model_table or os.getenv("ATHENA_MODEL_TABLE")
+        self.model_table = (model_table or os.getenv("ATHENA_TABLE_MODELS")
                             or "credits_by_model")
-        self.user_table = (user_table or os.getenv("ATHENA_USER_TABLE")
+        self.user_table = (user_table or os.getenv("ATHENA_TABLE_USERS")
                            or "credits_by_user")
         self.output_location = output_location or os.getenv("ATHENA_OUTPUT_LOCATION")
         if not self.output_location:

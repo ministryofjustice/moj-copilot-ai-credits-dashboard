@@ -66,8 +66,10 @@ spec:
             # Credentials resolve via IRSA (the pod service account) - no keys here.
             - name: ATHENA_DATABASE
               value: {{ .Values.app.deployment.athena.database | quote }}
-            - name: ATHENA_TABLE
-              value: {{ .Values.app.deployment.athena.table | quote }}
+            - name: ATHENA_TABLE_MODELS
+              value: {{ .Values.app.deployment.athena.tableModels | quote }}
+            - name: ATHENA_TABLE_USERS
+              value: {{ .Values.app.deployment.athena.tableUsers | quote }}
             - name: ATHENA_OUTPUT_LOCATION
               value: {{ .Values.app.deployment.athena.outputLocation | quote }}
             - name: ATHENA_WORKGROUP

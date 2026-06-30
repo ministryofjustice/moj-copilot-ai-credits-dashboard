@@ -21,8 +21,9 @@ app:
     # Athena backend config. Inert until REPORTS_SOURCE is set to "db" above.
     # Fill these in (confirm names against the deployed Glue table) before switching.
     athena:
-      database: "" # Glue database holding the ai-credits table
-      table: "" # table name (partitioned Parquet from build_credit_rows)
+      database: "" # Glue database holding the ai-credits tables
+      tableModels: "" # per-model table (partitioned Parquet from build_credit_rows)
+      tableUsers: "" # per-user table (partitioned Parquet from build_credit_rows)
       outputLocation: "" # s3://.../ Athena results staging dir
       workgroup: "primary"
       region: "eu-west-2"
