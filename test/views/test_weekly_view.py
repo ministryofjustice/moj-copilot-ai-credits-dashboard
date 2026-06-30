@@ -6,7 +6,7 @@ from app.main.services import ai_credits as ac
 def test_weekly_view_no_data(fake_source):
     v = ac.weekly_view(fake_source([]), plan=None, week=None)
     assert v["has_data"] is False
-    assert v["weeks"] == []
+    assert not v["weeks"]
 
 
 def test_weekly_view_rows_have_no_top_model(fake_source, week_records):

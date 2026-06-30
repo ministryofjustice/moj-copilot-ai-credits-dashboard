@@ -61,7 +61,7 @@ ignore-patterns=^\.#
 # supports qualified module names, as well as Unix pattern matching.
 # Third-party runtime/test deps are pinned in the Pipfile but not installed in
 # the MegaLinter container, so tell pylint not to flag them as unresolved.
-ignored-modules=flask,boto3,pytest
+ignored-modules=flask,boto3,pytest,pyarrow,pyarrow.dataset,pyarrow.fs,pyarrow.parquet
 
 # Python code to execute, usually for sys.path manipulation such as
 # pygtk.require().

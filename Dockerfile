@@ -38,8 +38,8 @@ RUN pipenv install --deploy --ignore-pipfile
 COPY --chown=appuser:appgroup app app
 
 # Environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Expose port
 EXPOSE 4567

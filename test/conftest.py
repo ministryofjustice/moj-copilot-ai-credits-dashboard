@@ -51,6 +51,28 @@ def make_record():
 
 
 @pytest.fixture
+def model_records():
+    """Two org per-model rows for 2026-06-01: an explicitly-chosen Opus and an
+    Auto-routed Haiku. Shared so model-split tests don't redefine them."""
+    return [
+        {"day": "2026-06-01", "model": "Opus 4.6", "model_family": "Opus",
+         "routed": False, "credits": 80.0},
+        {"day": "2026-06-01", "model": "Auto: Haiku", "model_family": "Haiku",
+         "routed": True, "credits": 20.0},
+    ]
+
+
+@pytest.fixture
+def mrows(model_records):
+    """The shared 2026-06-01 model rows plus a 2026-06-02 Opus row, for the
+    daily-view tests that need a second day."""
+    return model_records + [
+        {"day": "2026-06-02", "model": "Opus 4.6", "model_family": "Opus",
+         "routed": False, "credits": 40.0},
+    ]
+
+
+@pytest.fixture
 def week_records():
     """Four user rows inside ISO week 2026-W23 / month 2026-06."""
     return [

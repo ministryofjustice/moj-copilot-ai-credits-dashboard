@@ -22,22 +22,14 @@ def _admin_client(monkeypatch, source):
     return client
 
 
-def _model_rows():
-    return [
-        {"day": "2026-06-01", "model": "Opus 4.6", "model_family": "Opus",
-         "routed": False, "credits": 80.0},
-        {"day": "2026-06-01", "model": "Auto: Haiku", "model_family": "Haiku",
-         "routed": True, "credits": 20.0},
-    ]
-
-
 def _user_rows():
     return [{"day": "2026-06-01", "user_login": "alice", "credits": 60.0},
             {"day": "2026-06-01", "user_login": "bob", "credits": 40.0}]
 
 
-def test_admin_daily_renders_family_and_routed(monkeypatch, fake_source):
-    source = fake_source(_user_rows(), model_rows=_model_rows())
+def test_admin_daily_renders_family_and_routed(monkeypatch, fake_source,
+                                               model_records):
+    source = fake_source(_user_rows(), model_rows=model_records)
     client = _admin_client(monkeypatch, source)
     resp = client.get("/admin")
     assert resp.status_code == 200
