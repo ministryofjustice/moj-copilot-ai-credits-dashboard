@@ -53,6 +53,18 @@ def user_rows_from_table(table) -> list[dict]:
     ]
 
 
+def read_model_rows(dataset) -> list[dict]:
+    """Read a `credits_by_model` pyarrow dataset into model rows (local + S3)."""
+    return model_rows_from_table(dataset.to_table(
+        columns=["model", "model_family", "routed", "ai_credits_used", "day"]))
+
+
+def read_user_rows(dataset) -> list[dict]:
+    """Read a `credits_by_user` pyarrow dataset into user rows (local + S3)."""
+    return user_rows_from_table(dataset.to_table(
+        columns=["user_login", "ai_credits_used", "day"]))
+
+
 class ReportsSource(ABC):
     """Read-only access to captured AI-credit usage, independent of backend."""
 
@@ -80,14 +92,10 @@ class LocalFsReportsSource(ReportsSource):
                           format="parquet", partitioning=DAY)
 
     def model_rows(self) -> list[dict]:
-        t = self._dataset("credits_by_model").to_table(
-            columns=["model", "model_family", "routed", "ai_credits_used", "day"])
-        return model_rows_from_table(t)
+        return read_model_rows(self._dataset("credits_by_model"))
 
     def user_rows(self) -> list[dict]:
-        t = self._dataset("credits_by_user").to_table(
-            columns=["user_login", "ai_credits_used", "day"])
-        return user_rows_from_table(t)
+        return read_user_rows(self._dataset("credits_by_user"))
 
 
 def _build_source() -> ReportsSource:

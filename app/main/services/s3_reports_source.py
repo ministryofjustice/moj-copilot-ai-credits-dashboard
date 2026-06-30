@@ -22,7 +22,7 @@ import pyarrow.dataset as ds
 import pyarrow.fs as pafs
 
 from app.main.services.reports_source import (
-    DAY, ReportsSource, model_rows_from_table, user_rows_from_table)
+    DAY, ReportsSource, read_model_rows, read_user_rows)
 
 
 class S3ReportsSource(ReportsSource):
@@ -45,11 +45,7 @@ class S3ReportsSource(ReportsSource):
                           format="parquet", partitioning=DAY)
 
     def model_rows(self) -> list[dict]:
-        t = self._dataset("credits_by_model").to_table(
-            columns=["model", "model_family", "routed", "ai_credits_used", "day"])
-        return model_rows_from_table(t)
+        return read_model_rows(self._dataset("credits_by_model"))
 
     def user_rows(self) -> list[dict]:
-        t = self._dataset("credits_by_user").to_table(
-            columns=["user_login", "ai_credits_used", "day"])
-        return user_rows_from_table(t)
+        return read_user_rows(self._dataset("credits_by_user"))
