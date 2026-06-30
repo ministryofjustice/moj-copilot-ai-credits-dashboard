@@ -1,4 +1,5 @@
 import unittest
+from flask import session
 
 from app.app import create_app
 
@@ -10,8 +11,9 @@ class MainRouteTestCase(unittest.TestCase):
         self.client = self.app.test_client()
 
     def test_index(self):
-        with self.client.session_transaction() as sess:
-            sess["user"] = {
+        @self.app.before_request
+        def inject_mock_session():
+            session["user"] = {
                 "userinfo": {
                     "nickname": "test_user"
                 }
