@@ -1,10 +1,12 @@
 app:
   ingress:
-    host: "application.service.justice.gov.uk" # This should be changed as appropriate
+    host: "moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk" # This should be changed as appropriate
 
   deployment:
     replicaCount: 3
+    serviceAccountName: "moj-copilot-ai-credits-dashboard-prod"
     env:
+      AUTH0_DOMAIN: "check-your-co-pilot-usage-prod.uk.auth0.com"
       SENTRY_ENV: "production"
       FLASK_DEBUG: false
       REPORTS_SOURCE: "s3"

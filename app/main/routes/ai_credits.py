@@ -16,7 +16,10 @@ from flask import Blueprint, render_template, request
 
 from app.main.services import ai_credits as ac
 from app.main.services.reports_source import get_reports_source
-from app.main.middleware.auth import requires_auth
+from app.main.middleware.auth import requires_auth, requires_admin
+
+from flask import session
+
 
 ai_credits = Blueprint("ai_credits", __name__)
 
@@ -24,17 +27,23 @@ ai_credits = Blueprint("ai_credits", __name__)
 @ai_credits.route("/")
 @requires_auth
 def my_usage():
+    username = session["user"].get("userinfo", {}).get("nickname", "")
+
+    print(f"Username: {username}")
+
     view = ac.user_view(
         get_reports_source(),
-        request.args.get("user"),
+        username,
         request.args.get("plan"),
         request.args.get("week"),
     )
+
     return render_template("pages/my_usage.html", v=view)
 
 
 @ai_credits.route("/admin")
 @requires_auth
+@requires_admin
 def admin_daily():
     view = ac.daily_view(get_reports_source(), request.args.get("day"))
     return render_template("pages/admin_daily.html", v=view)
@@ -42,6 +51,7 @@ def admin_daily():
 
 @ai_credits.route("/admin/weekly")
 @requires_auth
+@requires_admin
 def admin_weekly():
     view = ac.weekly_view(
         get_reports_source(), request.args.get("plan"), request.args.get("week")
@@ -50,6 +60,8 @@ def admin_weekly():
 
 
 @ai_credits.route("/admin/pooled")
+@requires_auth
+@requires_admin
 def admin_pooled():
     view = ac.pooled_view(
         get_reports_source(),

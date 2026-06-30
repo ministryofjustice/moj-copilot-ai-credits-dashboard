@@ -13,11 +13,17 @@ env:
 
   IMAGE_TAG: ${{ github.sha }}
   ECR_REGISTRY: ${{ secrets.ECR_REGISTRY_URL }}
-  ECR_REPOSITORY: ${{ vars.ECR_REPOSITORY }}
+  ECR_REPOSITORY: ${{ vars.DEV_ECR_REPOSITORY }}
+
   FLASK_APP_SECRET: ${{ secrets.DEV_FLASK_APP_SECRET }}
 
   AUTH0_CLIENT_ID: ${{ secrets.DEV_AUTH0_CLIENT_ID }}
   AUTH0_CLIENT_SECRET: ${{ secrets.DEV_AUTH0_CLIENT_SECRET }}
+
+  ATHENA_DATABASE: ${{ secrets.DEV_ATHENA_DATABASE }}
+  ATHENA_TABLE_USERS: ${{ secrets.DEV_ATHENA_TABLE_USERS }}
+  ATHENA_TABLE_MODELS: ${{ secrets.DEV_ATHENA_TABLE_MODELS }}
+  ATHENA_WORKGROUP: ${{ secrets.DEV_ATHENA_WORKGROUP }}
 
 jobs:
   build-push:
@@ -30,8 +36,8 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4.0.2
         with:
-          role-to-assume: ${{ secrets.ECR_ROLE_TO_ASSUME }}
-          aws-region: "eu-west-2"
+          role-to-assume: ${{ secrets.DEV_ECR_ROLE_TO_ASSUME }}
+          aws-region: ${{ vars.DEV_ECR_REGION }}
 
       - uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
         id: login-ecr
@@ -69,4 +75,8 @@ jobs:
             --set app.deployment.env.AUTH0_CLIENT_SECRET="${AUTH0_CLIENT_SECRET}" \
             --set app.deployment.image.repository=$ECR_REGISTRY/$ECR_REPOSITORY \
             --set app.deployment.image.tag=$IMAGE_TAG \
-            --set app.deployment.env.APP_SECRET_KEY=${FLASK_APP_SECRET}
+            --set app.deployment.env.APP_SECRET_KEY=${FLASK_APP_SECRET} \
+            --set app.deployment.env.ATHENA_DATABASE=${ATHENA_DATABASE} \
+            --set app.deployment.env.ATHENA_TABLE_USERS=${ATHENA_TABLE_USERS} \
+            --set app.deployment.env.ATHENA_TABLE_MODELS=${ATHENA_TABLE_MODELS} \
+            --set app.deployment.env.ATHENA_WORKGROUP=${ATHENA_WORKGROUP}
