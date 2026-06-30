@@ -11,7 +11,7 @@
 {% include "components/admin_nav.html" with context %}
 
 {% if not v.has_data %}
-  {{ govukInsetText({"text": "No data found. Populate reports/<date>/billing/ai-credit-usage.json first."}) }}
+  {{ govukInsetText({"text": "No data found. Populate reports/credits_by_model/ first."}) }}
 {% else %}
 
 {% set day_items = [] %}
@@ -27,10 +27,10 @@
 <h2 class="govuk-heading-m">{{ v.day }}</h2>
 <div class="govuk-grid-row">
   {% set cards = [
-    ("Gross (consumed)", "$%.2f"|format(v.metrics.gross)),
-    ("Net (billed)", "$%.2f"|format(v.metrics.net)),
-    ("Covered by allowance", "$%.2f"|format(v.metrics.covered)),
-    ("AI Credits", "%.0f"|format(v.metrics.credits))
+    ("AI Credits (day)", "%.0f"|format(v.metrics.credits)),
+    ("$ equivalent", "$%.0f"|format(v.metrics.usd)),
+    ("Active spenders", "%d"|format(v.metrics.spenders)),
+    ("Models used", "%d"|format(v.metrics.models))
   ] %}
   {% for label, value in cards %}
   <div class="govuk-grid-column-one-quarter">
@@ -42,9 +42,23 @@
   {% endfor %}
 </div>
 
-{% if v.fully_covered %}
-  {{ govukInsetText({"text": "Net is $0 — fully covered by the monthly allowance so far. Watch the month-to-date gross below to see when the pool runs out."}) }}
-{% endif %}
+{# ---- Org Last-day / Week-to-date / Month-to-date (anchored to the selected day) ---- #}
+<div class="govuk-grid-row">
+  {% set roll = [
+    ("Last day", v.rollup.last_day),
+    ("Week-to-date (" ~ v.rollup.week_label ~ ")", v.rollup.wtd),
+    ("Month-to-date (" ~ v.rollup.month ~ ")", v.rollup.mtd)
+  ] %}
+  {% for label, credits in roll %}
+  <div class="govuk-grid-column-one-third">
+    <div style="border:1px solid #b1b4b6; padding:15px; margin-bottom:15px;">
+      <span class="govuk-caption-m">{{ label }}</span>
+      <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "%.0f"|format(credits) }} credits</span>
+      <span class="govuk-body-s">${{ "%.0f"|format(credits / 100) }}</span>
+    </div>
+  </div>
+  {% endfor %}
+</div>
 
 <h3 class="govuk-heading-s">Month-to-date trend</h3>
 {% if not v.trend %}
@@ -52,26 +66,25 @@
 {% else %}
 <div class="govuk-grid-row">
   <div class="govuk-grid-column-one-half">
-    <p class="govuk-body-s">Daily gross vs net</p>
-    <div style="height:300px;"><canvas data-chart="trendGrossNet"></canvas></div>
+    <p class="govuk-body-s">Daily org credits</p>
+    <div style="height:300px;"><canvas data-chart="trendDaily"></canvas></div>
   </div>
   <div class="govuk-grid-column-one-half">
-    <p class="govuk-body-s">Cumulative gross (allowance burn)</p>
+    <p class="govuk-body-s">Cumulative credits (month-to-date)</p>
     <div style="height:300px;"><canvas data-chart="trendCumulative"></canvas></div>
   </div>
 </div>
 {% endif %}
 
 {% if v.by_model %}
-<h3 class="govuk-heading-s">Spend by model (gross)</h3>
+<h3 class="govuk-heading-s">Spend by model (credits)</h3>
 <div class="govuk-grid-row">
   <div class="govuk-grid-column-one-half">
     <table class="govuk-table">
       <thead class="govuk-table__head">
         <tr class="govuk-table__row">
           <th scope="col" class="govuk-table__header">Model</th>
-          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Gross</th>
-          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Net</th>
+          <th scope="col" class="govuk-table__header govuk-table__header--numeric">Credits</th>
           <th scope="col" class="govuk-table__header govuk-table__header--numeric">Share</th>
         </tr>
       </thead>
@@ -79,8 +92,7 @@
         {% for r in v.by_model %}
         <tr class="govuk-table__row">
           <td class="govuk-table__cell">{{ r.model }}</td>
-          <td class="govuk-table__cell govuk-table__cell--numeric">${{ "%.2f"|format(r.gross) }}</td>
-          <td class="govuk-table__cell govuk-table__cell--numeric">${{ "%.2f"|format(r.net) }}</td>
+          <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.0f"|format(r.credits) }}</td>
           <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.0f%%"|format(r.share * 100) }}</td>
         </tr>
         {% endfor %}
@@ -91,21 +103,31 @@
     <div style="height:360px;"><canvas data-chart="model"></canvas></div>
   </div>
 </div>
+
+{# ---- model-family split + auto-routed vs explicitly chosen ---- #}
+<div class="govuk-grid-row">
+  <div class="govuk-grid-column-one-half">
+    <h3 class="govuk-heading-s">By model family</h3>
+    <div style="height:320px;"><canvas data-chart="family"></canvas></div>
+  </div>
+  <div class="govuk-grid-column-one-half">
+    <h3 class="govuk-heading-s">Auto-routed vs explicitly chosen</h3>
+    <div style="height:320px;"><canvas data-chart="routed"></canvas></div>
+  </div>
+</div>
 {% endif %}
 
 {% if v.per_user.with_spend %}
-<h3 class="govuk-heading-s">Per-user spend (gross)</h3>
+<h3 class="govuk-heading-s">Per-user spend (credits)</h3>
 <p class="govuk-body-s">
-  {{ v.per_user.with_spend }} of {{ v.per_user.queried }} queried users had spend ·
-  top {{ v.per_user.top_n }} account for {{ "%.0f%%"|format(v.per_user.concentration * 100) }} of the day's gross.
+  {{ v.per_user.with_spend }} user(s) had spend ·
+  top {{ v.per_user.top_n }} account for {{ "%.0f%%"|format(v.per_user.concentration * 100) }} of the day.
 </p>
 <table class="govuk-table">
   <thead class="govuk-table__head">
     <tr class="govuk-table__row">
       <th scope="col" class="govuk-table__header">User</th>
-      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Gross</th>
-      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Net</th>
-      <th scope="col" class="govuk-table__header">Top model</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Credits</th>
       <th scope="col" class="govuk-table__header govuk-table__header--numeric">Share</th>
     </tr>
   </thead>
@@ -113,9 +135,7 @@
     {% for r in v.per_user.rows %}
     <tr class="govuk-table__row">
       <td class="govuk-table__cell">{{ r.user }}</td>
-      <td class="govuk-table__cell govuk-table__cell--numeric">${{ "%.2f"|format(r.gross) }}</td>
-      <td class="govuk-table__cell govuk-table__cell--numeric">${{ "%.2f"|format(r.net) }}</td>
-      <td class="govuk-table__cell">{{ r.top_model }}</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.0f"|format(r.credits) }}</td>
       <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.0f%%"|format(r.share * 100) }}</td>
     </tr>
     {% endfor %}
@@ -124,10 +144,14 @@
 {% endif %}
 
 {% set charts = {} %}
-{% if v.by_model %}{{- charts.update({"model": {"type": "bar", "labels": v.model_chart.labels, "datasets": [{"label": "Gross $", "data": v.model_chart.gross}]}}) or "" -}}{% endif %}
+{% if v.by_model %}
+  {{- charts.update({"model": {"type": "bar", "labels": v.model_chart.labels, "datasets": [{"label": "Credits", "data": v.model_chart.credits}]}}) or "" -}}
+  {{- charts.update({"family": {"type": "bar", "labels": v.family_chart.labels, "datasets": [{"label": "Credits", "data": v.family_chart.credits}]}}) or "" -}}
+  {{- charts.update({"routed": {"type": "bar", "labels": v.routed_chart.labels, "datasets": [{"label": "Credits", "data": v.routed_chart.credits}]}}) or "" -}}
+{% endif %}
 {% if v.trend %}
-  {{- charts.update({"trendGrossNet": {"type": "line", "labels": v.trend.labels, "datasets": [{"label": "Gross", "data": v.trend.gross}, {"label": "Net", "data": v.trend.net}]}}) or "" -}}
-  {{- charts.update({"trendCumulative": {"type": "line", "labels": v.trend.labels, "datasets": [{"label": "Cumulative gross", "data": v.trend.cumulative}]}}) or "" -}}
+  {{- charts.update({"trendDaily": {"type": "line", "labels": v.trend.labels, "datasets": [{"label": "Org credits / day", "data": v.trend.totals}]}}) or "" -}}
+  {{- charts.update({"trendCumulative": {"type": "line", "labels": v.trend.labels, "datasets": [{"label": "Cumulative credits", "data": v.trend.cumulative}]}}) or "" -}}
 {% endif %}
 <script type="application/json" id="chart-data">{{ charts | tojson }}</script>
 {% endif %}
