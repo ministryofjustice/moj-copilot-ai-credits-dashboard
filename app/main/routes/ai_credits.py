@@ -71,4 +71,3 @@ def admin_pooled():
         request.args.get("seats"),
     )
     return render_template("pages/admin_pooled.html", v=view)
-
