@@ -39,6 +39,32 @@
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-full">
 
+      {# ---- Last-day / Week-to-date / Month-to-date (as of latest captured day) ---- #}
+      <h2 class="govuk-heading-m">Your usage so far (as of {{ v.summary.as_of }})</h2>
+      <div class="govuk-grid-row">
+        {% set s = v.summary %}
+        {% set hero = [
+          ("This week (WTD)", "%.1f"|format(s.wtd.credits), "%.0f"|format(s.wtd.allowance), s.wtd.pct, "%.1f credits left this week"|format(s.wtd.remaining)),
+          ("Latest day", "%.1f"|format(s.last_day.credits), "%.1f"|format(s.last_day.allowance), s.last_day.pct, ""),
+          ("This month (MTD)", "%.1f"|format(s.mtd.credits), "%.0f"|format(s.mtd.allowance), s.mtd.pct, "")
+        ] %}
+        {% for label, used, allow, pct, sub in hero %}
+        <div class="govuk-grid-column-one-third">
+          <div style="border:1px solid #b1b4b6; padding:15px; margin-bottom:15px;
+                      {% if pct >= 1.0 %}border-left:6px solid #d4351c;{% elif loop.first %}border-left:6px solid #1d70b8;{% endif %}">
+            <span class="govuk-caption-m">{{ label }}</span>
+            <span class="govuk-heading-l govuk-!-margin-bottom-0">{{ used }}</span>
+            <span class="govuk-body-s">of {{ allow }} allowance · {{ "%.0f%%"|format(pct * 100) }}</span>
+            {% if sub %}<br><span class="govuk-body-s govuk-!-margin-bottom-0">{{ sub }}</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if v.summary.wtd.pct >= 1.0 %}
+        {{ govukInsetText({"text": "You are over your weekly allowance by " ~ "%.1f"|format(-v.summary.wtd.remaining) ~ " credits this week."}) }}
+      {% endif %}
+      <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
       {# ---- Usage heatmap (rolling window) — first, after the inputs ---- #}
       <h3 class="govuk-heading-s">Daily usage heatmap (last {{ v.calendar.weeks | length }} weeks)</h3>
       <p class="govuk-body-s">Each square is one day, shaded by credits used against the
