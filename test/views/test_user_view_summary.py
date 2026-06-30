@@ -53,4 +53,4 @@ def test_user_view_drops_top_model(fake_source):
     v = ac.user_view(fake_source(_rows()), "a", "$70 / month", None)
     assert "top_model" not in v
     assert all("top_model" not in w for w in v["weekly"])
-    assert all("usd" not in d for d in v["daily"])
+    assert all("usd" not in w for w in v["weekly"])

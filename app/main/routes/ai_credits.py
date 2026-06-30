@@ -41,7 +41,7 @@ def my_usage():
         source,
         username,
         request.args.get("plan"),
-        request.args.get("week"),
+        request.args.get("month"),
     )
 
     return render_template("pages/my_usage.html", v=view)

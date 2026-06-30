@@ -431,13 +431,15 @@ def user_view(  # pylint: disable=too-many-locals
     source: ReportsSource,
     login: str | None,
     plan: str | None,
-    week: str | None = None,
+    month: str | None = None,
 ) -> dict:
     """One user's personal usage, led by per-week usage vs the weekly limit.
 
-    `week` selects which ISO week is in focus (defaults to the latest the user
-    has data for); it drives the headline detail card and the daily breakdown.
-    All figures are in AI credits.
+    `month` selects which calendar month is in focus (defaults to the latest the
+    user has data for); it drives the per-week cost-stats table, the per-week
+    bar chart, and the cumulative chart. A week is attributed to the month its
+    Monday falls in, so a week straddling a boundary stays whole. All figures
+    are in AI credits.
     """
     plan = resolve_plan(plan)
     allowance = weekly_allowance(plan)
@@ -455,19 +457,23 @@ def user_view(  # pylint: disable=too-many-locals
         (r for r in records if r["user"] == login_str), key=lambda r: r["day"]
     )
     if not urecs:
-        return {**base, "searched": True, "found": False, "week": None}
+        return {**base, "searched": True, "found": False, "month": None}
 
     # ---- weekly history (the headline): one row per ISO week the user appears in
     all_rows = wpu.rollup_weekly(records)
     weekly_rows = []
     for r in (row for row in all_rows if row["user"] == login_str):
         credits_val = float(r["credits"])
-        mon, sun = wpu.week_span(int(r["iso_year"]), int(r["iso_week"]))
+        iso_year, iso_week = int(r["iso_year"]), int(r["iso_week"])
+        mon, sun = wpu.week_span(iso_year, iso_week)
         weekly_rows.append({
             "week_label": r["week_label"], "credits": credits_val,
             "pct": (credits_val / allowance) if allowance else 0.0,
             "remaining": allowance - credits_val, "day_count": int(r["day_count"]),
             "span": f"{mon:%d %b} – {sun:%d %b}",
+            "range": wpu.format_week_range(iso_year, iso_week),
+            # A week belongs to the month its Monday falls in (so it stays whole).
+            "month": f"{mon:%Y-%m}",
         })
     weekly_rows.sort(key=lambda x: x["week_label"])
     weeks = [w["week_label"] for w in weekly_rows]
@@ -477,32 +483,33 @@ def user_view(  # pylint: disable=too-many-locals
         "credits": [round(w["credits"], 1) for w in weekly_rows],
     }
 
-    # ---- selected week drives the detail card + the daily breakdown
-    selected = week if week in weeks else weeks[-1]
-    current = next(w for w in weekly_rows if w["week_label"] == selected)
-
-    week_recs = [r for r in urecs if wpu.iso_week_label(r["day"])[0] == selected]
-    daily_rows = [
-        {"day": r["day"], "credits": r["credits"]}
-        for r in week_recs
-    ]
-    daily_chart = {
-        "labels": [r["day"] for r in daily_rows],
-        "credits": [round(r["credits"], 1) for r in daily_rows],
+    # ---- selected month drives the per-week cost stats (table + bar) and the
+    # cumulative chart; default to the latest month the user has data for.
+    months = sorted({w["month"] for w in weekly_rows})
+    selected_month = month if month in months else months[-1]
+    month_weeks = [w for w in weekly_rows if w["month"] == selected_month]
+    month_week_labels = {w["week_label"] for w in month_weeks}
+    month_weekly_chart = {
+        "labels": [f"{w['week_label']} ({w['range']})" for w in month_weeks],
+        "credits": [round(w["credits"], 1) for w in month_weeks],
     }
 
-    # ---- month-to-date: cumulative credits over the latest captured month
-    latest_month = urecs[-1]["day"][:7]  # 'YYYY-MM'
-    month_recs = [r for r in urecs if r["day"][:7] == latest_month]
-    mtd_labels, mtd_cumulative, running = [], [], 0.0
-    for r in month_recs:
+    # ---- cumulative credits across the selected month's weeks. Keyed on whole
+    # weeks (not calendar days) so a straddling week's spill-over days stay with
+    # the month its Monday belongs to, matching the table and bar above.
+    month_day_recs = [
+        r for r in urecs if wpu.iso_week_label(r["day"])[0] in month_week_labels
+    ]
+    cum_labels, cum_values, running = [], [], 0.0
+    for r in month_day_recs:
         running += r["credits"]
-        mtd_labels.append(r["day"])
-        mtd_cumulative.append(round(running, 1))
-    mtd = {
-        "month": latest_month,
+        cum_labels.append(r["day"])
+        cum_values.append(round(running, 1))
+    month_cumulative = {
+        "month": selected_month,
+        "month_label": wpu.format_month_label(selected_month),
         "total_credits": running,
-        "chart": {"labels": mtd_labels, "cumulative": mtd_cumulative},
+        "chart": {"labels": cum_labels, "cumulative": cum_values},
     }
 
     # ---- Last-day / Week-to-date / Month-to-date, anchored to the latest day.
@@ -514,11 +521,12 @@ def user_view(  # pylint: disable=too-many-locals
         "searched": True, "found": True,
         "weeks": weeks, "weekly": weekly_rows, "weekly_chart": weekly_chart,
         "week_ranges": week_ranges,
-        "week": selected, "span": current["span"],
-        "used": current["credits"], "remaining": current["remaining"],
-        "pct": current["pct"], "day_count": current["day_count"],
-        "daily": daily_rows, "daily_chart": daily_chart,
-        "mtd": mtd,
+        "months": months, "month": selected_month,
+        "month_label": wpu.format_month_label(selected_month),
+        "month_options": [{"value": m, "text": wpu.format_month_label(m)}
+                          for m in months],
+        "month_weeks": month_weeks, "month_weekly_chart": month_weekly_chart,
+        "month_cumulative": month_cumulative,
         "summary": summary,
         "calendar": _usage_calendar(urecs, limits["daily"]),
     }
