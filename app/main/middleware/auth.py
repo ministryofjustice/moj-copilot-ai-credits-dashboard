@@ -40,7 +40,7 @@ def requires_admin(function_f):
 
         if role == "admin":
             return function_f(*args, **kwargs)
-        
+
         return render_template("pages/errors/403.html")
 
     return decorated
