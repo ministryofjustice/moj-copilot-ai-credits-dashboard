@@ -149,106 +149,102 @@ def _usage_calendar(urecs: list[dict], daily_allowance: float,  # pylint: disabl
 
 
 # ----------------------------------------------------------------- daily helpers
-def _totals(items: list[dict]) -> tuple[float, float, float]:
-    gross = sum(i.get("grossAmount", 0.0) for i in items)
-    net = sum(i.get("netAmount", 0.0) for i in items)
-    total_credits = sum(i.get("grossQuantity", 0.0) for i in items)
-    return gross, net, total_credits
+def _agg_by(rows: list[dict], field: str, total: float) -> list[dict]:
+    """Sum credits by `field` over model rows, spenders only, descending."""
+    agg: dict[str, float] = defaultdict(float)
+    for r in rows:
+        agg[r[field]] += r["credits"]
+    out = [{field: k, "credits": v, "share": (v / total) if total else 0.0}
+           for k, v in agg.items() if v > 0]
+    out.sort(key=lambda r: r["credits"], reverse=True)
+    return out
 
 
-def _by_model(items: list[dict]) -> list[dict]:
-    """Aggregate usageItems by model, gross-spend descending, spenders only."""
-    agg: dict[str, dict] = {}
-    for i in items:
-        m = agg.setdefault(i["model"], {"model": i["model"], "gross": 0.0, "net": 0.0})
-        m["gross"] += i.get("grossAmount", 0.0)
-        m["net"] += i.get("netAmount", 0.0)
-    rows = [r for r in agg.values() if r["gross"] > 0]
-    rows.sort(key=lambda r: r["gross"], reverse=True)
-    return rows
+def _org_rollup(day_total: dict[str, float], day: str) -> dict:
+    """Org Last-day / WTD / MTD credits, anchored to (and counting up to) `day`."""
+    label = wpu.iso_week_label(day)[0]
+    wtd = sum(c for d, c in day_total.items()
+              if wpu.iso_week_label(d)[0] == label and d <= day)
+    month = day[:7]
+    mtd = sum(c for d, c in day_total.items() if d[:7] == month and d <= day)
+    return {"last_day": day_total[day], "wtd": wtd, "mtd": mtd,
+            "week_label": label, "month": month}
 
 
 def daily_view(source: ReportsSource, day: str | None = None) -> dict:  # pylint: disable=too-many-locals
-    """Everything the Daily admin page needs for one day, plus the MTD trend."""
-    docs = source.daily_docs()
-    if not docs:
+    """Everything the Daily admin page needs for one day, plus the MTD trend.
+
+    Org-level credits only (the data has no gross/net/coverage). Adds a model-family
+    split, an auto-routed-vs-chosen split, and the org Last-day/WTD/MTD rollup.
+    """
+    mrows = source.model_rows()
+    if not mrows:
         return {"has_data": False, "days": []}
 
-    days = list(docs)
-    day = day if day in docs else days[-1]
-    doc = docs[day]
-    scope = doc.get("organization") or doc.get("enterprise") or "?"
-    items = doc.get("usageItems", [])
-    gross, net, total_credits = _totals(items)
+    day_total: dict[str, float] = defaultdict(float)
+    for r in mrows:
+        day_total[r["day"]] += r["credits"]
+    days = sorted(day_total)
+    day = day if day in day_total else days[-1]
 
-    by_model = _by_model(items)
-    for r in by_model:
-        r["share"] = (r["gross"] / gross) if gross else 0.0
+    day_rows = [r for r in mrows if r["day"] == day]
+    total = sum(r["credits"] for r in day_rows)
+    by_model = _agg_by(day_rows, "model", total)
+    by_family = _agg_by(day_rows, "model_family", total)
+    routed = sum(r["credits"] for r in day_rows if r["routed"])
+    chosen = total - routed
 
     # Month-to-date trend (only meaningful with 2+ days captured).
     trend = None
     if len(days) >= 2:
-        labels, g_series, n_series, cumulative = [], [], [], []
-        running = 0.0
+        running, totals, cumulative = 0.0, [], []
         for d in days:
-            dg, dn, _ = _totals(docs[d].get("usageItems", []))
-            running += dg
-            labels.append(d)
-            g_series.append(round(dg, 2))
-            n_series.append(round(dn, 2))
+            running += day_total[d]
+            totals.append(round(day_total[d], 2))
             cumulative.append(round(running, 2))
-        trend = {
-            "labels": labels, "gross": g_series, "net": n_series,
-            "cumulative": cumulative,
-        }
+        trend = {"labels": days, "totals": totals, "cumulative": cumulative}
+
+    per_user = _per_user_day(source, day, total)
 
     return {
         "has_data": True,
         "days": days,
         "day": day,
-        "scope": scope,
-        "metrics": {
-            "gross": gross, "net": net, "covered": gross - net, "credits": total_credits,
-        },
-        "fully_covered": net == 0 and gross > 0,
+        "scope": ENTERPRISE,
+        "metrics": {"credits": total, "usd": total / CREDITS_PER_USD,
+                    "spenders": per_user["with_spend"], "models": len(by_model)},
         "by_model": by_model,
         "model_chart": {
             "labels": [r["model"] for r in by_model],
-            "gross": [round(r["gross"], 2) for r in by_model],
+            "credits": [round(r["credits"], 2) for r in by_model],
+        },
+        "family_chart": {
+            "labels": [r["model_family"] for r in by_family],
+            "credits": [round(r["credits"], 2) for r in by_family],
+        },
+        "routed_chart": {
+            "labels": ["Auto-routed", "Explicitly chosen"],
+            "credits": [round(routed, 2), round(chosen, 2)],
         },
         "trend": trend,
-        "per_user": _per_user_day(source, day, gross),
+        "rollup": _org_rollup(day_total, day),
+        "per_user": per_user,
     }
 
 
-def _per_user_day(source: ReportsSource, day: str, day_gross: float) -> dict:
-    """Per-user spend for a day: spenders sorted desc + summary counts."""
-    docs = source.per_user_docs(day)
-    spenders = []
-    queried = 0
-    for login, items in docs.items():
-        if not items:
-            continue
-        queried += 1
-        gross = sum(i.get("grossAmount", 0.0) for i in items)
-        net = sum(i.get("netAmount", 0.0) for i in items)
-        if gross <= 0:
-            continue
-        active = [i for i in items if i.get("grossAmount", 0.0) > 0]
-        top = max(active, key=lambda i: i["grossAmount"])["model"] if active else "—"
-        spenders.append({
-            "user": login, "gross": gross, "net": net, "top_model": top,
-            "share": (gross / day_gross) if day_gross else 0.0,
-        })
-    spenders.sort(key=lambda r: r["gross"], reverse=True)
+def _per_user_day(source: ReportsSource, day: str, day_total: float) -> dict:
+    """Per-user spend for a day: spenders sorted desc + concentration of the top few."""
+    rows = [r for r in source.user_rows() if r["day"] == day and r["credits"] > 0]
+    spenders = [{"user": r["user_login"], "credits": r["credits"],
+                 "share": (r["credits"] / day_total) if day_total else 0.0}
+                for r in rows]
+    spenders.sort(key=lambda r: r["credits"], reverse=True)
     top_n = min(3, len(spenders))
-    concentration = sum(r["share"] for r in spenders[:top_n])
     return {
         "rows": spenders,
-        "queried": queried,
         "with_spend": len(spenders),
         "top_n": top_n,
-        "concentration": concentration,
+        "concentration": sum(r["share"] for r in spenders[:top_n]),
     }
 
 
