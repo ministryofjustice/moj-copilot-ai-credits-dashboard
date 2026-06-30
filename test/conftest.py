@@ -63,7 +63,7 @@ def model_records():
 
 
 @pytest.fixture
-def mrows(model_records):
+def mrows(model_records):  # pylint: disable=redefined-outer-name
     """The shared 2026-06-01 model rows plus a 2026-06-02 Opus row, for the
     daily-view tests that need a second day."""
     return model_records + [
