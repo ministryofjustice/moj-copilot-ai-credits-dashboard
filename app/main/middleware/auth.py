@@ -27,6 +27,7 @@ def requires_auth(function_f):
 
     return decorated
 
+
 def requires_admin(function_f):
     @wraps(function_f)
     def decorated(*args, **kwargs):
@@ -43,4 +44,3 @@ def requires_admin(function_f):
             return render_template("pages/errors/403.html")
 
     return decorated
-
