@@ -6,6 +6,7 @@ from flask import (
     redirect,
     session,
     request,
+    render_template
 )
 
 from app.main.config.app_config import app_config
@@ -23,5 +24,23 @@ def requires_auth(function_f):
             session["post_auth_redirect_path"] = request.full_path
             return redirect("/auth/login")
         return function_f(*args, **kwargs)
+
+    return decorated
+
+
+def requires_admin(function_f):
+    @wraps(function_f)
+    def decorated(*args, **kwargs):
+        if app_config.auth_disabled:
+            return function_f(*args, **kwargs)
+
+        role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
+
+        print(f"User role: {role}")
+
+        if role == "admin":
+            return function_f(*args, **kwargs)
+
+        return render_template("pages/errors/403.html")
 
     return decorated

@@ -17,14 +17,11 @@
     <p class="govuk-body">
       Enter your GitHub username to see your AI-credit usage for the current week.
     </p>
+    <p class="govuk-body">
+      GitHub username: <strong>{{ v.login }}</strong>
+    </p>
 
     <form method="get" action="/">
-      {{ govukInput({
-        "id": "user", "name": "user",
-        "label": {"text": "GitHub username"},
-        "value": v.login,
-        "classes": "govuk-input--width-20"
-      }) }}
       {{ govukSelect({
         "id": "plan", "name": "plan",
         "label": {"text": "Plan budget (per seat)"},
