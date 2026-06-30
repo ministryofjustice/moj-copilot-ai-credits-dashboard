@@ -61,11 +61,12 @@ class FakeAthenaClient:
 
 def _source(result_set=None, states=("SUCCEEDED",)):
     return DbReportsSource(
-        database="db", table="t", output_location="s3://staging/",
+        database="db", output_location="s3://staging/",
         client=FakeAthenaClient(result_set, states), sleep=lambda _s: None,
     )
 
 
+# ---------------------------------------------------------------- query plumbing
 def test_run_query_maps_rows_to_dicts():
     src = _source(_result_set(["a", "b"], [["1", "x"], ["2", "y"]]))
     assert src._run_query("SELECT a, b FROM t") == [
@@ -78,15 +79,14 @@ def test_run_query_concatenates_paginated_pages():
     page1 = _result_set(["a"], [["1"]])
     page2 = {"ResultSet": {"Rows": [_row(["2"])]}}
     client = FakeAthenaClient(pages=[page1, page2])
-    src = DbReportsSource(database="db", table="t", output_location="s3://x/",
+    src = DbReportsSource(database="db", output_location="s3://x/",
                           client=client, sleep=lambda _s: None)
     assert src._run_query("SELECT a FROM t") == [{"a": "1"}, {"a": "2"}]
 
 
 def test_run_query_handles_empty_page():
-    # A page with no Rows at all must not IndexError into the (absent) header.
     client = FakeAthenaClient(pages=[{"ResultSet": {"Rows": []}}])
-    src = DbReportsSource(database="db", table="t", output_location="s3://x/",
+    src = DbReportsSource(database="db", output_location="s3://x/",
                           client=client, sleep=lambda _s: None)
     assert not src._run_query("SELECT a FROM t")
 
@@ -94,7 +94,7 @@ def test_run_query_handles_empty_page():
 def test_run_query_polls_until_succeeded():
     client = FakeAthenaClient(_result_set(["a"], [["1"]]),
                               states=("QUEUED", "RUNNING", "SUCCEEDED"))
-    src = DbReportsSource(database="db", table="t", output_location="s3://x/",
+    src = DbReportsSource(database="db", output_location="s3://x/",
                           client=client, sleep=lambda _s: None)
     assert src._run_query("SELECT a FROM t") == [{"a": "1"}]
 
@@ -105,114 +105,66 @@ def test_run_query_raises_on_failed():
         src._run_query("SELECT 1")
 
 
+# ---------------------------------------------------------------- config guards
 def test_missing_database_raises(monkeypatch):
     monkeypatch.delenv("ATHENA_DATABASE", raising=False)
     with pytest.raises(ValueError, match="ATHENA_DATABASE"):
-        DbReportsSource(table="t", output_location="s3://x/",
-                        client=FakeAthenaClient())
-
-
-def test_missing_table_raises(monkeypatch):
-    monkeypatch.delenv("ATHENA_TABLE", raising=False)
-    with pytest.raises(ValueError, match="ATHENA_TABLE"):
-        DbReportsSource(database="db", output_location="s3://x/",
-                        client=FakeAthenaClient())
+        DbReportsSource(output_location="s3://x/", client=FakeAthenaClient())
 
 
 def test_missing_output_location_raises(monkeypatch):
     monkeypatch.delenv("ATHENA_OUTPUT_LOCATION", raising=False)
     with pytest.raises(ValueError, match="ATHENA_OUTPUT_LOCATION"):
-        DbReportsSource(database="db", table="t", client=FakeAthenaClient())
+        DbReportsSource(database="db", client=FakeAthenaClient())
 
 
-def test_start_query_passes_database_and_output_location():
+def test_start_query_passes_sql():
     client = FakeAthenaClient(_result_set(["a"], []))
-    src = DbReportsSource(database="mydb", table="t", output_location="s3://stg/",
+    src = DbReportsSource(database="mydb", output_location="s3://stg/",
                           workgroup="wg", client=client, sleep=lambda _s: None)
     src._run_query("SELECT a FROM t")
     assert client.queries == ["SELECT a FROM t"]
 
 
-def test_per_user_docs_groups_by_login_and_casts():
+# ------------------------------------------------------------------- model_rows
+def test_model_rows_parses_routed_and_credits():
     rows = _result_set(
-        ["user", "model", "gross_quantity", "gross_amount"],
-        [["alice", "AI Credits", "5", "0.05"],
-         ["bob", "AI Credits", "3", "0.03"]],
+        ["model", "model_family", "routed", "ai_credits_used", "day"],
+        [["Opus 4.6", "Opus", "false", "100.5", "2026-06-01"],
+         ["Auto: Haiku", "Haiku", "true", "5.0", "2026-06-01"]],
     )
     src = _source(rows)
-    docs = src.per_user_docs("2026-06-01")
-    assert docs == {
-        "alice": [{"model": "AI Credits", "grossQuantity": 5.0, "grossAmount": 0.05}],
-        "bob": [{"model": "AI Credits", "grossQuantity": 3.0, "grossAmount": 0.03}],
-    }
+    out = src.model_rows()
+    assert out[0] == {"day": "2026-06-01", "model": "Opus 4.6",
+                      "model_family": "Opus", "routed": False, "credits": 100.5}
+    assert out[1]["routed"] is True
 
 
-def test_per_user_docs_partition_filters_by_date():
+def test_model_rows_queries_model_table():
     client = FakeAthenaClient(_result_set(
-        ["user", "model", "gross_quantity", "gross_amount"], []))
-    src = DbReportsSource(database="db", table="t", output_location="s3://x/",
+        ["model", "model_family", "routed", "ai_credits_used", "day"], []))
+    src = DbReportsSource(database="db", model_table="cbm", output_location="s3://x/",
                           client=client, sleep=lambda _s: None)
-    src.per_user_docs("2026-06-04")
-    sql = client.queries[0]
-    assert "year = 2026" in sql and "month = 6" in sql and "day = 4" in sql
-    assert '"user"' in sql  # reserved word is quoted
+    src.model_rows()
+    assert "FROM cbm" in client.queries[0]
 
 
-def test_per_user_docs_rejects_bad_day():
-    src = _source()
-    with pytest.raises(ValueError):
-        src.per_user_docs("not-a-date")
-
-
-def test_weekly_records_shape_and_per_model():
+# -------------------------------------------------------------------- user_rows
+def test_user_rows_parses_credits():
     rows = _result_set(
-        ["year", "month", "day", "user", "model", "credits", "usd"],
-        [["2026", "6", "1", "alice", "AI Credits", "100", "1.0"],
-         ["2026", "6", "2", "alice", "AI Credits", "10", "0.1"]],
+        ["user_login", "ai_credits_used", "day"],
+        [["alice", "10324.7", "2026-06-01"], ["bob", "3.0", "2026-06-01"]],
     )
     src = _source(rows)
-    records = src.weekly_records()
-    assert {(r["day"], r["user"]) for r in records} == {
-        ("2026-06-01", "alice"), ("2026-06-02", "alice")}
-    day1 = next(r for r in records if r["day"] == "2026-06-01")
-    assert day1["credits"] == pytest.approx(100.0)
-    assert day1["usd"] == pytest.approx(1.0)
-    assert day1["per_model"] == {"AI Credits": pytest.approx(100.0)}
-
-
-def test_weekly_records_uses_group_by():
-    client = FakeAthenaClient(_result_set(
-        ["year", "month", "day", "user", "model", "credits", "usd"], []))
-    src = DbReportsSource(database="db", table="t", output_location="s3://x/",
-                          client=client, sleep=lambda _s: None)
-    src.weekly_records()
-    assert "GROUP BY" in client.queries[0]
-
-
-def test_weekly_records_skips_zero_credit_users():
-    rows = _result_set(
-        ["year", "month", "day", "user", "model", "credits", "usd"],
-        [["2026", "6", "1", "idle", "AI Credits", "0", "0.0"]],
-    )
-    src = _source(rows)
-    assert not src.weekly_records()
-
-
-def test_daily_docs_grouped_by_day_sorted():
-    rows = _result_set(
-        ["year", "month", "day", "enterprise", "user",
-         "model", "gross_quantity", "gross_amount"],
-        [["2026", "6", "2", "MoJ", "alice", "AI Credits", "5", "0.05"],
-         ["2026", "6", "1", "MoJ", "bob", "AI Credits", "3", "0.03"],
-         ["2026", "6", "1", "MoJ", "carol", "AI Credits", "2", "0.02"]],
-    )
-    src = _source(rows)
-    docs = src.daily_docs()
-    assert list(docs) == ["2026-06-01", "2026-06-02"]
-    assert docs["2026-06-01"]["enterprise"] == "MoJ"
-    assert docs["2026-06-01"]["usageItems"] == [
-        {"model": "AI Credits", "grossQuantity": 3.0, "grossAmount": 0.03},
-        {"model": "AI Credits", "grossQuantity": 2.0, "grossAmount": 0.02},
+    assert src.user_rows() == [
+        {"day": "2026-06-01", "user_login": "alice", "credits": 10324.7},
+        {"day": "2026-06-01", "user_login": "bob", "credits": 3.0},
     ]
-    assert docs["2026-06-02"]["usageItems"] == [
-        {"model": "AI Credits", "grossQuantity": 5.0, "grossAmount": 0.05}]
+
+
+def test_user_rows_queries_user_table():
+    client = FakeAthenaClient(_result_set(["user_login", "ai_credits_used", "day"], []))
+    src = DbReportsSource(database="db", user_table="cbu", output_location="s3://x/",
+                          client=client, sleep=lambda _s: None)
+    src.user_rows()
+    assert "FROM cbu" in client.queries[0]

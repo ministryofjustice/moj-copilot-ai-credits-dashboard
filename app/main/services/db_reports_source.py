@@ -1,54 +1,43 @@
 """Athena-backed reports source.
 
-Queries an Athena table over partitioned Parquet (one row per day/user, written
-by the producer's build_credit_rows) and returns the same shapes the on-disk and
-S3 sources return. Selected when REPORTS_SOURCE=db.
+Queries the two Athena tables over the partitioned Parquet (`credits_by_model`,
+`credits_by_user`) and returns the same row-lists the local and S3 sources return.
+Selected when REPORTS_SOURCE=db.
 
 Config (env):
 * ATHENA_DATABASE        - Glue database (required).
-* ATHENA_TABLE           - table name (required).
+* ATHENA_MODEL_TABLE     - per-model table name (default "credits_by_model").
+* ATHENA_USER_TABLE      - per-user table name (default "credits_by_user").
 * ATHENA_OUTPUT_LOCATION - s3://.../ results staging dir (required).
 * ATHENA_WORKGROUP       - workgroup (default "primary").
 * AWS_DEFAULT_REGION     - region for the boto3 client (default "eu-west-2").
 
 Credentials are resolved by boto3's default chain (IRSA / the pod's service
 account role) - no static keys are read or stored here.
-
-Limitations: the Parquet has no net-amount column, so netAmount is left unset
-(consumers default it to 0.0); daily_docs() reads all partitions by contract.
 """
 
 from __future__ import annotations
 
 import os
 import time
-from datetime import date
 
-from app.main.services import weekly_per_user as wpu
 from app.main.services.reports_source import ReportsSource
 
 _POLL_SECONDS = 1.0
 _MAX_POLLS = 300  # ~5 min ceiling at 1s between polls
 
 
-def _item(row: dict) -> dict:
-    """One Athena row -> one usageItem (no netAmount; defaults to 0.0 downstream)."""
-    return {
-        "model": row["model"],
-        "grossQuantity": float(row["gross_quantity"]),
-        "grossAmount": float(row["gross_amount"]),
-    }
-
-
 class DbReportsSource(ReportsSource):
-    def __init__(self, database=None, table=None, output_location=None,  # pylint: disable=too-many-arguments
-                 *, workgroup=None, client=None, sleep=None) -> None:
+    def __init__(self, database=None, model_table=None, user_table=None,  # pylint: disable=too-many-arguments
+                 output_location=None, *, workgroup=None, client=None,
+                 sleep=None) -> None:
         self.database = database or os.getenv("ATHENA_DATABASE")
         if not self.database:
             raise ValueError("ATHENA_DATABASE is required when REPORTS_SOURCE=db")
-        self.table = table or os.getenv("ATHENA_TABLE")
-        if not self.table:
-            raise ValueError("ATHENA_TABLE is required when REPORTS_SOURCE=db")
+        self.model_table = (model_table or os.getenv("ATHENA_MODEL_TABLE")
+                            or "credits_by_model")
+        self.user_table = (user_table or os.getenv("ATHENA_USER_TABLE")
+                           or "credits_by_user")
         self.output_location = output_location or os.getenv("ATHENA_OUTPUT_LOCATION")
         if not self.output_location:
             raise ValueError(
@@ -99,53 +88,20 @@ class DbReportsSource(ReportsSource):
                 rows.append(dict(zip(header, values)))
         return rows
 
-    def daily_docs(self) -> dict[str, dict]:
-        sql = (
-            'SELECT year, month, day, enterprise, "user", model, '
-            "gross_quantity, gross_amount "
-            f"FROM {self.table}"
-        )
-        docs: dict[str, dict] = {}
-        for row in self._run_query(sql):
-            day = (f'{int(row["year"]):04d}-'
-                   f'{int(row["month"]):02d}-{int(row["day"]):02d}')
-            doc = docs.setdefault(
-                day, {"enterprise": row["enterprise"], "usageItems": []})
-            doc["usageItems"].append(_item(row))
-        return dict(sorted(docs.items()))
+    def model_rows(self) -> list[dict]:
+        sql = ("SELECT model, model_family, routed, ai_credits_used, day "
+               f"FROM {self.model_table}")
+        return [
+            {"day": r["day"], "model": r["model"], "model_family": r["model_family"],
+             "routed": str(r["routed"]).strip().lower() == "true",
+             "credits": float(r["ai_credits_used"])}
+            for r in self._run_query(sql)
+        ]
 
-    def per_user_docs(self, day: str) -> dict[str, list]:
-        d = date.fromisoformat(day)  # raises ValueError on bad input
-        sql = (
-            'SELECT "user", model, gross_quantity, gross_amount '
-            f"FROM {self.table} "
-            f"WHERE year = {d.year} AND month = {d.month} AND day = {d.day}"
-        )
-        out: dict[str, list] = {}
-        for row in self._run_query(sql):
-            out.setdefault(row["user"], []).append(_item(row))
-        return out
-
-    def weekly_records(self) -> list[dict]:
-        sql = (
-            'SELECT year, month, day, "user", model, '
-            "SUM(gross_quantity) AS credits, SUM(gross_amount) AS usd "
-            f"FROM {self.table} "
-            'GROUP BY year, month, day, "user", model'
-        )
-        grouped: dict[tuple[str, str], list] = {}
-        for row in self._run_query(sql):
-            day = (f'{int(row["year"]):04d}-'
-                   f'{int(row["month"]):02d}-{int(row["day"]):02d}')
-            item = {
-                "model": row["model"],
-                "grossQuantity": float(row["credits"]),
-                "grossAmount": float(row["usd"]),
-            }
-            grouped.setdefault((day, row["user"]), []).append(item)
-        records: list[dict] = []
-        for (day, user), items in grouped.items():
-            rec = wpu.record_from_items(day, user, items)
-            if rec is not None:
-                records.append(rec)
-        return records
+    def user_rows(self) -> list[dict]:
+        sql = f"SELECT user_login, ai_credits_used, day FROM {self.user_table}"
+        return [
+            {"day": r["day"], "user_login": r["user_login"],
+             "credits": float(r["ai_credits_used"])}
+            for r in self._run_query(sql)
+        ]
