@@ -1,4 +1,3 @@
-import json
 from datetime import date
 
 from pytest import approx
@@ -46,15 +45,14 @@ def test_format_month_label_is_human_readable():
     assert wpu.format_month_label("2026-01") == "Jan 2026"
 
 
-def _rec(day, user, credits_val, usd, per_model):
-    return {"day": day, "user": user, "credits": credits_val, "usd": usd,
-            "per_model": per_model}
+def _rec(day, user, credits_val):
+    return {"day": day, "user": user, "credits": credits_val}
 
 
 def test_rollup_weekly_sums_user_across_days_in_same_week():
     records = [
-        _rec("2026-06-01", "alice", 100.0, 1.0, {"Opus": 100.0}),
-        _rec("2026-06-04", "alice", 50.0, 0.5, {"Opus": 40.0, "Haiku": 10.0}),
+        _rec("2026-06-01", "alice", 100.0),
+        _rec("2026-06-04", "alice", 50.0),
     ]
     rows = wpu.rollup_weekly(records)
     assert len(rows) == 1
@@ -62,17 +60,16 @@ def test_rollup_weekly_sums_user_across_days_in_same_week():
     assert row["week_label"] == "2026-W23"
     assert row["user"] == "alice"
     assert row["credits"] == approx(150.0)
-    assert row["usd"] == approx(1.5)
     assert row["day_count"] == 2
-    assert row["top_model"] == "Opus"
-    assert row["per_model"] == {"Opus": approx(140.0), "Haiku": approx(10.0)}
+    assert "top_model" not in row
+    assert "per_model" not in row
 
 
 def test_rollup_weekly_splits_users_and_weeks():
     records = [
-        _rec("2026-06-07", "alice", 10.0, 0.1, {"Opus": 10.0}),   # W23
-        _rec("2026-06-08", "alice", 20.0, 0.2, {"Opus": 20.0}),   # W24
-        _rec("2026-06-08", "bob", 5.0, 0.05, {"Haiku": 5.0}),     # W24
+        _rec("2026-06-07", "alice", 10.0),   # W23
+        _rec("2026-06-08", "alice", 20.0),   # W24
+        _rec("2026-06-08", "bob", 5.0),      # W24
     ]
     rows = wpu.rollup_weekly(records)
     assert len(rows) == 3
@@ -84,58 +81,18 @@ def test_rollup_weekly_splits_users_and_weeks():
     assert alice_w24["credits"] == approx(20.0)
 
 
+def test_rollup_weekly_sorts_by_week_then_credits_desc():
+    records = [
+        _rec("2026-06-01", "small", 5.0),
+        _rec("2026-06-01", "big", 500.0),
+    ]
+    rows = wpu.rollup_weekly(records)
+    assert [r["user"] for r in rows] == ["big", "small"]
+
+
 def test_rollup_weekly_empty_returns_empty_list():
     rows = wpu.rollup_weekly([])
     assert not rows
-
-
-def test_record_from_items_sums_per_model():
-    rec = wpu.record_from_items("2026-06-01", "alice", [
-        {"model": "Opus", "grossQuantity": 100.0, "grossAmount": 1.0},
-        {"model": "Opus", "grossQuantity": 20.0, "grossAmount": 0.2},
-        {"model": "Haiku", "grossQuantity": 5.0, "grossAmount": 0.05},
-    ])
-    assert rec == {
-        "day": "2026-06-01", "user": "alice",
-        "credits": approx(125.0), "usd": approx(1.25),
-        "per_model": {"Opus": approx(120.0), "Haiku": approx(5.0)},
-    }
-
-
-def test_record_from_items_returns_none_when_no_usage():
-    assert wpu.record_from_items("2026-06-01", "empty", []) is None
-    assert wpu.record_from_items("2026-06-01", "zero", [
-        {"model": "Opus", "grossQuantity": 0.0, "grossAmount": 0.0},
-    ]) is None
-
-
-def _write_per_user(tmp_path, day, login, items):
-    d = tmp_path / "reports" / day / "billing" / "per-user"
-    d.mkdir(parents=True, exist_ok=True)
-    (d / f"{login}.json").write_text(json.dumps({
-        "timePeriod": {"year": 2026, "month": 6, "day": int(day[-2:])},
-        "user": login, "usageItems": items,
-    }))
-
-
-def test_load_weekly_records_reads_and_sums_per_model(tmp_path):
-    _write_per_user(tmp_path, "2026-06-01", "alice", [
-        {"model": "Opus", "grossQuantity": 100.0, "grossAmount": 1.0},
-        {"model": "Opus", "grossQuantity": 20.0, "grossAmount": 0.2},
-        {"model": "Haiku", "grossQuantity": 5.0, "grossAmount": 0.05},
-    ])
-    _write_per_user(tmp_path, "2026-06-01", "empty", [])  # skipped: no usage
-
-    glob_pat = str(tmp_path / "reports" / "*" / "billing" / "per-user" / "*.json")
-    records = wpu.load_weekly_records(glob_pat)
-
-    assert len(records) == 1
-    rec = records[0]
-    assert rec["day"] == "2026-06-01"
-    assert rec["user"] == "alice"
-    assert rec["credits"] == approx(125.0)
-    assert rec["usd"] == approx(1.25)
-    assert rec["per_model"] == {"Opus": approx(120.0), "Haiku": approx(5.0)}
 
 
 def test_assign_tiers_bins_users_by_spend_rank():

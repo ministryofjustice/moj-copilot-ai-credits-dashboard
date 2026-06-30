@@ -1,14 +1,10 @@
-"""Pure logic for the weekly per-user AI-credit view in ai_credits_app.py.
+"""Pure logic for the weekly per-user AI-credit view.
 
-Kept free of Streamlit so it can be imported and unit-tested directly. Reads the
-per-user billing JSON that download-billing.sh writes to
-reports/<date>/billing/per-user/<login>.json.
+Kept free of Flask so it can be imported and unit-tested directly. Operates on
+plain per-user daily records (`{day, user, credits}`) sourced from the
+`credits_by_user` parquet table — no per-model breakdown exists in this data.
 """
 
-import glob
-import json
-import os
-from collections import defaultdict
 from datetime import date
 
 
@@ -79,12 +75,11 @@ def assign_tiers(user_credits: dict[str, float]) -> dict[str, str]:
 
 
 def rollup_weekly(records: list[dict]) -> list[dict]:
-    """Sum per-(week, user) credits/usd from per-day records.
+    """Sum per-(week, user) credits from per-day {day, user, credits} records.
 
-    records: [{"day","user","credits","usd","per_model": {model: credits}}, ...]
-    Returns one dict per (week_label, user) with merged per-model sums, the top
-    model by credits, and the count of distinct days the user appears in, sorted
-    by week (ascending) then credits (descending). Empty input -> empty list.
+    Returns one dict per (week_label, user) with summed credits and the count of
+    distinct days the user appears in, sorted by week (ascending) then credits
+    (descending). Empty input -> empty list.
     """
     agg: dict[tuple[str, str], dict] = {}
     for r in records:
@@ -94,73 +89,16 @@ def rollup_weekly(records: list[dict]) -> list[dict]:
         if bucket is None:
             bucket = {
                 "week_label": label, "iso_year": iso_year, "iso_week": iso_week,
-                "user": r["user"], "credits": 0.0, "usd": 0.0,
-                "days": set(), "per_model": defaultdict(float),
+                "user": r["user"], "credits": 0.0, "days": set(),
             }
             agg[key] = bucket
         bucket["credits"] += r["credits"]
-        bucket["usd"] += r["usd"]
         bucket["days"].add(r["day"])
-        for model, cr in r.get("per_model", {}).items():
-            bucket["per_model"][model] += cr
 
-    rows = []
-    for bucket in agg.values():
-        per_model = dict(bucket["per_model"])
-        top_model = max(per_model, key=per_model.get) if per_model else "—"
-        rows.append({
-            "week_label": bucket["week_label"], "iso_year": bucket["iso_year"],
-            "iso_week": bucket["iso_week"], "user": bucket["user"],
-            "credits": bucket["credits"], "usd": bucket["usd"],
-            "day_count": len(bucket["days"]), "top_model": top_model,
-            "per_model": per_model,
-        })
-
+    rows = [{
+        "week_label": b["week_label"], "iso_year": b["iso_year"],
+        "iso_week": b["iso_week"], "user": b["user"],
+        "credits": b["credits"], "day_count": len(b["days"]),
+    } for b in agg.values()]
     rows.sort(key=lambda x: (x["week_label"], -x["credits"]))
     return rows
-
-
-PER_USER_GLOB = "reports/*/billing/per-user/*.json"
-
-
-def _day_from_per_user_path(path: str) -> str:
-    # reports/2026-06-01/billing/per-user/alice.json -> 2026-06-01
-    parts = path.replace("\\", "/").split("/")
-    return parts[parts.index("reports") + 1]
-
-
-def record_from_items(day: str, user: str, items: list[dict]) -> dict | None:
-    """One (day, user) record with usage summed per model.
-
-    Returns None when there are no items or no positive credit usage, so callers
-    can skip non-spenders. Mirrors the shape rollup_weekly expects.
-    """
-    if not items:
-        return None
-    per_model: dict[str, float] = defaultdict(float)
-    total_credits = 0.0
-    usd = 0.0
-    for it in items:
-        cr = it.get("grossQuantity", 0.0)
-        per_model[it["model"]] += cr
-        total_credits += cr
-        usd += it.get("grossAmount", 0.0)
-    if total_credits <= 0:
-        return None
-    return {
-        "day": day, "user": user,
-        "credits": total_credits, "usd": usd, "per_model": dict(per_model),
-    }
-
-
-def load_weekly_records(glob_pattern: str = PER_USER_GLOB) -> list[dict]:
-    """One record per (day, user) with usage, summed per model. Skips empties."""
-    records = []
-    for path in sorted(glob.glob(glob_pattern)):
-        login = os.path.splitext(os.path.basename(path))[0]
-        with open(path, encoding="utf-8") as f:
-            items = json.load(f).get("usageItems", [])
-        rec = record_from_items(_day_from_per_user_path(path), login, items)
-        if rec is not None:
-            records.append(rec)
-    return records
