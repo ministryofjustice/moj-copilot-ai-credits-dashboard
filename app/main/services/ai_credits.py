@@ -11,6 +11,7 @@ minus `@st.cache_data`.
 
 from __future__ import annotations
 
+from collections import defaultdict
 from datetime import date, timedelta
 
 from app.main.services import weekly_per_user as wpu
@@ -25,6 +26,14 @@ WEEKS_PER_MONTH = 4.33
 PLAN_TIERS_USD_PER_MONTH = {"$70 / month": 70.0, "$39 / month": 39.0}
 DEFAULT_PLAN = "$70 / month"
 DEFAULT_SEATS = 405
+# The dataset has no scope column; the enterprise it covers is fixed.
+ENTERPRISE = "ministryofjustice"
+
+
+def _user_records(source: ReportsSource) -> list[dict]:
+    """user_rows reshaped to the {day, user, credits} the week/pool maths expect."""
+    return [{"day": r["day"], "user": r["user_login"], "credits": r["credits"]}
+            for r in source.user_rows()]
 
 
 def resolve_seats(raw) -> int:
@@ -245,7 +254,7 @@ def _per_user_day(source: ReportsSource, day: str, day_gross: float) -> dict:
 
 # ---------------------------------------------------------------- weekly helpers
 def _weekly_rows(source: ReportsSource) -> list[dict]:
-    return wpu.rollup_weekly(source.weekly_records())
+    return wpu.rollup_weekly(_user_records(source))
 
 
 def _week_labels(rows: list[dict]) -> list[str]:
@@ -299,7 +308,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     period = "weekly" if period == "weekly" else "monthly"
     plan = resolve_plan(plan)
     seats = resolve_seats(seats)
-    records = source.weekly_records()
+    records = _user_records(source)
     keys = sorted({_record_period_key(r["day"], period) for r in records})
 
     base = {
@@ -385,7 +394,7 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
             "user": r["user"], "credits": credits_val,
             "pct": (credits_val / allowance) if allowance else 0.0,
             "remaining": allowance - credits_val,
-            "top_model": r["top_model"], "day_count": int(r["day_count"]),
+            "day_count": int(r["day_count"]),
         })
     rows.sort(key=lambda x: x["credits"], reverse=True)
     over = sum(1 for x in rows if x["pct"] >= 1.0)
