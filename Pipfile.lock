@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "13d0d158a9003c4ce67d75f57a99a65239a15518db31a230ecbb44b83afc2205"
+            "sha256": "a8315bb2e95325c8cc86c82e54ab4be6942cccd6031fdd7e322e01aaccb3726e"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -405,12 +405,12 @@
         },
         "govuk-frontend-jinja": {
             "hashes": [
-                "sha256:0675860c60158f57f24406a22fbea43ddcfce7b93346af098868b4999f8918ed",
-                "sha256:fd8cb0b08be013b1bef893da46a364367b6bacc1c1e535083f5693c7bf6f698f"
+                "sha256:1bcb50779ae4852a0fcb9fb53dab2301a08f1435923900cf5d1be84d8063f31b",
+                "sha256:8e21fe3c0f3a2499507b021f32f99a3c0107d19cda8c03d9e8572333568e17e9"
             ],
             "index": "pypi",
-            "markers": "python_version >= '3.8'",
-            "version": "==3.0.0"
+            "markers": "python_version >= '3.10'",
+            "version": "==4.0.0"
         },
         "gunicorn": {
             "hashes": [
