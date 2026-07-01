@@ -27,11 +27,18 @@ def _user_rows():
             {"day": "2026-06-01", "user_login": "bob", "credits": 40.0}]
 
 
+def test_admin_index_redirects_to_pooled(monkeypatch, fake_source):
+    client = _admin_client(monkeypatch, fake_source([], model_rows=[]))
+    resp = client.get("/admin")
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/admin/pooled")
+
+
 def test_admin_daily_renders_family_and_routed(monkeypatch, fake_source,
                                                model_records):
     source = fake_source(_user_rows(), model_rows=model_records)
     client = _admin_client(monkeypatch, source)
-    resp = client.get("/admin")
+    resp = client.get("/admin/daily")
     assert resp.status_code == 200
     body = resp.get_data(as_text=True)
     assert "By model family" in body
@@ -42,7 +49,7 @@ def test_admin_daily_renders_family_and_routed(monkeypatch, fake_source,
 
 def test_admin_daily_no_data(monkeypatch, fake_source):
     client = _admin_client(monkeypatch, fake_source([], model_rows=[]))
-    resp = client.get("/admin")
+    resp = client.get("/admin/daily")
     assert resp.status_code == 200
     assert "No data found" in resp.get_data(as_text=True)
 
