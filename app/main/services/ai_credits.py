@@ -445,6 +445,7 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
 def user_view(  # pylint: disable=too-many-locals
     source: ReportsSource,
     login: str | None,
+    role: str | None,
     plan: str | None,
     month: str | None = None,
 ) -> dict:
@@ -461,7 +462,7 @@ def user_view(  # pylint: disable=too-many-locals
     limits = plan_limits(plan)
     base = {
         "plans": plan_labels(), "plan": plan, "allowance": allowance,
-        "limits": limits, "login": (login or "").strip(),
+        "limits": limits, "login": (login or "").strip(), "role": (role or "")
     }
     if not base["login"]:
         return {**base, "searched": False}
