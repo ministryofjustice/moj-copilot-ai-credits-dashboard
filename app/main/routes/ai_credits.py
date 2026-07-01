@@ -4,15 +4,16 @@ Three pages, all state carried in the URL query string (the Flask-idiomatic
 replacement for Streamlit's reactive widgets):
 
     /              My usage   — ?user=<login>&plan=<plan>
-    /admin         Org daily  — ?day=YYYY-MM-DD
-    /admin/weekly  Org weekly — ?plan=<plan>&week=YYYY-Www
+    /admin         Redirects to the default admin view (/admin/pooled)
     /admin/pooled  Org pooled — ?period=weekly|monthly&key=<key>&plan=<plan>&seats=<n>
+    /admin/weekly  Org weekly — ?plan=<plan>&week=YYYY-Www
+    /admin/daily   Org daily  — ?day=YYYY-MM-DD
 
 The data backend is resolved per request via `get_reports_source()` (local files
 today, S3/DB later) so these handlers never touch storage directly.
 """
 
-from flask import Blueprint, render_template, request, session
+from flask import Blueprint, redirect, render_template, request, session
 
 from app.main.services import ai_credits as ac
 from app.main.services.reports_source import get_reports_source
@@ -48,6 +49,13 @@ def my_usage():
 
 
 @ai_credits.route("/admin")
+@requires_auth
+@requires_admin
+def admin_index():
+    return redirect("/admin/pooled")
+
+
+@ai_credits.route("/admin/daily")
 @requires_auth
 @requires_admin
 def admin_daily():
