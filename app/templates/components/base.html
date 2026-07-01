@@ -36,25 +36,26 @@
           <image src="/app/static/images/moj-logotype-crest.png" xlink:href="" class="moj-header__logotype-crest-fallback-image" width="40" height="40"></image>  
         </svg>
         <a class="moj-header__link moj-header__link--organisation-name" href="#">Ministry of Justice</a>
-        {{ govukServiceNavigation({
-          "serviceName": "Check my Copilot AI Credits Usage",
-          "serviceUrl": "/",
-          "navigationLabel": "Menu",
-          "navigation": [
-              {
-                  "text": "My Usage",
-                  "href": "/",
-                  "active": true
-              },
-              {
-                  "text": "Admin",
-                  "href": "/admin"
-              }
-          ]
-        }) }}
       </div>
     </div>
   </header>
+  
+  {{ govukServiceNavigation({
+    "serviceName": "Check my Copilot AI Credits Usage",
+    "serviceUrl": "/",
+    "navigationLabel": "Menu",
+    "navigation": [
+      {
+        "text": "My Usage",
+        "href": "/",
+        "active": true
+      },
+      {
+        "text": "Admin",
+        "href": "/admin"
+      }
+    ]
+  }) }}
 {% endblock %}
 
 
