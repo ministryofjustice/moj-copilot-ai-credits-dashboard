@@ -12,13 +12,12 @@ The data backend is resolved per request via `get_reports_source()` (local files
 today, S3/DB later) so these handlers never touch storage directly.
 """
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, render_template, request, session
 
 from app.main.services import ai_credits as ac
 from app.main.services.reports_source import get_reports_source
 from app.main.middleware.auth import requires_auth, requires_admin
-
-from flask import session
+from app.main.config.app_config import app_config
 
 
 ai_credits = Blueprint("ai_credits", __name__)
@@ -27,15 +26,22 @@ ai_credits = Blueprint("ai_credits", __name__)
 @ai_credits.route("/")
 @requires_auth
 def my_usage():
-    username = session["user"].get("userinfo", {}).get("nickname", "")
+    source = get_reports_source()
+
+    if app_config.auth_disabled:
+        # No Auth0 session locally — take ?user= or stand in a random example user
+        # (one of the top spenders, picked at runtime) so the page shows real data.
+        username = request.args.get("user") or ac.example_login(source)
+    else:
+        username = session["user"].get("userinfo", {}).get("nickname", "")
 
     print(f"Username: {username}")
 
     view = ac.user_view(
-        get_reports_source(),
+        source,
         username,
         request.args.get("plan"),
-        request.args.get("week"),
+        request.args.get("month"),
     )
 
     return render_template("pages/my_usage.html", v=view)

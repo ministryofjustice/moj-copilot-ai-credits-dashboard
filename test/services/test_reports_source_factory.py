@@ -3,6 +3,7 @@
 import pytest
 
 from app.main.services.caching_reports_source import CachingReportsSource
+from app.main.services.db_reports_source import DbReportsSource
 from app.main.services.reports_source import LocalFsReportsSource, get_reports_source
 
 
@@ -33,3 +34,15 @@ def test_unknown_backend_raises(monkeypatch):
     monkeypatch.setenv("REPORTS_SOURCE", "nope")
     with pytest.raises(ValueError, match="Unknown REPORTS_SOURCE"):
         get_reports_source()
+
+
+def test_db_backend_builds_db_source(monkeypatch):
+    monkeypatch.setenv("REPORTS_SOURCE", "db")
+    monkeypatch.setenv("REPORTS_CACHE_TTL", "0")  # bare source, easier to assert
+    monkeypatch.setenv("AWS_DEFAULT_REGION", "eu-west-2")
+    monkeypatch.setenv("ATHENA_DATABASE", "db")
+    monkeypatch.setenv("ATHENA_TABLE_MODELS", "cbm")
+    monkeypatch.setenv("ATHENA_TABLE_USERS", "cbu")
+    monkeypatch.setenv("ATHENA_OUTPUT_LOCATION", "s3://staging/")
+    src = get_reports_source()
+    assert isinstance(src, DbReportsSource)

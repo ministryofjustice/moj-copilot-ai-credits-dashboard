@@ -20,7 +20,7 @@
 {% set week_items = [] %}
 {% for w in v.weeks %}{{- week_items.append({"value": w, "text": w ~ " (" ~ v.week_ranges[w] ~ ")", "selected": w == v.week}) or "" -}}{% endfor %}
 
-<form method="get" action="/admin/weekly" class="govuk-!-margin-bottom-4">
+<form method="get" action="/admin/weekly" class="govuk-!-margin-bottom-4" data-auto-submit>
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-one-third">
       {{ govukSelect({"id": "plan", "name": "plan", "label": {"text": "Plan budget"}, "items": plan_items}) }}
@@ -29,7 +29,7 @@
       {{ govukSelect({"id": "week", "name": "week", "label": {"text": "ISO week"}, "items": week_items}) }}
     </div>
     <div class="govuk-grid-column-one-third">
-      <div class="govuk-!-padding-top-6">{{ govukButton({"text": "Apply", "classes": "govuk-button--secondary"}) }}</div>
+      <div class="govuk-!-padding-top-6" data-auto-submit-hide>{{ govukButton({"text": "Apply", "classes": "govuk-button--secondary"}) }}</div>
     </div>
   </div>
 </form>
@@ -50,7 +50,6 @@
       <th scope="col" class="govuk-table__header govuk-table__header--numeric">Credits used</th>
       <th scope="col" class="govuk-table__header">% of allowance</th>
       <th scope="col" class="govuk-table__header govuk-table__header--numeric">Remaining</th>
-      <th scope="col" class="govuk-table__header">Top model</th>
       <th scope="col" class="govuk-table__header govuk-table__header--numeric">Days</th>
     </tr>
   </thead>
@@ -69,7 +68,6 @@
         <span class="govuk-body-s govuk-!-margin-left-2">{{ "%.0f%%"|format(pct) }}</span>
       </td>
       <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.1f"|format(r.remaining) }}</td>
-      <td class="govuk-table__cell">{{ r.top_model }}</td>
       <td class="govuk-table__cell govuk-table__cell--numeric">{{ r.day_count }}</td>
     </tr>
     {% endfor %}

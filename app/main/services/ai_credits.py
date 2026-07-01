@@ -11,10 +11,32 @@ minus `@st.cache_data`.
 
 from __future__ import annotations
 
+import random
+from collections import defaultdict
 from datetime import date, timedelta
 
 from app.main.services import weekly_per_user as wpu
 from app.main.services.reports_source import ReportsSource
+
+# How many of the biggest spenders the local-dev example user is drawn from.
+EXAMPLE_POOL_SIZE = 10
+
+
+def example_login(source: ReportsSource) -> str:
+    """A random login from the top spenders — a stand-in user for local dev.
+
+    No real login is hard-coded; one is picked at runtime from the biggest
+    `EXAMPLE_POOL_SIZE` spenders so the My usage page renders with real data.
+    Returns "" when there is no data.
+    """
+    totals: dict[str, float] = defaultdict(float)
+    for r in source.user_rows():
+        totals[r["user_login"]] += r["credits"]
+    if not totals:
+        return ""
+    top = sorted(totals, key=totals.get, reverse=True)[:EXAMPLE_POOL_SIZE]
+    return random.choice(top)
+
 
 # Per-seat allowance maths. Credits bill at $0.01 each ($1 == 100 credits). The
 # included allowance is monthly; spread across an average ISO week (month / 4.33)
@@ -25,6 +47,14 @@ WEEKS_PER_MONTH = 4.33
 PLAN_TIERS_USD_PER_MONTH = {"$70 / month": 70.0, "$39 / month": 39.0}
 DEFAULT_PLAN = "$70 / month"
 DEFAULT_SEATS = 405
+# The dataset has no scope column; the enterprise it covers is fixed.
+ENTERPRISE = "ministryofjustice"
+
+
+def _user_records(source: ReportsSource) -> list[dict]:
+    """user_rows reshaped to the {day, user, credits} the week/pool maths expect."""
+    return [{"day": r["day"], "user": r["user_login"], "credits": r["credits"]}
+            for r in source.user_rows()]
 
 
 def resolve_seats(raw) -> int:
@@ -140,112 +170,123 @@ def _usage_calendar(urecs: list[dict], daily_allowance: float,  # pylint: disabl
 
 
 # ----------------------------------------------------------------- daily helpers
-def _totals(items: list[dict]) -> tuple[float, float, float]:
-    gross = sum(i.get("grossAmount", 0.0) for i in items)
-    net = sum(i.get("netAmount", 0.0) for i in items)
-    total_credits = sum(i.get("grossQuantity", 0.0) for i in items)
-    return gross, net, total_credits
+def _agg_by(rows: list[dict], field: str, total: float) -> list[dict]:
+    """Sum credits by `field` over model rows, spenders only, descending."""
+    agg: dict[str, float] = defaultdict(float)
+    for r in rows:
+        agg[r[field]] += r["credits"]
+    out = [{field: k, "credits": v, "share": (v / total) if total else 0.0}
+           for k, v in agg.items() if v > 0]
+    out.sort(key=lambda r: r["credits"], reverse=True)
+    return out
 
 
-def _by_model(items: list[dict]) -> list[dict]:
-    """Aggregate usageItems by model, gross-spend descending, spenders only."""
-    agg: dict[str, dict] = {}
-    for i in items:
-        m = agg.setdefault(i["model"], {"model": i["model"], "gross": 0.0, "net": 0.0})
-        m["gross"] += i.get("grossAmount", 0.0)
-        m["net"] += i.get("netAmount", 0.0)
-    rows = [r for r in agg.values() if r["gross"] > 0]
-    rows.sort(key=lambda r: r["gross"], reverse=True)
-    return rows
+def _org_rollup(day_total: dict[str, float], day: str) -> dict:
+    """Org Last-day / WTD / MTD credits, anchored to (and counting up to) `day`."""
+    label = wpu.iso_week_label(day)[0]
+    wtd = sum(c for d, c in day_total.items()
+              if wpu.iso_week_label(d)[0] == label and d <= day)
+    month = day[:7]
+    mtd = sum(c for d, c in day_total.items() if d[:7] == month and d <= day)
+    return {"last_day": day_total[day], "wtd": wtd, "mtd": mtd,
+            "week_label": label, "month": month}
 
 
 def daily_view(source: ReportsSource, day: str | None = None) -> dict:  # pylint: disable=too-many-locals
-    """Everything the Daily admin page needs for one day, plus the MTD trend."""
-    docs = source.daily_docs()
-    if not docs:
+    """Everything the Daily admin page needs for one day, plus the MTD trend.
+
+    Org-level credits only (the data has no gross/net/coverage). Adds a model-family
+    split, an auto-routed-vs-chosen split, and the org Last-day/WTD/MTD rollup.
+    """
+    mrows = source.model_rows()
+    if not mrows:
         return {"has_data": False, "days": []}
 
-    days = list(docs)
-    day = day if day in docs else days[-1]
-    doc = docs[day]
-    scope = doc.get("organization") or doc.get("enterprise") or "?"
-    items = doc.get("usageItems", [])
-    gross, net, total_credits = _totals(items)
+    day_total: dict[str, float] = defaultdict(float)
+    for r in mrows:
+        day_total[r["day"]] += r["credits"]
+    days = sorted(day_total)
+    day = day if day in day_total else days[-1]
 
-    by_model = _by_model(items)
-    for r in by_model:
-        r["share"] = (r["gross"] / gross) if gross else 0.0
+    day_rows = [r for r in mrows if r["day"] == day]
+    total = sum(r["credits"] for r in day_rows)
+    by_model = _agg_by(day_rows, "model", total)
+    by_family = _agg_by(day_rows, "model_family", total)
+    routed = sum(r["credits"] for r in day_rows if r["routed"])
+    chosen = total - routed
 
     # Month-to-date trend (only meaningful with 2+ days captured).
     trend = None
     if len(days) >= 2:
-        labels, g_series, n_series, cumulative = [], [], [], []
-        running = 0.0
+        running, totals, cumulative = 0.0, [], []
         for d in days:
-            dg, dn, _ = _totals(docs[d].get("usageItems", []))
-            running += dg
-            labels.append(d)
-            g_series.append(round(dg, 2))
-            n_series.append(round(dn, 2))
+            running += day_total[d]
+            totals.append(round(day_total[d], 2))
             cumulative.append(round(running, 2))
-        trend = {
-            "labels": labels, "gross": g_series, "net": n_series,
-            "cumulative": cumulative,
-        }
+        trend = {"labels": days, "totals": totals, "cumulative": cumulative}
+
+    per_user = _per_user_day(source, day, total)
 
     return {
         "has_data": True,
         "days": days,
         "day": day,
-        "scope": scope,
-        "metrics": {
-            "gross": gross, "net": net, "covered": gross - net, "credits": total_credits,
-        },
-        "fully_covered": net == 0 and gross > 0,
+        "scope": ENTERPRISE,
+        "metrics": {"credits": total, "usd": total / CREDITS_PER_USD,
+                    "spenders": per_user["with_spend"], "models": len(by_model)},
         "by_model": by_model,
         "model_chart": {
             "labels": [r["model"] for r in by_model],
-            "gross": [round(r["gross"], 2) for r in by_model],
+            "credits": [round(r["credits"], 2) for r in by_model],
+        },
+        "family_chart": {
+            "labels": [r["model_family"] for r in by_family],
+            "credits": [round(r["credits"], 2) for r in by_family],
+        },
+        "routed_chart": {
+            "labels": ["Auto-routed", "Explicitly chosen"],
+            "credits": [round(routed, 2), round(chosen, 2)],
         },
         "trend": trend,
-        "per_user": _per_user_day(source, day, gross),
+        "rollup": _org_rollup(day_total, day),
+        "per_user": per_user,
     }
 
 
-def _per_user_day(source: ReportsSource, day: str, day_gross: float) -> dict:
-    """Per-user spend for a day: spenders sorted desc + summary counts."""
-    docs = source.per_user_docs(day)
-    spenders = []
-    queried = 0
-    for login, items in docs.items():
-        if not items:
-            continue
-        queried += 1
-        gross = sum(i.get("grossAmount", 0.0) for i in items)
-        net = sum(i.get("netAmount", 0.0) for i in items)
-        if gross <= 0:
-            continue
-        active = [i for i in items if i.get("grossAmount", 0.0) > 0]
-        top = max(active, key=lambda i: i["grossAmount"])["model"] if active else "—"
-        spenders.append({
-            "user": login, "gross": gross, "net": net, "top_model": top,
-            "share": (gross / day_gross) if day_gross else 0.0,
-        })
-    spenders.sort(key=lambda r: r["gross"], reverse=True)
+def _per_user_day(source: ReportsSource, day: str, day_total: float) -> dict:
+    """Per-user spend for a day: spenders sorted desc + concentration of the top few."""
+    rows = [r for r in source.user_rows() if r["day"] == day and r["credits"] > 0]
+    spenders = [{"user": r["user_login"], "credits": r["credits"],
+                 "share": (r["credits"] / day_total) if day_total else 0.0}
+                for r in rows]
+    spenders.sort(key=lambda r: r["credits"], reverse=True)
     top_n = min(3, len(spenders))
-    concentration = sum(r["share"] for r in spenders[:top_n])
     return {
         "rows": spenders,
-        "queried": queried,
         "with_spend": len(spenders),
         "top_n": top_n,
-        "concentration": concentration,
+        "concentration": sum(r["share"] for r in spenders[:top_n]),
     }
 
 
 # ---------------------------------------------------------------- weekly helpers
+def _resolve_label(selected: str | None, labels: list[str]) -> str:
+    """Pick a period label from `labels`, matching case-insensitively.
+
+    The govuk select macro lowercases every option `value`, so the browser
+    submits e.g. 'week=2026-w23' for the option labelled '2026-W23'. Match
+    ignoring case so the selection resolves to the real label; fall back to the
+    most recent label when there's no match (or nothing selected).
+    """
+    if selected:
+        for label in labels:
+            if label.lower() == selected.lower():
+                return label
+    return labels[-1]
+
+
 def _weekly_rows(source: ReportsSource) -> list[dict]:
-    return wpu.rollup_weekly(source.weekly_records())
+    return wpu.rollup_weekly(_user_records(source))
 
 
 def _week_labels(rows: list[dict]) -> list[str]:
@@ -299,7 +340,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     period = "weekly" if period == "weekly" else "monthly"
     plan = resolve_plan(plan)
     seats = resolve_seats(seats)
-    records = source.weekly_records()
+    records = _user_records(source)
     keys = sorted({_record_period_key(r["day"], period) for r in records})
 
     base = {
@@ -309,7 +350,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     if not keys:
         return {**base, "has_data": False, "key": None}
 
-    key = key if key in keys else keys[-1]
+    key = _resolve_label(key, keys)
     user_credits: dict[str, float] = {}
     for r in records:
         if _record_period_key(r["day"], period) == key:
@@ -370,7 +411,7 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
         return {"has_data": False, "plans": plan_labels(), "plan": plan, "weeks": []}
 
     weeks = _week_labels(all_rows)
-    week = week if week in weeks else weeks[-1]
+    week = _resolve_label(week, weeks)
     allowance = weekly_allowance(plan)
 
     wk = [r for r in all_rows if r["week_label"] == week]
@@ -385,7 +426,7 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
             "user": r["user"], "credits": credits_val,
             "pct": (credits_val / allowance) if allowance else 0.0,
             "remaining": allowance - credits_val,
-            "top_model": r["top_model"], "day_count": int(r["day_count"]),
+            "day_count": int(r["day_count"]),
         })
     rows.sort(key=lambda x: x["credits"], reverse=True)
     over = sum(1 for x in rows if x["pct"] >= 1.0)
@@ -405,13 +446,15 @@ def user_view(  # pylint: disable=too-many-locals
     source: ReportsSource,
     login: str | None,
     plan: str | None,
-    week: str | None = None,
+    month: str | None = None,
 ) -> dict:
     """One user's personal usage, led by per-week usage vs the weekly limit.
 
-    `week` selects which ISO week is in focus (defaults to the latest the user
-    has data for); it drives the headline detail card and the daily breakdown.
-    All figures are in AI credits.
+    `month` selects which calendar month is in focus (defaults to the latest the
+    user has data for); it drives the per-week cost-stats table, the per-week
+    bar chart, and the cumulative chart. A week is attributed to the month its
+    Monday falls in, so a week straddling a boundary stays whole. All figures
+    are in AI credits.
     """
     plan = resolve_plan(plan)
     allowance = weekly_allowance(plan)
@@ -424,24 +467,28 @@ def user_view(  # pylint: disable=too-many-locals
         return {**base, "searched": False}
 
     login_str = base["login"]
-    records = source.weekly_records()
+    records = _user_records(source)
     urecs = sorted(
         (r for r in records if r["user"] == login_str), key=lambda r: r["day"]
     )
     if not urecs:
-        return {**base, "searched": True, "found": False, "week": None}
+        return {**base, "searched": True, "found": False, "month": None}
 
     # ---- weekly history (the headline): one row per ISO week the user appears in
     all_rows = wpu.rollup_weekly(records)
     weekly_rows = []
     for r in (row for row in all_rows if row["user"] == login_str):
         credits_val = float(r["credits"])
-        mon, sun = wpu.week_span(int(r["iso_year"]), int(r["iso_week"]))
+        iso_year, iso_week = int(r["iso_year"]), int(r["iso_week"])
+        mon, sun = wpu.week_span(iso_year, iso_week)
         weekly_rows.append({
             "week_label": r["week_label"], "credits": credits_val,
             "pct": (credits_val / allowance) if allowance else 0.0,
             "remaining": allowance - credits_val, "day_count": int(r["day_count"]),
-            "top_model": r["top_model"], "span": f"{mon:%d %b} – {sun:%d %b}",
+            "span": f"{mon:%d %b} – {sun:%d %b}",
+            "range": wpu.format_week_range(iso_year, iso_week),
+            # A week belongs to the month its Monday falls in (so it stays whole).
+            "month": f"{mon:%Y-%m}",
         })
     weekly_rows.sort(key=lambda x: x["week_label"])
     weeks = [w["week_label"] for w in weekly_rows]
@@ -451,44 +498,77 @@ def user_view(  # pylint: disable=too-many-locals
         "credits": [round(w["credits"], 1) for w in weekly_rows],
     }
 
-    # ---- selected week drives the detail card + the daily breakdown
-    selected = week if week in weeks else weeks[-1]
-    current = next(w for w in weekly_rows if w["week_label"] == selected)
+    # ---- selected month drives the per-week cost stats (table + bar) and the
+    # cumulative chart; default to the latest month the user has data for.
+    months = sorted({w["month"] for w in weekly_rows})
+    selected_month = month if month in months else months[-1]
+    month_weeks = [w for w in weekly_rows if w["month"] == selected_month]
+    month_week_labels = {w["week_label"] for w in month_weeks}
+    month_weekly_chart = {
+        "labels": [f"{w['week_label']} ({w['range']})" for w in month_weeks],
+        "credits": [round(w["credits"], 1) for w in month_weeks],
+    }
 
-    week_recs = [r for r in urecs if wpu.iso_week_label(r["day"])[0] == selected]
-    daily_rows = [
-        {"day": r["day"], "credits": r["credits"], "usd": r["usd"]}
-        for r in week_recs
+    # ---- cumulative credits across the selected month's weeks. Keyed on whole
+    # weeks (not calendar days) so a straddling week's spill-over days stay with
+    # the month its Monday belongs to, matching the table and bar above.
+    month_day_recs = [
+        r for r in urecs if wpu.iso_week_label(r["day"])[0] in month_week_labels
     ]
-    daily_chart = {
-        "labels": [r["day"] for r in daily_rows],
-        "credits": [round(r["credits"], 1) for r in daily_rows],
+    cum_labels, cum_values, running = [], [], 0.0
+    for r in month_day_recs:
+        running += r["credits"]
+        cum_labels.append(r["day"])
+        cum_values.append(round(running, 1))
+    month_cumulative = {
+        "month": selected_month,
+        "month_label": wpu.format_month_label(selected_month),
+        "total_credits": running,
+        "chart": {"labels": cum_labels, "cumulative": cum_values},
     }
 
-    # ---- month-to-date: cumulative credits over the latest captured month
-    latest_month = urecs[-1]["day"][:7]  # 'YYYY-MM'
-    month_recs = [r for r in urecs if r["day"][:7] == latest_month]
-    mtd_labels, mtd_cumulative, running = [], [], 0.0
-    for r in month_recs:
-        running += r["credits"]
-        mtd_labels.append(r["day"])
-        mtd_cumulative.append(round(running, 1))
-    mtd = {
-        "month": latest_month,
-        "total_credits": running,
-        "chart": {"labels": mtd_labels, "cumulative": mtd_cumulative},
-    }
+    # ---- Last-day / Week-to-date / Month-to-date, anchored to the latest day.
+    # The plan is weekly limits, so WTD-vs-weekly-allowance is the teaching number.
+    summary = _user_summary(urecs, allowance, limits)
 
     return {
         **base,
         "searched": True, "found": True,
         "weeks": weeks, "weekly": weekly_rows, "weekly_chart": weekly_chart,
         "week_ranges": week_ranges,
-        "week": selected, "span": current["span"],
-        "used": current["credits"], "remaining": current["remaining"],
-        "pct": current["pct"], "day_count": current["day_count"],
-        "top_model": current["top_model"],
-        "daily": daily_rows, "daily_chart": daily_chart,
-        "mtd": mtd,
+        "months": months, "month": selected_month,
+        "month_label": wpu.format_month_label(selected_month),
+        "month_options": [{"value": m, "text": wpu.format_month_label(m)}
+                          for m in months],
+        "month_weeks": month_weeks, "month_weekly_chart": month_weekly_chart,
+        "month_cumulative": month_cumulative,
+        "summary": summary,
         "calendar": _usage_calendar(urecs, limits["daily"]),
+    }
+
+
+def _user_summary(urecs: list[dict], allowance: float, limits: dict) -> dict:
+    """Last-day / WTD / MTD figures for a user, anchored to their latest day.
+
+    `urecs` is the user's per-day records sorted ascending by day. WTD/MTD are
+    running totals of the latest ISO week / calendar month (the data only runs to
+    the latest day, so "to date" falls straight out of summing those records).
+    """
+    as_of = urecs[-1]["day"]
+    last_day = sum(r["credits"] for r in urecs if r["day"] == as_of)
+    wtd_label = wpu.iso_week_label(as_of)[0]
+    wtd_recs = [r for r in urecs if wpu.iso_week_label(r["day"])[0] == wtd_label]
+    wtd = sum(r["credits"] for r in wtd_recs)
+    month = as_of[:7]
+    mtd = sum(r["credits"] for r in urecs if r["day"][:7] == month)
+    return {
+        "as_of": as_of,
+        "last_day": {"credits": last_day, "allowance": limits["daily"],
+                     "pct": (last_day / limits["daily"]) if limits["daily"] else 0.0},
+        "wtd": {"credits": wtd, "allowance": allowance,
+                "remaining": allowance - wtd, "week_label": wtd_label,
+                "days": len({r["day"] for r in wtd_recs}),
+                "pct": (wtd / allowance) if allowance else 0.0},
+        "mtd": {"credits": mtd, "allowance": limits["monthly"], "month": month,
+                "pct": (mtd / limits["monthly"]) if limits["monthly"] else 0.0},
     }

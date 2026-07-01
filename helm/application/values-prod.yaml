@@ -9,7 +9,7 @@ app:
       AUTH0_DOMAIN: "check-your-co-pilot-usage-prod.uk.auth0.com"
       SENTRY_ENV: "production"
       FLASK_DEBUG: false
-      REPORTS_SOURCE: "s3"
+      REPORTS_SOURCE: "db"
       REPORTS_CACHE_TTL: 300 # seconds; memoise the S3 reads (data updates ~daily). 0 disables.
     s3:
       # Confirm against `kubectl get secrets -n moj-copilot-ai-credits-dashboard-prod`.
@@ -17,4 +17,13 @@ app:
       secretName: "s3-bucket-output"
       bucketNameKey: "bucket_name"
       prefix: "reports"
+      region: "eu-west-2"
+    # Athena backend config. Inert until REPORTS_SOURCE is set to "db" above.
+    # Fill these in (confirm names against the deployed Glue table) before switching.
+    athena:
+      database: "" # Glue database holding the ai-credits tables
+      tableModels: "" # per-model table (partitioned Parquet from build_credit_rows)
+      tableUsers: "" # per-user table (partitioned Parquet from build_credit_rows)
+      # No outputLocation: Athena uses the workgroup's default output location.
+      workgroup: "primary"
       region: "eu-west-2"

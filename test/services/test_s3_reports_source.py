@@ -1,112 +1,49 @@
-import json
+"""S3ReportsSource tests.
 
+The S3 read path is pure pyarrow `ds.dataset(..., filesystem=...)`; injecting a
+`LocalFileSystem` over a tmp parquet tree exercises the exact same code (path
+building + partition parsing) without touching real S3. `bucket` doubles as the
+on-disk root because `_path` joins bucket/prefix/table.
+"""
+
+import pyarrow.fs as pafs
 import pytest
 
 from app.main.services.s3_reports_source import S3ReportsSource
-
-# These fakes mirror boto3's S3 client API, whose kwargs are PascalCase
-# (Bucket/Prefix/Key) and some of which the stubs deliberately ignore.
-# pylint: disable=too-few-public-methods,invalid-name,unused-argument
+from services.parquet_fixtures import write_model_partition, write_user_partition
 
 
-class _Body:
-    def __init__(self, data: bytes):
-        self._data = data
-
-    def read(self) -> bytes:
-        return self._data
+def _source(tmp_path, prefix=""):
+    return S3ReportsSource(bucket=str(tmp_path), prefix=prefix,
+                           filesystem=pafs.LocalFileSystem())
 
 
-class _Paginator:
-    def __init__(self, store: dict):
-        self._store = store
-
-    def paginate(self, Bucket, Prefix):  # noqa: N803 (boto3 kwarg names)
-        contents = [
-            {"Key": k} for k in sorted(self._store) if k.startswith(Prefix)
-        ]
-        yield {"Contents": contents}
-
-
-class FakeS3Client:
-    """Minimal in-memory stand-in for a boto3 S3 client."""
-
-    def __init__(self, objects: dict[str, dict]):
-        self._store = {k: json.dumps(v).encode("utf-8") for k, v in objects.items()}
-
-    def get_paginator(self, name):
-        assert name == "list_objects_v2"
-        return _Paginator(self._store)
-
-    def get_object(self, Bucket, Key):  # noqa: N803
-        return {"Body": _Body(self._store[Key])}
+def test_model_rows_over_injected_fs(tmp_path):
+    write_model_partition(str(tmp_path), "2026-06-01",
+                          [("Opus 4.6", "Opus", False, 9.0),
+                           ("Auto: Haiku", "Haiku", True, 1.0)])
+    rows = _source(tmp_path).model_rows()
+    by_model = {r["model"]: r for r in rows}
+    assert by_model["Opus 4.6"]["day"] == "2026-06-01"
+    assert by_model["Opus 4.6"]["credits"] == 9.0
+    assert by_model["Auto: Haiku"]["routed"] is True
 
 
-def _source(objects, prefix="reports"):
-    return S3ReportsSource(
-        bucket="test-bucket", prefix=prefix, client=FakeS3Client(objects)
-    )
+def test_user_rows_over_injected_fs(tmp_path):
+    write_user_partition(str(tmp_path), "2026-06-02", [("alice", 12.5)])
+    rows = _source(tmp_path).user_rows()
+    assert rows == [{"day": "2026-06-02", "user_login": "alice", "credits": 12.5}]
 
 
-def test_daily_docs_keyed_by_date_sorted():
-    src = _source({
-        "reports/2026-06-02/billing/ai-credit-usage.json": {
-            "enterprise": "MoJ", "usageItems": [{"model": "Opus"}]},
-        "reports/2026-06-01/billing/ai-credit-usage.json": {
-            "enterprise": "MoJ", "usageItems": []},
-        "reports/2026-06-01/billing/per-user/alice.json": {"usageItems": []},
-    })
-    docs = src.daily_docs()
-    assert list(docs) == ["2026-06-01", "2026-06-02"]
-    assert docs["2026-06-02"]["usageItems"] == [{"model": "Opus"}]
-
-
-def test_per_user_docs_keyed_by_login():
-    src = _source({
-        "reports/2026-06-01/billing/per-user/alice.json": {
-            "usageItems": [{"model": "Opus", "grossQuantity": 5.0}]},
-        "reports/2026-06-01/billing/per-user/bob.json": {"usageItems": []},
-        "reports/2026-06-02/billing/per-user/carol.json": {
-            "usageItems": [{"model": "Haiku"}]},
-    })
-    docs = src.per_user_docs("2026-06-01")
-    assert set(docs) == {"alice", "bob"}
-    assert docs["alice"] == [{"model": "Opus", "grossQuantity": 5.0}]
-    assert docs["bob"] == []
-
-
-def test_weekly_records_built_from_all_days():
-    src = _source({
-        "reports/2026-06-01/billing/ai-credit-usage.json": {
-            "enterprise": "MoJ", "usageItems": []},
-        "reports/2026-06-02/billing/ai-credit-usage.json": {
-            "enterprise": "MoJ", "usageItems": []},
-        "reports/2026-06-01/billing/per-user/alice.json": {"usageItems": [
-            {"model": "Opus", "grossQuantity": 100.0, "grossAmount": 1.0},
-        ]},
-        "reports/2026-06-01/billing/per-user/empty.json": {"usageItems": []},
-        "reports/2026-06-02/billing/per-user/alice.json": {"usageItems": [
-            {"model": "Haiku", "grossQuantity": 10.0, "grossAmount": 0.1},
-        ]},
-    })
-    records = src.weekly_records()
-    assert {(r["day"], r["user"]) for r in records} == {
-        ("2026-06-01", "alice"), ("2026-06-02", "alice"),
-    }
-    day1 = next(r for r in records if r["day"] == "2026-06-01")
-    assert day1["credits"] == pytest.approx(100.0)
-    assert day1["per_model"] == {"Opus": pytest.approx(100.0)}
-
-
-def test_custom_prefix_is_honoured():
-    src = _source({
-        "data/2026-06-01/billing/ai-credit-usage.json": {
-            "enterprise": "MoJ", "usageItems": [{"model": "Opus"}]},
-    }, prefix="data")
-    assert list(src.daily_docs()) == ["2026-06-01"]
+def test_custom_prefix_is_honoured(tmp_path):
+    sub = tmp_path / "data"
+    write_model_partition(str(sub), "2026-06-01", [("Opus", "Opus", False, 3.0)])
+    rows = S3ReportsSource(bucket=str(tmp_path), prefix="data",
+                           filesystem=pafs.LocalFileSystem()).model_rows()
+    assert rows[0]["credits"] == 3.0
 
 
 def test_missing_bucket_raises(monkeypatch):
     monkeypatch.delenv("REPORTS_S3_BUCKET", raising=False)
     with pytest.raises(ValueError, match="REPORTS_S3_BUCKET"):
-        S3ReportsSource(client=FakeS3Client({}))
+        S3ReportsSource(filesystem=pafs.LocalFileSystem())

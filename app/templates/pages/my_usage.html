@@ -15,29 +15,52 @@
   <div class="govuk-grid-column-two-thirds">
     <h1 class="govuk-heading-l">My Copilot AI-credit usage</h1>
     <p class="govuk-body">
-      Enter your GitHub username to see your AI-credit usage for the current week.
-    </p>
-    <p class="govuk-body">
       GitHub username: <strong>{{ v.login }}</strong>
     </p>
 
-    <form method="get" action="/">
+    <form method="get" action="/" data-auto-submit>
       {{ govukSelect({
         "id": "plan", "name": "plan",
         "label": {"text": "Plan budget (per seat)"},
         "items": plan_items
       }) }}
-      {{ govukButton({"text": "View usage"}) }}
+      <span data-auto-submit-hide>{{ govukButton({"text": "View usage"}) }}</span>
     </form>
   </div>
 </div>
 
 {% if v.searched %}
   {% if v.found %}
-  {% set week_items = [] %}
-  {% for w in v.weeks %}{{- week_items.append({"value": w, "text": w ~ " (" ~ v.week_ranges[w] ~ ")", "selected": w == v.week}) or "" -}}{% endfor %}
+  {% set month_items = [] %}
+  {% for opt in v.month_options %}{{- month_items.append({"value": opt.value, "text": opt.text, "selected": opt.value == v.month}) or "" -}}{% endfor %}
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-full">
+
+      {# ---- Last-day / Week-to-date / Month-to-date (as of latest captured day) ---- #}
+      <h2 class="govuk-heading-m">Your usage so far (as of {{ v.summary.as_of }})</h2>
+      <div class="govuk-grid-row">
+        {% set s = v.summary %}
+        {% set hero = [
+          ("This week (WTD)", "%.1f"|format(s.wtd.credits), "%.0f"|format(s.wtd.allowance), s.wtd.pct, "%.1f credits left this week"|format(s.wtd.remaining)),
+          ("Latest day", "%.1f"|format(s.last_day.credits), "%.1f"|format(s.last_day.allowance), s.last_day.pct, ""),
+          ("This month (MTD)", "%.1f"|format(s.mtd.credits), "%.0f"|format(s.mtd.allowance), s.mtd.pct, "")
+        ] %}
+        {% for label, used, allow, pct, sub in hero %}
+        <div class="govuk-grid-column-one-third">
+          <div style="border:1px solid #b1b4b6; padding:15px; margin-bottom:15px;
+                      {% if pct >= 1.0 %}border-left:6px solid #d4351c;{% elif loop.first %}border-left:6px solid #1d70b8;{% endif %}">
+            <span class="govuk-caption-m">{{ label }}</span>
+            <span class="govuk-heading-l govuk-!-margin-bottom-0">{{ used }}</span>
+            <span class="govuk-body-s">of {{ allow }} allowance · {{ "%.0f%%"|format(pct * 100) }}</span>
+            {% if sub %}<br><span class="govuk-body-s govuk-!-margin-bottom-0">{{ sub }}</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if v.summary.wtd.pct >= 1.0 %}
+        {{ govukInsetText({"text": "You are over your weekly allowance by " ~ "%.1f"|format(-v.summary.wtd.remaining) ~ " credits this week."}) }}
+      {% endif %}
+      <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
 
       {# ---- Usage heatmap (rolling window) — first, after the inputs ---- #}
       <h3 class="govuk-heading-s">Daily usage heatmap (last {{ v.calendar.weeks | length }} weeks)</h3>
@@ -114,54 +137,62 @@
 
       <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
 
-      {# ---- Week selector ---- #}
-      <form method="get" action="/" class="govuk-!-margin-bottom-4">
+      {# ---- Month selector ---- #}
+      <form method="get" action="/" class="govuk-!-margin-bottom-4" data-auto-submit>
         <input type="hidden" name="user" value="{{ v.login }}">
         <input type="hidden" name="plan" value="{{ v.plan }}">
         <div class="govuk-grid-row">
           <div class="govuk-grid-column-one-third">
-            {{ govukSelect({"id": "week", "name": "week", "label": {"text": "Week"}, "items": week_items}) }}
+            {{ govukSelect({"id": "month", "name": "month", "label": {"text": "Month"}, "items": month_items}) }}
           </div>
           <div class="govuk-grid-column-two-thirds">
-            <div class="govuk-!-padding-top-6">{{ govukButton({"text": "View week", "classes": "govuk-button--secondary"}) }}</div>
+            <div class="govuk-!-padding-top-6" data-auto-submit-hide>{{ govukButton({"text": "View month", "classes": "govuk-button--secondary"}) }}</div>
           </div>
         </div>
       </form>
 
-      {# ---- Selected-week detail: credits used / remaining / % ---- #}
-      <h3 class="govuk-heading-s">{{ v.week }} · {{ v.span }} (resets Monday) · {{ v.day_count }} active day(s)</h3>
-      <div class="govuk-grid-row">
-        {% set cards = [
-          ("Credits used", "%.1f"|format(v.used)),
-          ("Credits remaining", "%.1f"|format(v.remaining)),
-          ("% of allowance", "%.0f%%"|format(v.pct * 100))
-        ] %}
-        {% for label, value in cards %}
-        <div class="govuk-grid-column-one-third">
-          <div style="border:1px solid #b1b4b6; padding:15px; margin-bottom:15px;">
-            <span class="govuk-caption-m">{{ label }}</span>
-            <span class="govuk-heading-l govuk-!-margin-bottom-0">{{ value }}</span>
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      {% if v.pct >= 1.0 %}
-        {{ govukInsetText({"text": "Over the weekly allowance by " ~ "%.1f"|format(-v.remaining) ~ " credits."}) }}
-      {% endif %}
+      {# ---- Weekly cost stats for each week in the selected month ---- #}
+      <h3 class="govuk-heading-s">Weekly cost in {{ v.month_label }}</h3>
+      <p class="govuk-body-s">
+        Credits used per ISO week (each resets Monday), against the
+        {{ "%.0f"|format(v.limits.weekly) }}-credit weekly allowance.
+      </p>
+      <table class="govuk-table">
+        <thead class="govuk-table__head">
+          <tr class="govuk-table__row">
+            <th scope="col" class="govuk-table__header">Week</th>
+            <th scope="col" class="govuk-table__header">Dates</th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Credits used</th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">Remaining</th>
+            <th scope="col" class="govuk-table__header govuk-table__header--numeric">% of allowance</th>
+          </tr>
+        </thead>
+        <tbody class="govuk-table__body">
+          {% for w in v.month_weeks %}
+          <tr class="govuk-table__row">
+            <td class="govuk-table__cell">{{ w.week_label }}</td>
+            <td class="govuk-table__cell">{{ w.range }}</td>
+            <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.1f"|format(w.credits) }}</td>
+            <td class="govuk-table__cell govuk-table__cell--numeric">{{ "%.1f"|format(w.remaining) }}</td>
+            <td class="govuk-table__cell govuk-table__cell--numeric">
+              {{ "%.0f%%"|format(w.pct * 100) }}
+              {% if w.pct >= 1.0 %}{{ govukTag({"text": "Over", "classes": "govuk-tag--red"}) }}{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      <div style="height:300px;"><canvas data-chart="userMonthWeekly"></canvas></div>
 
-      {# ---- Daily breakdown for the selected week ---- #}
-      <h3 class="govuk-heading-s">Daily usage in {{ v.week }} ({{ v.week_ranges[v.week] }})</h3>
-      <div style="height:300px;"><canvas data-chart="userDaily"></canvas></div>
-
-      {# ---- Month-to-date ---- #}
-      <h3 class="govuk-heading-s govuk-!-margin-top-6">Month-to-date ({{ v.mtd.month }})</h3>
-      <p class="govuk-body-s">Total this month: <strong>{{ "%.1f"|format(v.mtd.total_credits) }}</strong> credits.</p>
-      <div style="max-width:760px; height:300px;"><canvas data-chart="userMTD"></canvas></div>
+      {# ---- Cumulative credits across the month's weeks ---- #}
+      <h3 class="govuk-heading-s govuk-!-margin-top-6">Cumulative usage in {{ v.month_label }}</h3>
+      <p class="govuk-body-s">Total across this month: <strong>{{ "%.1f"|format(v.month_cumulative.total_credits) }}</strong> credits.</p>
+      <div style="max-width:760px; height:300px;"><canvas data-chart="userMonthCumulative"></canvas></div>
 
       <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
 
-      {# ---- Per-week usage vs the weekly limit — kept at the bottom ---- #}
-      <h2 class="govuk-heading-m">{{ v.login }} — weekly usage</h2>
+      {# ---- Full weekly history vs the weekly limit — kept at the bottom ---- #}
+      <h2 class="govuk-heading-m">{{ v.login }} — full weekly history</h2>
       <p class="govuk-body-s">
         Credits used per ISO week against the {{ "%.0f"|format(v.limits.weekly) }}-credit weekly allowance ({{ v.plan }}).
       </p>
@@ -171,18 +202,18 @@
         "userWeekly": {"type": "bar", "labels": v.weekly_chart.labels,
           "datasets": [{"label": "Credits / week", "data": v.weekly_chart.credits}],
           "limit": {"value": v.limits.weekly | round(1), "label": "Weekly allowance"}},
-        "userDaily": {"type": "bar", "labels": v.daily_chart.labels,
-          "datasets": [{"label": "Credits / day", "data": v.daily_chart.credits}],
-          "limit": {"value": v.limits.daily | round(1), "label": "Daily allowance"}},
-        "userMTD": {"type": "line", "labels": v.mtd.chart.labels,
-          "datasets": [{"label": "Cumulative credits", "data": v.mtd.chart.cumulative}],
+        "userMonthWeekly": {"type": "bar", "labels": v.month_weekly_chart.labels,
+          "datasets": [{"label": "Credits / week", "data": v.month_weekly_chart.credits}],
+          "limit": {"value": v.limits.weekly | round(1), "label": "Weekly allowance"}},
+        "userMonthCumulative": {"type": "line", "labels": v.month_cumulative.chart.labels,
+          "datasets": [{"label": "Cumulative credits", "data": v.month_cumulative.chart.cumulative}],
           "limit": {"value": v.limits.monthly | round(1), "label": "Monthly allowance"}}
       } %}
       <script type="application/json" id="chart-data">{{ charts | tojson }}</script>
     </div>
   </div>
   {% else %}
-    {{ govukInsetText({"text": "No usage captured for " ~ v.login ~ ((" in " ~ v.week) if v.week else "") ~ ". Check the spelling of the GitHub username."}) }}
+    {{ govukInsetText({"text": "No usage captured for " ~ v.login ~ ". Check the spelling of the GitHub username."}) }}
   {% endif %}
 {% endif %}
 {% endblock %}

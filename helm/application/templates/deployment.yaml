@@ -61,6 +61,20 @@ spec:
             - name: AWS_DEFAULT_REGION
               value: {{ .Values.app.deployment.s3.region | default "eu-west-2" | quote }}
             {{- end }}
+            {{- if eq (.Values.app.deployment.env.REPORTS_SOURCE | default "local") "db" }}
+            # Athena backend (DbReportsSource). Dormant until REPORTS_SOURCE=db.
+            # Credentials resolve via IRSA (the pod service account) - no keys here.
+            - name: ATHENA_DATABASE
+              value: {{ .Values.app.deployment.athena.database | quote }}
+            - name: ATHENA_TABLE_MODELS
+              value: {{ .Values.app.deployment.athena.tableModels | quote }}
+            - name: ATHENA_TABLE_USERS
+              value: {{ .Values.app.deployment.athena.tableUsers | quote }}
+            - name: ATHENA_WORKGROUP
+              value: {{ .Values.app.deployment.athena.workgroup | default "primary" | quote }}
+            - name: AWS_DEFAULT_REGION
+              value: {{ .Values.app.deployment.athena.region | default "eu-west-2" | quote }}
+            {{- end }}
 
           ports:
             - name: http
