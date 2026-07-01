@@ -36,6 +36,7 @@
         </svg>
         <a class="moj-header__link moj-header__link--organisation-name" href="#">Ministry of Justice</a>
         <a class="moj-header__link moj-header__link--service-name" href="/">Check my Copilot AI Credits Usage</a>
+        <a class="moj-header__link moj-header__link--service-name" href="/">Role: {{ v.role }}</a>
         {% if v.role == "admin" %}
           {% include "components/header_nav.html" with context %}
         {% endif %}
