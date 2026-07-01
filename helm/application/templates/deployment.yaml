@@ -70,8 +70,6 @@ spec:
               value: {{ .Values.app.deployment.athena.tableModels | quote }}
             - name: ATHENA_TABLE_USERS
               value: {{ .Values.app.deployment.athena.tableUsers | quote }}
-            - name: ATHENA_OUTPUT_LOCATION
-              value: {{ .Values.app.deployment.athena.outputLocation | quote }}
             - name: ATHENA_WORKGROUP
               value: {{ .Values.app.deployment.athena.workgroup | default "primary" | quote }}
             - name: AWS_DEFAULT_REGION

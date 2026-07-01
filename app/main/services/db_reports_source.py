@@ -8,7 +8,8 @@ Config (env):
 * ATHENA_DATABASE        - Glue database (required).
 * ATHENA_TABLE_MODELS    - per-model table name (default "credits_by_model").
 * ATHENA_TABLE_USERS     - per-user table name (default "credits_by_user").
-* ATHENA_OUTPUT_LOCATION - s3://.../ results staging dir (required).
+* ATHENA_OUTPUT_LOCATION - s3://.../ results staging dir (optional; when unset,
+                           Athena uses the workgroup's default output location).
 * ATHENA_WORKGROUP       - workgroup (default "primary").
 * AWS_DEFAULT_REGION     - region for the boto3 client (default "eu-west-2").
 
@@ -38,10 +39,9 @@ class DbReportsSource(ReportsSource):
                             or "credits_by_model")
         self.user_table = (user_table or os.getenv("ATHENA_TABLE_USERS")
                            or "credits_by_user")
+        # Optional: when unset, Athena writes results to the workgroup's own
+        # default output location (result_configuration on the workgroup).
         self.output_location = output_location or os.getenv("ATHENA_OUTPUT_LOCATION")
-        if not self.output_location:
-            raise ValueError(
-                "ATHENA_OUTPUT_LOCATION is required when REPORTS_SOURCE=db")
         self.workgroup = workgroup or os.getenv("ATHENA_WORKGROUP") or "primary"
         self._sleep = sleep or time.sleep
         if client is not None:
@@ -53,12 +53,15 @@ class DbReportsSource(ReportsSource):
             self._client = boto3.client("athena", region_name=region)
 
     def _run_query(self, sql: str) -> list[dict]:
-        start = self._client.start_query_execution(
-            QueryString=sql,
-            QueryExecutionContext={"Database": self.database},
-            ResultConfiguration={"OutputLocation": self.output_location},
-            WorkGroup=self.workgroup,
-        )
+        params = {
+            "QueryString": sql,
+            "QueryExecutionContext": {"Database": self.database},
+            "WorkGroup": self.workgroup,
+        }
+        if self.output_location:
+            params["ResultConfiguration"] = {
+                "OutputLocation": self.output_location}
+        start = self._client.start_query_execution(**params)
         qid = start["QueryExecutionId"]
         for _ in range(_MAX_POLLS):
             status = self._client.get_query_execution(

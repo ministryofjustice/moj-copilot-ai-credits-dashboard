@@ -45,9 +45,11 @@ class FakeAthenaClient:
             result_set or _result_set([], [])]
         self._states = list(states)
         self.queries = []
+        self.last_start_kwargs = None
 
     def start_query_execution(self, **kw):
         self.queries.append(kw["QueryString"])
+        self.last_start_kwargs = kw
         return {"QueryExecutionId": "qid-1"}
 
     def get_query_execution(self, QueryExecutionId):  # noqa: N803
@@ -112,10 +114,23 @@ def test_missing_database_raises(monkeypatch):
         DbReportsSource(output_location="s3://x/", client=FakeAthenaClient())
 
 
-def test_missing_output_location_raises(monkeypatch):
+def test_missing_output_location_omits_result_configuration(monkeypatch):
+    # No output location -> rely on the workgroup's default; Athena is called
+    # without ResultConfiguration rather than erroring.
     monkeypatch.delenv("ATHENA_OUTPUT_LOCATION", raising=False)
-    with pytest.raises(ValueError, match="ATHENA_OUTPUT_LOCATION"):
-        DbReportsSource(database="db", client=FakeAthenaClient())
+    client = FakeAthenaClient(_result_set(["a"], [["1"]]))
+    src = DbReportsSource(database="db", client=client, sleep=lambda _s: None)
+    src._run_query("SELECT a FROM t")
+    assert "ResultConfiguration" not in client.last_start_kwargs
+
+
+def test_output_location_sets_result_configuration():
+    client = FakeAthenaClient(_result_set(["a"], [["1"]]))
+    src = DbReportsSource(database="db", output_location="s3://stg/",
+                          client=client, sleep=lambda _s: None)
+    src._run_query("SELECT a FROM t")
+    assert client.last_start_kwargs["ResultConfiguration"] == {
+        "OutputLocation": "s3://stg/"}
 
 
 def test_start_query_passes_sql():
