@@ -42,7 +42,6 @@ def my_usage():
     view = ac.user_view(
         source,
         username,
-        role,
         request.args.get("plan"),
         request.args.get("month"),
     )
