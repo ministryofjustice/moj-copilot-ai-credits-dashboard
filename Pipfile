@@ -21,7 +21,7 @@ requests = "==2.32.0"
 sentry-sdk = "==2.8.0"
 freezegun = "==1.5.1"
 setuptools = "==70.0.0"
-govuk-frontend-jinja = "==3.3.0"
+govuk-frontend-jinja = "==3.0.0"
 
 [dev-packages]
 coverage = "==7.4.4"
