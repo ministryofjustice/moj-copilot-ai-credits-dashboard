@@ -8,7 +8,7 @@
 {% from 'govuk_frontend_jinja/components/footer/macro.html' import govukFooter %}
 {% from 'govuk_frontend_jinja/components/phase-banner/macro.html' import govukPhaseBanner %}
 {% from 'govuk_frontend_jinja/components/panel/macro.html' import govukPanel %}
-{% from 'govuk_frontend_jinja/components/service-navigation/macro.html' import govukServiceNavigation %}
+{% from "govuk_frontend_jinja/components/service-navigation/macro.html" import govukServiceNavigation %}
 
 {% extends 'govuk_frontend_jinja/template.html' %}
 
@@ -37,18 +37,19 @@
         </svg>
         <a class="moj-header__link moj-header__link--organisation-name" href="#">Ministry of Justice</a>
         {{ govukServiceNavigation({
-          serviceName: "Service name",
-          serviceUrl: "/",
-          navigation: [
-            {
-              href: "/",
-              text: "Admin Daily"
-            },
-            {
-              href: "/admin",
-              text: "Admin",
-              active: true
-            }
+          "serviceName": "Check my Copilot AI Credits Usage",
+          "serviceUrl": "/",
+          "navigationLabel": "Menu",
+          "navigation": [
+              {
+                  "text": "My Usage",
+                  "href": "/",
+                  "active": true
+              },
+              {
+                  "text": "Admin",
+                  "href": "/admin"
+              }
           ]
         }) }}
       </div>
