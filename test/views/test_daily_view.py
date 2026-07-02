@@ -56,9 +56,9 @@ def test_daily_view_trend_totals_only(fake_source, mrows):
     assert "net" not in v["trend"]
 
 
-def _mrow(day, credits):
+def _mrow(day, amount):
     return {"day": day, "model": "Opus 4.6", "model_family": "Opus",
-            "routed": False, "credits": credits}
+            "routed": False, "credits": amount}
 
 
 def test_daily_view_trend_scoped_to_selected_month(fake_source):
