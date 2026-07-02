@@ -150,8 +150,8 @@
   {{- charts.update({"routed": {"type": "bar", "labels": v.routed_chart.labels, "datasets": [{"label": "Credits", "data": v.routed_chart.credits}]}}) or "" -}}
 {% endif %}
 {% if v.trend %}
-  {{- charts.update({"trendDaily": {"type": "line", "labels": v.trend.labels, "datasets": [{"label": "Org credits / day", "data": v.trend.totals}]}}) or "" -}}
-  {{- charts.update({"trendCumulative": {"type": "line", "labels": v.trend.labels, "datasets": [{"label": "Cumulative credits", "data": v.trend.cumulative}]}}) or "" -}}
+  {{- charts.update({"trendDaily": {"type": "line", "labels": v.trend.labels, "highlight": v.trend.highlight, "datasets": [{"label": "Org credits / day", "data": v.trend.totals}]}}) or "" -}}
+  {{- charts.update({"trendCumulative": {"type": "line", "labels": v.trend.labels, "highlight": v.trend.highlight, "datasets": [{"label": "Cumulative credits", "data": v.trend.cumulative}]}}) or "" -}}
 {% endif %}
 <script type="application/json" id="chart-data">{{ charts | tojson }}</script>
 {% endif %}

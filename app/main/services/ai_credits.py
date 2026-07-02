@@ -215,15 +215,20 @@ def daily_view(source: ReportsSource, day: str | None = None) -> dict:  # pylint
     routed = sum(r["credits"] for r in day_rows if r["routed"])
     chosen = total - routed
 
-    # Month-to-date trend (only meaningful with 2+ days captured).
+    # Month-to-date trend: every captured day in the selected day's calendar
+    # month (full month shape, not truncated at the selection). `highlight` marks
+    # the selected day's position so the chart can flag it. Needs 2+ in-month days.
+    month = day[:7]
+    month_days = [d for d in days if d[:7] == month]
     trend = None
-    if len(days) >= 2:
+    if len(month_days) >= 2:
         running, totals, cumulative = 0.0, [], []
-        for d in days:
+        for d in month_days:
             running += day_total[d]
             totals.append(round(day_total[d], 2))
             cumulative.append(round(running, 2))
-        trend = {"labels": days, "totals": totals, "cumulative": cumulative}
+        trend = {"labels": month_days, "totals": totals, "cumulative": cumulative,
+                 "highlight": month_days.index(day)}
 
     per_user = _per_user_day(source, day, total)
 
