@@ -13,6 +13,7 @@ def __get_bool_env_var(name: str) -> bool:
 app_config = SimpleNamespace(
     flask=SimpleNamespace(
         app_secret_key=__get_env_var("APP_SECRET_KEY"),
+        app_env=__get_env_var("APP_ENV")
     ),
     # Local-dev escape hatch: when truthy, `requires_auth` is a no-op so the app
     # can run without a reachable Auth0 tenant. Never enable in deployed envs.

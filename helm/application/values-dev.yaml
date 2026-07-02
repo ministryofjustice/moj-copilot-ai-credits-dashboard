@@ -8,6 +8,7 @@ app:
     env:
       AUTH0_DOMAIN: "check-your-co-pilot-usage-dev.uk.auth0.com"
       SENTRY_ENV: "development"
+      APP_ENV: "development"
       FLASK_DEBUG: true
       REPORTS_SOURCE: "db"
     s3:
