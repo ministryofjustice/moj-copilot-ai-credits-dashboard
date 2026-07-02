@@ -32,10 +32,8 @@ def my_usage():
         # No Auth0 session locally — take ?user= or stand in a random example user
         # (one of the top spenders, picked at runtime) so the page shows real data.
         username = request.args.get("user") or ac.example_login(source)
-        role = request.args.get("role") or "admin"
     else:
         username = session["user"].get("userinfo", {}).get("nickname", "")
-        role = session["user"].get("userinfo", {}).get("https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role", "")
 
     print(f"Username: {username}")
 

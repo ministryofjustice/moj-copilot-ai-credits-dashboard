@@ -461,7 +461,7 @@ def user_view(  # pylint: disable=too-many-locals
     limits = plan_limits(plan)
     base = {
         "plans": plan_labels(), "plan": plan, "allowance": allowance,
-        "limits": limits, "login": (login or "").strip()
+        "limits": limits, "login": (login or "").strip(),
     }
     if not base["login"]:
         return {**base, "searched": False}
