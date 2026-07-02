@@ -34,6 +34,8 @@ spec:
           env:
             - name: APP_SECRET_KEY
               value: {{ .Values.app.deployment.env.APP_SECRET_KEY | quote }}
+            - name: APP_ENV
+              value: {{ .Values.app.deployment.env.APP_ENV | quote }}
             - name: FLASK_DEBUG
               value: {{ .Values.app.deployment.env.FLASK_DEBUG | quote }}
             - name: AUTH0_DOMAIN
