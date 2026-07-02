@@ -63,7 +63,7 @@ jobs:
 
       - name: Deploy helm chart to dev
         run: |
-          helm upgrade application\
+          helm upgrade application \
             helm/application \
             --install \
             --force \
