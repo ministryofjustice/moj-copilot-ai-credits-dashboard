@@ -12,6 +12,7 @@
 
   var GOVUK_BLUE = "#1d70b8";
   var GOVUK_GREEN = "#00703c";
+  var GOVUK_RED = "#d4351c";
 
   function dataEl() {
     return document.getElementById("chart-data");
@@ -30,17 +31,35 @@
     }
     var type = spec.type || "bar";
     var labels = spec.labels || [];
+    // Optional: a single point (e.g. the selected day) drawn as a larger red
+    // marker. Chart.js reads point styling per-index when given arrays.
+    var highlight =
+      type === "line" && typeof spec.highlight === "number"
+        ? spec.highlight
+        : null;
+
     var datasets = (spec.datasets || []).map(function (ds, i) {
-      return {
+      var data = ds.data || [];
+      var ds_out = {
         type: type,
         label: ds.label || "",
-        data: ds.data || [],
+        data: data,
         backgroundColor: type === "line" ? "transparent" : colour(i),
         borderColor: colour(i),
         borderWidth: 2,
         tension: 0.2,
         pointRadius: type === "line" ? 2 : 0,
       };
+      if (highlight !== null) {
+        ds_out.pointRadius = data.map(function (_, j) {
+          return j === highlight ? 5 : 2;
+        });
+        ds_out.pointBackgroundColor = data.map(function (_, j) {
+          return j === highlight ? GOVUK_RED : colour(i);
+        });
+        ds_out.pointBorderColor = ds_out.pointBackgroundColor;
+      }
+      return ds_out;
     });
 
     // Optional dashed reference line at a fixed value (e.g. an allowance limit).

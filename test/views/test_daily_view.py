@@ -54,3 +54,42 @@ def test_daily_view_trend_totals_only(fake_source, mrows):
     assert v["trend"]["totals"] == [100.0, 40.0]
     assert v["trend"]["cumulative"] == [100.0, 140.0]
     assert "net" not in v["trend"]
+
+
+def _mrow(day, amount):
+    return {"day": day, "model": "Opus 4.6", "model_family": "Opus",
+            "routed": False, "credits": amount}
+
+
+def test_daily_view_trend_scoped_to_selected_month(fake_source):
+    """Trend includes every day of the selected day's month (full-month shape),
+    excluding other months - and never truncates at the selection."""
+    src = fake_source([], model_rows=[
+        _mrow("2026-06-30", 500.0), _mrow("2026-07-01", 100.0),
+        _mrow("2026-07-02", 200.0),
+    ])
+    # Selecting the earlier July day still shows the whole month, not just up to it.
+    v = ac.daily_view(src, "2026-07-01")
+    assert v["trend"]["labels"] == ["2026-07-01", "2026-07-02"]
+    assert v["trend"]["totals"] == [100.0, 200.0]
+    # Cumulative resets at the month boundary - June's 500 is excluded.
+    assert v["trend"]["cumulative"] == [100.0, 300.0]
+
+
+def test_daily_view_trend_highlights_selected_day(fake_source):
+    """The selected day's index is flagged so the chart can mark it."""
+    src = fake_source([], model_rows=[
+        _mrow("2026-07-01", 100.0), _mrow("2026-07-02", 200.0),
+    ])
+    assert ac.daily_view(src, "2026-07-01")["trend"]["highlight"] == 0
+    assert ac.daily_view(src, "2026-07-02")["trend"]["highlight"] == 1
+
+
+def test_daily_view_trend_none_when_month_has_single_day(fake_source):
+    """The reported case: plenty of June data but only one July day, so a July
+    selection yields no trend (chart needs 2+ in-month days)."""
+    src = fake_source([], model_rows=[
+        _mrow("2026-06-29", 400.0), _mrow("2026-06-30", 500.0),
+        _mrow("2026-07-01", 100.0),
+    ])
+    assert ac.daily_view(src, "2026-07-01")["trend"] is None
