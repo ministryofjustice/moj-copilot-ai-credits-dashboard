@@ -1,4 +1,5 @@
 import unittest
+
 from flask import session
 
 from app.app import create_app
@@ -53,6 +54,23 @@ class MainRouteTestCase(unittest.TestCase):
         body = response.get_data(as_text=True)
         self.assertIn("Your usage so far", body)
         self.assertIn("This week (WTD)", body)
+
+    def test_index_in_progress_month_renders_pace_panel(self):
+        self._inject("ignored")
+        rows = [{"day": "2026-06-22", "user_login": "alice", "credits": 120.0},
+                {"day": "2026-06-23", "user_login": "alice", "credits": 30.0}]
+        self._use_source(rows)
+        body = self.client.get("/?user=alice").get_data(as_text=True)
+        self.assertIn("Projected Jun 2026 usage", body)
+
+    def test_index_completed_month_hides_pace_panel(self):
+        self._inject("ignored")
+        # A July record marks June as fully captured — no June projection.
+        rows = [{"day": "2026-06-22", "user_login": "alice", "credits": 120.0},
+                {"day": "2026-07-02", "user_login": "alice", "credits": 30.0}]
+        self._use_source(rows)
+        body = self.client.get("/?user=alice&month=2026-06").get_data(as_text=True)
+        self.assertNotIn("Projected Jun 2026 usage", body)
 
 
 if __name__ == "__main__":
