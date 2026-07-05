@@ -50,6 +50,12 @@
         tension: 0.2,
         pointRadius: type === "line" ? 2 : 0,
       };
+      if (ds.dash) {
+        ds_out.borderDash = [6, 6];
+      }
+      if (ds.spanGaps) {
+        ds_out.spanGaps = true;
+      }
       if (highlight !== null) {
         ds_out.pointRadius = data.map(function (_, j) {
           return j === highlight ? 5 : 2;

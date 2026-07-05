@@ -81,7 +81,31 @@
   (Power = top 5%, Heavy = next 15%, Typical = middle 55%, Light = bottom 25%).
 </p>
 
+{% if v.cumulative %}
+<h3 class="govuk-heading-s govuk-!-margin-top-6">Cumulative usage — {{ v.cumulative.month_label }}</h3>
+{% if v.cumulative.pace %}
+  {{ govukInsetText({"text":
+    "Projected month-end: " ~ "{:,.0f}".format(v.cumulative.pace.projected) ~ " credits ("
+    ~ "{:,.0f}".format(v.cumulative.pace.pct * 100) ~ "% of pool — " ~ v.cumulative.pace.status ~ ")."}) }}
+{% else %}
+  {{ govukInsetText({"text": "Projection appears once 5+ days of the month are captured."}) }}
+{% endif %}
+<div style="height:360px;"><canvas data-chart="pooledCumulative"></canvas></div>
+{% endif %}
+
 {% set charts = {"pooledTree": v.treemap} %}
+{% if v.cumulative %}
+  {% set cumdatasets = [{"label": "Cumulative (this month)", "data": v.cumulative.current}] %}
+  {% if v.cumulative.prior %}
+    {{- cumdatasets.append({"label": v.cumulative.prior.month_label ~ " (prior)", "data": v.cumulative.prior.cumulative}) or "" -}}
+  {% endif %}
+  {% if v.cumulative.projection %}
+    {{- cumdatasets.append({"label": "Projection", "data": v.cumulative.projection, "dash": true}) or "" -}}
+  {% endif %}
+  {{- charts.update({"pooledCumulative": {
+        "type": "line", "labels": v.cumulative.labels, "datasets": cumdatasets,
+        "limit": {"value": v.cumulative.pool, "label": "Pool budget"}}}) or "" -}}
+{% endif %}
 <script type="application/json" id="chart-data">{{ charts | tojson }}</script>
 {% endif %}
 {% endblock %}
