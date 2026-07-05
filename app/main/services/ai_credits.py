@@ -47,7 +47,7 @@ WEEKS_PER_MONTH = 4.33
 # Selectable monthly per-seat AI-credit budgets (USD).
 PLAN_TIERS_USD_PER_MONTH = {"$70 / month": 70.0, "$39 / month": 39.0}
 DEFAULT_PLAN = "$70 / month"
-DEFAULT_SEATS = 405
+DEFAULT_SEATS = 480
 # The dataset has no scope column; the enterprise it covers is fixed.
 ENTERPRISE = "ministryofjustice"
 
@@ -334,6 +334,76 @@ def _period_text(key: str, period: str) -> str:
     return wpu.format_month_label(key)
 
 
+def _prior_overlay(prior_recs: list[dict], days_in_month: int) -> dict | None:
+    """Prior calendar month's cumulative curve, aligned to this month's width.
+
+    Running-summed by day-of-month and padded to `days_in_month` (None past the
+    prior month's own last day) so it overlays the current month by day index.
+    Returns None when there is no prior-month data.
+    """
+    if not prior_recs:
+        return None
+    prior_month = prior_recs[0]["day"][:7]
+    py, pm = (int(p) for p in prior_month.split("-"))
+    p_days = calendar.monthrange(py, pm)[1]
+    p_by_day: dict[str, float] = defaultdict(float)
+    for r in prior_recs:
+        p_by_day[r["day"]] += r["credits"]
+    p_cum, p_running = [], 0.0
+    for d in range(1, days_in_month + 1):
+        if d <= p_days:
+            p_running += p_by_day.get(f"{prior_month}-{d:02d}", 0.0)
+            p_cum.append(round(p_running, 1))
+        else:
+            p_cum.append(None)
+    return {"month": prior_month,
+            "month_label": wpu.format_month_label(prior_month),
+            "cumulative": p_cum}
+
+
+def _pool_cumulative(month_recs: list[dict], prior_recs: list[dict],  # pylint: disable=too-many-locals
+                     selected_month: str, latest_day: str, pool: float) -> dict:
+    """Full-month-width (day-of-month indexed) cumulative view-model for the pool.
+
+    `current` carries the running total forward across days with no usage; it is
+    truncated to the newest captured day while `selected_month` is still in
+    progress, and spans the whole month once complete, so its last non-null value
+    equals the pool `gross`. `projection` (via `_month_pace`, with `pool` as the
+    limit) is None until PACE_MIN_DAYS in and on completed months; `prior` is the
+    previous month's overlay or None.
+    """
+    year, mon = (int(p) for p in selected_month.split("-"))
+    days_in_month = calendar.monthrange(year, mon)[1]
+    cutoff = int(latest_day[8:10]) if latest_day[:7] == selected_month else days_in_month
+
+    by_day: dict[str, float] = defaultdict(float)
+    for r in month_recs:
+        by_day[r["day"]] += r["credits"]
+    labels, current, running = [], [], 0.0
+    for d in range(1, days_in_month + 1):
+        running += by_day.get(f"{selected_month}-{d:02d}", 0.0)
+        labels.append(str(d))
+        current.append(round(running, 1) if d <= cutoff else None)
+
+    pace = _month_pace(month_recs, selected_month, latest_day, pool)
+    projection = None
+    if pace is not None:
+        de, rate = pace["days_elapsed"], pace["mtd"] / pace["days_elapsed"]
+        projection = [round(rate * d, 1) if d >= de else None
+                      for d in range(1, days_in_month + 1)]
+
+    return {
+        "month": selected_month,
+        "month_label": wpu.format_month_label(selected_month),
+        "labels": labels,
+        "current": current,
+        "pool": pool,
+        "pace": pace,
+        "projection": projection,
+        "prior": _prior_overlay(prior_recs, days_in_month),
+    }
+
+
 def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # pylint: disable=too-many-locals
                 plan: str | None, seats) -> dict:
     """Pooled-billing treemap data for one ISO week or calendar month.
@@ -392,6 +462,17 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
                       "amount": round(headroom, 1), "users": None,
                       "colour": TIER_COLOURS["Unused pool"]})
 
+    cumulative = None
+    if period == "monthly":
+        month_recs = [r for r in records
+                      if _record_period_key(r["day"], "monthly") == key]
+        y, m = int(key[:4]), int(key[5:7])
+        prior_month = f"{date(y, m, 1) - timedelta(days=1):%Y-%m}"
+        prior_recs = [r for r in records
+                      if _record_period_key(r["day"], "monthly") == prior_month]
+        latest_day = max(r["day"] for r in records)
+        cumulative = _pool_cumulative(month_recs, prior_recs, key, latest_day, pool)
+
     return {
         **base,
         "has_data": True,
@@ -402,6 +483,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
         "active_users": len(user_credits),
         "metrics": {"pool": pool, "gross": gross, "overage": overage,
                     "total": total, "headroom": headroom},
+        "cumulative": cumulative,
         "tiles": tiles,
         "treemap": {"type": "treemap",
                     "root": f"Total bill {total:,.0f} credits (${total / 100:,.0f})",
