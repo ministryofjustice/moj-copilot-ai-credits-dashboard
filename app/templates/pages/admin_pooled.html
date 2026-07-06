@@ -97,7 +97,7 @@
 {% if v.cumulative %}
   {% set cumdatasets = [{"label": "Cumulative (this month)", "data": v.cumulative.current}] %}
   {% if v.cumulative.prior %}
-    {{- cumdatasets.append({"label": v.cumulative.prior.month_label ~ " (prior)", "data": v.cumulative.prior.cumulative}) or "" -}}
+    {{- cumdatasets.append({"label": v.cumulative.prior.month_label ~ " (prior)", "data": v.cumulative.prior.cumulative, "color": "#626a6e", "dash": true}) or "" -}}
   {% endif %}
   {% if v.cumulative.projection %}
     {{- cumdatasets.append({"label": "Projection", "data": v.cumulative.projection, "dash": true}) or "" -}}
