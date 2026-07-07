@@ -40,22 +40,31 @@
 
     var datasets = (spec.datasets || []).map(function (ds, i) {
       var data = ds.data || [];
+      // A dataset may override its series colour (e.g. a muted grey for a
+      // prior-period comparison line); otherwise fall back to the palette.
+      var col = ds.color || colour(i);
       var ds_out = {
         type: type,
         label: ds.label || "",
         data: data,
-        backgroundColor: type === "line" ? "transparent" : colour(i),
-        borderColor: colour(i),
+        backgroundColor: type === "line" ? "transparent" : col,
+        borderColor: col,
         borderWidth: 2,
         tension: 0.2,
         pointRadius: type === "line" ? 2 : 0,
       };
+      if (ds.dash) {
+        ds_out.borderDash = [6, 6];
+      }
+      if (ds.spanGaps) {
+        ds_out.spanGaps = true;
+      }
       if (highlight !== null) {
         ds_out.pointRadius = data.map(function (_, j) {
           return j === highlight ? 5 : 2;
         });
         ds_out.pointBackgroundColor = data.map(function (_, j) {
-          return j === highlight ? GOVUK_RED : colour(i);
+          return j === highlight ? GOVUK_RED : col;
         });
         ds_out.pointBorderColor = ds_out.pointBackgroundColor;
       }

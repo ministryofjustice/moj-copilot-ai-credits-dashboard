@@ -11,6 +11,7 @@ minus `@st.cache_data`.
 
 from __future__ import annotations
 
+import calendar
 import random
 from collections import defaultdict
 from datetime import date, timedelta
@@ -46,7 +47,7 @@ WEEKS_PER_MONTH = 4.33
 # Selectable monthly per-seat AI-credit budgets (USD).
 PLAN_TIERS_USD_PER_MONTH = {"$70 / month": 70.0, "$39 / month": 39.0}
 DEFAULT_PLAN = "$70 / month"
-DEFAULT_SEATS = 405
+DEFAULT_SEATS = 480
 # The dataset has no scope column; the enterprise it covers is fixed.
 ENTERPRISE = "ministryofjustice"
 
@@ -333,6 +334,76 @@ def _period_text(key: str, period: str) -> str:
     return wpu.format_month_label(key)
 
 
+def _prior_overlay(prior_recs: list[dict], days_in_month: int) -> dict | None:
+    """Prior calendar month's cumulative curve, aligned to this month's width.
+
+    Running-summed by day-of-month and padded to `days_in_month` (None past the
+    prior month's own last day) so it overlays the current month by day index.
+    Returns None when there is no prior-month data.
+    """
+    if not prior_recs:
+        return None
+    prior_month = prior_recs[0]["day"][:7]
+    py, pm = (int(p) for p in prior_month.split("-"))
+    p_days = calendar.monthrange(py, pm)[1]
+    p_by_day: dict[str, float] = defaultdict(float)
+    for r in prior_recs:
+        p_by_day[r["day"]] += r["credits"]
+    p_cum, p_running = [], 0.0
+    for d in range(1, days_in_month + 1):
+        if d <= p_days:
+            p_running += p_by_day.get(f"{prior_month}-{d:02d}", 0.0)
+            p_cum.append(round(p_running, 1))
+        else:
+            p_cum.append(None)
+    return {"month": prior_month,
+            "month_label": wpu.format_month_label(prior_month),
+            "cumulative": p_cum}
+
+
+def _pool_cumulative(month_recs: list[dict], prior_recs: list[dict],  # pylint: disable=too-many-locals
+                     selected_month: str, latest_day: str, pool: float) -> dict:
+    """Full-month-width (day-of-month indexed) cumulative view-model for the pool.
+
+    `current` carries the running total forward across days with no usage; it is
+    truncated to the newest captured day while `selected_month` is still in
+    progress, and spans the whole month once complete, so its last non-null value
+    equals the pool `gross`. `projection` (via `_month_pace`, with `pool` as the
+    limit) is None until PACE_MIN_DAYS in and on completed months; `prior` is the
+    previous month's overlay or None.
+    """
+    year, mon = (int(p) for p in selected_month.split("-"))
+    days_in_month = calendar.monthrange(year, mon)[1]
+    cutoff = int(latest_day[8:10]) if latest_day[:7] == selected_month else days_in_month
+
+    by_day: dict[str, float] = defaultdict(float)
+    for r in month_recs:
+        by_day[r["day"]] += r["credits"]
+    labels, current, running = [], [], 0.0
+    for d in range(1, days_in_month + 1):
+        running += by_day.get(f"{selected_month}-{d:02d}", 0.0)
+        labels.append(str(d))
+        current.append(round(running, 1) if d <= cutoff else None)
+
+    pace = _month_pace(month_recs, selected_month, latest_day, pool)
+    projection = None
+    if pace is not None:
+        de, rate = pace["days_elapsed"], pace["mtd"] / pace["days_elapsed"]
+        projection = [round(rate * d, 1) if d >= de else None
+                      for d in range(1, days_in_month + 1)]
+
+    return {
+        "month": selected_month,
+        "month_label": wpu.format_month_label(selected_month),
+        "labels": labels,
+        "current": current,
+        "pool": pool,
+        "pace": pace,
+        "projection": projection,
+        "prior": _prior_overlay(prior_recs, days_in_month),
+    }
+
+
 def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # pylint: disable=too-many-locals
                 plan: str | None, seats) -> dict:
     """Pooled-billing treemap data for one ISO week or calendar month.
@@ -391,6 +462,17 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
                       "amount": round(headroom, 1), "users": None,
                       "colour": TIER_COLOURS["Unused pool"]})
 
+    cumulative = None
+    if period == "monthly":
+        month_recs = [r for r in records
+                      if _record_period_key(r["day"], "monthly") == key]
+        y, m = int(key[:4]), int(key[5:7])
+        prior_month = f"{date(y, m, 1) - timedelta(days=1):%Y-%m}"
+        prior_recs = [r for r in records
+                      if _record_period_key(r["day"], "monthly") == prior_month]
+        latest_day = max(r["day"] for r in records)
+        cumulative = _pool_cumulative(month_recs, prior_recs, key, latest_day, pool)
+
     return {
         **base,
         "has_data": True,
@@ -401,6 +483,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
         "active_users": len(user_credits),
         "metrics": {"pool": pool, "gross": gross, "overage": overage,
                     "total": total, "headroom": headroom},
+        "cumulative": cumulative,
         "tiles": tiles,
         "treemap": {"type": "treemap",
                     "root": f"Total bill {total:,.0f} credits (${total / 100:,.0f})",
@@ -457,9 +540,10 @@ def user_view(  # pylint: disable=too-many-locals
 
     `month` selects which calendar month is in focus (defaults to the latest the
     user has data for); it drives the per-week cost-stats table, the per-week
-    bar chart, and the cumulative chart. A week is attributed to the month its
-    Monday falls in, so a week straddling a boundary stays whole. All figures
-    are in AI credits.
+    bar chart, the cumulative chart and the pace projection. The month list and
+    the cumulative chart are scoped to calendar days; the per-week table shows
+    every ISO week with usage in the month, keeping whole-week credits, so a
+    straddling week appears under both months. All figures are in AI credits.
     """
     plan = resolve_plan(plan)
     allowance = weekly_allowance(plan)
@@ -492,8 +576,6 @@ def user_view(  # pylint: disable=too-many-locals
             "remaining": allowance - credits_val, "day_count": int(r["day_count"]),
             "span": f"{mon:%d %b} – {sun:%d %b}",
             "range": wpu.format_week_range(iso_year, iso_week),
-            # A week belongs to the month its Monday falls in (so it stays whole).
-            "month": f"{mon:%Y-%m}",
         })
     weekly_rows.sort(key=lambda x: x["week_label"])
     weeks = [w["week_label"] for w in weekly_rows]
@@ -503,23 +585,22 @@ def user_view(  # pylint: disable=too-many-locals
         "credits": [round(w["credits"], 1) for w in weekly_rows],
     }
 
-    # ---- selected month drives the per-week cost stats (table + bar) and the
-    # cumulative chart; default to the latest month the user has data for.
-    months = sorted({w["month"] for w in weekly_rows})
+    # ---- selected month drives the per-week cost stats (table + bar), the
+    # cumulative chart and the pace projection; default to the latest calendar
+    # month the user has data for.
+    months = sorted({r["day"][:7] for r in urecs})
     selected_month = month if month in months else months[-1]
-    month_weeks = [w for w in weekly_rows if w["month"] == selected_month]
-    month_week_labels = {w["week_label"] for w in month_weeks}
+    month_day_recs = [r for r in urecs if r["day"][:7] == selected_month]
+
+    # Every ISO week with usage in the month, at whole-week credits (the
+    # allowance is weekly), so a straddling week shows under both its months.
+    month_week_labels = {wpu.iso_week_label(r["day"])[0] for r in month_day_recs}
+    month_weeks = [w for w in weekly_rows if w["week_label"] in month_week_labels]
     month_weekly_chart = {
         "labels": [f"{w['week_label']} ({w['range']})" for w in month_weeks],
         "credits": [round(w["credits"], 1) for w in month_weeks],
     }
-
-    # ---- cumulative credits across the selected month's weeks. Keyed on whole
-    # weeks (not calendar days) so a straddling week's spill-over days stay with
-    # the month its Monday belongs to, matching the table and bar above.
-    month_day_recs = [
-        r for r in urecs if wpu.iso_week_label(r["day"])[0] in month_week_labels
-    ]
+    # Cumulative credits over the month's calendar days (resets at the 1st).
     cum_labels, cum_values, running = [], [], 0.0
     for r in month_day_recs:
         running += r["credits"]
@@ -547,8 +628,55 @@ def user_view(  # pylint: disable=too-many-locals
                           for m in months],
         "month_weeks": month_weeks, "month_weekly_chart": month_weekly_chart,
         "month_cumulative": month_cumulative,
+        "month_pace": _month_pace(month_day_recs, selected_month,
+                                  max(r["day"] for r in records),
+                                  limits["monthly"]),
         "summary": summary,
         "calendar": _usage_calendar(urecs, limits["daily"]),
+    }
+
+
+# Projections within ±2% of the monthly allowance read as "on track" rather
+# than flapping between over/under on tiny day-to-day swings.
+PACE_ON_TRACK_TOLERANCE = 0.02
+# Fewer elapsed days than this is too noisy to project a whole month from.
+PACE_MIN_DAYS = 5
+
+
+def _month_pace(month_day_recs: list[dict], selected_month: str,
+                latest_day: str, monthly_limit: float) -> dict | None:
+    """Full-month projection of the user's MTD spend, at the current daily pace.
+
+    Only meaningful while the month is still being captured: `latest_day` (the
+    newest day across the whole org, so an idle user's pace doesn't stall) must
+    fall inside `selected_month`, at least `PACE_MIN_DAYS` in and before its
+    last day. Completed or barely-started months → None.
+    """
+    if latest_day[:7] != selected_month:
+        return None
+    year, mon = (int(p) for p in selected_month.split("-"))
+    days_in_month = calendar.monthrange(year, mon)[1]
+    days_elapsed = int(latest_day[8:10])
+    if not PACE_MIN_DAYS <= days_elapsed < days_in_month:
+        return None
+
+    mtd = sum(r["credits"] for r in month_day_recs)
+    projected = mtd / days_elapsed * days_in_month
+    pct = (projected / monthly_limit) if monthly_limit else 0.0
+    if pct > 1.0 + PACE_ON_TRACK_TOLERANCE:
+        status = "over"
+    elif pct < 1.0 - PACE_ON_TRACK_TOLERANCE:
+        status = "under"
+    else:
+        status = "on-track"
+    return {
+        "projected": round(projected, 1),
+        "pct": pct,
+        "delta": round(projected - monthly_limit, 1),
+        "days_elapsed": days_elapsed,
+        "days_in_month": days_in_month,
+        "mtd": round(mtd, 1),
+        "status": status,
     }
 
 
