@@ -23,6 +23,11 @@ replacement for the reactive widgets of the Streamlit app this was ported from),
 so pages are shareable and bookmarkable. Charts are rendered client-side with
 Chart.js; the server ships plain JSON-serialisable view models.
 
+The **My usage** page also renders a rolling calendar heatmap of daily usage
+(GitHub-contributions-graph style): each day is bucketed into one of 6 levels
+based on its usage as a percentage of the daily allowance (`<25%`, `<50%`,
+`<100%`, `<150%`, `<300%`, `≥300%`), so heavy days stand out at a glance.
+
 ## How it works
 
 ```
