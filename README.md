@@ -191,6 +191,36 @@ Access is gated by **Auth0**. `@requires_auth` enforces a signed-in session and
 `@requires_admin` checks an org-role claim on the user's `userinfo`. Login,
 callback, and logout are handled in `app/main/routes/auth.py`.
 
+## Frontend assets
+
+GOV.UK Frontend, MoJ Frontend, Chart.js, and the `chartjs-chart-treemap`
+plugin are **vendored**: committed as static files under
+`app/static/javascript/` and `app/static/stylesheets/`, and served from this
+app (`url_for('static', ...)` in `app/templates/components/base.html` and the
+page templates) rather than pulled from a CDN `<script src="https://...">` at
+request time.
+
+This is deliberate — it avoids the class of "JS gremlin" that comes from
+depending on a third party at runtime:
+
+* **No CDN on the request path.** A CDN outage, a yanked/changed package
+  version, or a compromised CDN serving different JS than what was reviewed
+  can't silently affect this app, because nothing is fetched over the network
+  when a page loads.
+* **No Subresource Integrity bookkeeping.** Self-hosted files don't need SRI
+  hashes — the file committed to the repo is byte-for-byte the file served.
+* **A visible diff on upgrade, not a silent version bump.** The Chart.js
+  files even carry their upstream version and source URL in a header comment
+  (e.g. `chart.umd.min.js` is Chart.js v4.4.3 from
+  `/npm/chart.js@4.4.3/dist/chart.umd.js`), so bumping a library is a
+  reviewable file replacement, not a floating `^4.0.0` in a manifest.
+
+To upgrade one of these libraries: download the new minified build from its
+official release/CDN, replace the corresponding file under
+`app/static/javascript/` or `app/static/stylesheets/` (keeping the existing
+naming — GOV.UK Frontend's filename carries its version, e.g.
+`govuk-frontend-5.1.0.min.js`), and note the version bump in the commit.
+
 ## Testing
 
 ```bash
