@@ -28,6 +28,25 @@ The **My usage** page also renders a rolling calendar heatmap of daily usage
 based on its usage as a percentage of the daily allowance (`<25%`, `<50%`,
 `<100%`, `<150%`, `<300%`, `≥300%`), so heavy days stand out at a glance.
 
+### Projected usage
+
+The **My usage** and **Org pooled** pages both project where the month will
+land if the current daily pace continues, alongside the cumulative
+credits-so-far chart:
+
+* Once at least 5 days into the month (and before it's finished), the
+  month-to-date total is extrapolated straight-line to a full-month figure:
+  `mtd ÷ days_elapsed × days_in_month`.
+* The projection is labelled **over** / **under** / **on-track** against the
+  relevant limit (the user's monthly allowance, or the pool's `seats × plan`
+  allowance on the admin page), with a ±2% tolerance band so it doesn't flip
+  labels on small day-to-day swings.
+* The cumulative chart also overlays the **previous calendar month's** curve
+  (aligned by day-of-month) so the current trend can be read against recent
+  history.
+* Completed months, and months with too little data yet (<5 days), show the
+  cumulative curve without a projection.
+
 ## How it works
 
 ```
