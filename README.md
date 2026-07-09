@@ -75,7 +75,7 @@ roughly once a day.
 │   ├── app.py                       # Application factory entry point
 │   ├── run.py                       # `python -m app.run` dev runner
 │   └── main/
-│       ├── config/                  # Modular config (auth0, cors, sentry, logging, ...)
+│       ├── config/                  # Modular config (auth0, cors, logging, ...)
 │       ├── middleware/
 │       │   ├── auth.py              # @requires_auth / @requires_admin (Auth0)
 │       │   └── error_handler.py
@@ -118,15 +118,6 @@ run without a reachable Auth0 tenant. **Never enable it in a deployed env.** Wit
 auth disabled, the *My usage* page stands in a random top-spender so the page
 renders with real-shaped data; override with `?user=<login>`.
 
-### Option B — Docker Compose
-
-```bash
-make build     # docker-compose build
-make up        # docker-compose up -d
-make logs      # tail the app logs
-make down      # stop & remove
-```
-
 The app is served at <http://localhost:4567/>.
 
 > You need a populated `reports/` directory locally for the `local` backend to
@@ -143,7 +134,6 @@ All config is read from environment variables (see `app/main/config/`).
 | `AUTH_DISABLED` | Local-only escape hatch to bypass Auth0 |
 | `LOGGING_LEVEL` | e.g. `DEBUG`, `INFO` |
 | `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` | Auth0 tenant + app |
-| `SENTRY_DSN_KEY` / `SENTRY_ENV` | Sentry error reporting (optional) |
 | `REPORTS_SOURCE` | `local` (default) \| `s3` \| `db` |
 | `REPORTS_DIR` | Local backend root (default `reports`) |
 | `REPORTS_CACHE_TTL` | Seconds to memoise reads (default `300`, `0` disables) |
@@ -208,15 +198,10 @@ and it keeps several useful pieces of that template's scaffolding:
 * **Helm charts** for Cloud Platform deployments.
 * **Pre-wired linting & testing** — `flake8`, `pylint`, `black`, MegaLinter, and
   `pytest` with coverage.
-* **Error-handling middleware** and Sentry integration.
+* **Error-handling middleware** 
 
-The template's helper scripts are retained in `bin/` and exposed via the makefile:
+Helper scripts are retained in `bin/` 
 
-| Command | What it does |
-|---------|--------------|
-| `make rename NEW_NAME=<name>` | Renames the placeholder `application` across the tree (`bin/rename_project.py`) — kept for reference / re-scaffolding. |
-| `make new-namespace REPOSITORY_NAME=<repo> ENVIRONMENT=<env>` | Scaffolds a Cloud Platform namespace (`bin/make_new_cloud_platform_namespace.py`). |
-| `make decode-session-cookie PAYLOAD=<cookie>` | Decodes a Flask session cookie for debugging (`bin/decode_cookie.py`). |
 
 ## Contributing
 
