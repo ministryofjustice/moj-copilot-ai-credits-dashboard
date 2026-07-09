@@ -1,172 +1,227 @@
-# 🗄️ Flask Application Template
+# 📊 MoJ Copilot AI Credits Dashboard
 
-This repository serves as a template for creating Flask applications with a structured design, best practices, and tooling for development and deployment. It includes Docker support, linting, and configurations to help standardise projects within the team.
+A Flask web app that visualises GitHub Copilot **AI-credit usage** across the
+Ministry of Justice enterprise. It gives individual users a view of their own
+spend against their plan allowance, and gives admins pooled, weekly, and daily
+views across the whole org.
 
-## Features
+The app is **read-only**: it renders usage data that is captured elsewhere and
+handed to it as a partitioned Parquet dataset. It never calls the GitHub API and
+never writes to its data source.
 
-- **Flask Framework**: Organised structure for Flask projects, enabling scalability.
-- **Docker**: Pre-configured Docker support for containerisation.
-- **Pipenv**: Dependency management using Pipenv for virtual environments and package versioning.
-- **Helm**: Helm charts for Kubernetes deployments.
-- **Pre-commit Hooks**: Pre-configured linting and code style enforcement using `flake8`, `pylint`, and `black`.
-- **Testing Setup**: Integrated with `pytest` for testing.
-- **Error Handling**: Custom middleware for error handling.
+## What it shows
 
-## Directory Structure
+| Route | Page | Audience | Key query params |
+|-------|------|----------|------------------|
+| `/` | **My usage** | Any signed-in user | `?user=<login>&plan=<plan>&month=<YYYY-MM>` |
+| `/admin/pooled` | **Org pooled** | Admins | `?period=weekly\|monthly&plan=<plan>&seats=<n>` |
+| `/admin/weekly` | **Org weekly** | Admins | `?plan=<plan>&week=YYYY-Www` |
+| `/admin/daily` | **Org daily** | Admins | `?day=YYYY-MM-DD` |
+
+All view state is carried in the URL query string (the Flask-idiomatic
+replacement for the reactive widgets of the Streamlit app this was ported from),
+so pages are shareable and bookmarkable. Charts are rendered client-side with
+Chart.js; the server ships plain JSON-serialisable view models.
+
+## How it works
+
+```
+                 ┌─────────────────────────────────────────┐
+   Parquet       │  ReportsSource (abstract)                │
+   dataset  ───► │    • LocalFsReportsSource  (reports/)    │ ──► view-model
+  (2 tables)     │    • S3ReportsSource       (S3 bucket)   │     builders ──► Jinja + Chart.js
+                 │    • DbReportsSource       (Athena)      │     (ai_credits.py)
+                 └─────────────────────────────────────────┘
+```
+
+### The data model
+
+The data is a two-table dataset, Hive-partitioned by `day` (`day=YYYY-MM-DD/`):
+
+* **`credits_by_model`** → `{day, model, model_family, routed, credits}` — the
+  org-level per-model split (`routed` is `True` for `Auto:`-prefixed models).
+* **`credits_by_user`** → `{day, user_login, credits}` — per-user daily totals
+  (there is **no** per-model breakdown per user in this data).
+
+Every backend returns these same plain row-lists, so the view-model code in
+`app/main/services/ai_credits.py` is completely backend-agnostic and unit-testable.
+
+### Data backends (`REPORTS_SOURCE`)
+
+The source is resolved per request by `get_reports_source()` and selected with
+the `REPORTS_SOURCE` env var:
+
+| Value | Backend | Reads from | Used in |
+|-------|---------|------------|---------|
+| `local` (default) | `LocalFsReportsSource` | `reports/` on disk | local dev |
+| `s3` | `S3ReportsSource` | S3 bucket (pyarrow) | — |
+| `db` | `DbReportsSource` | Athena over the Parquet | production |
+
+For `s3`/`db`, AWS credentials are resolved by the default AWS chain (IRSA / the
+pod's service-account role) — **no static keys are read or stored**. Reads are
+memoised for `REPORTS_CACHE_TTL` seconds (default 300) since the data updates
+roughly once a day.
+
+> **Note on the data:** the `reports/` directory (the raw usage data) is
+> `.gitignore`d and is **never committed** — it may contain user/billing data.
+> In production the data lives in S3/Athena and is reached via the pod's IAM
+> role. The pipeline that *builds* the Parquet dataset lives outside this repo.
+
+## Directory structure
 
 ```bash
 .
-├── Dockerfile                  
-├── LICENSE                      
-├── Pipfile                      # Pipenv dependencies
-├── Pipfile.lock                 # Locked dependencies for Pipenv
-├── README.md                    
-├── app/                         # Application source code
-│   ├── __init__.py              # Application factory
-│   ├── app.py                   # Entry point for the app
-│   ├── main/                    # Main application module
-│   │   ├── config/              # Configuration files for the application
-│   │   │   ├── app_config.py    # Application-specific configurations i.e. env vars
-│   │   │   ├── cors_config.py   # CORS configuration
-│   │   │   ├── error_handlers_config.py
-│   │   │   ├── jinja_config.py  
-│   │   │   ├── limiter_config.py 
-│   │   │   ├── logging_config.py
-│   │   │   ├── routes_config.py 
-│   │   │   └── sentry_config.py 
-│   │   ├── middleware/          # Middleware for request/response handling
-│   │   │   ├── error_handler.py  # Custom error handler middleware
-│   │   ├── routes/              
-│   │   │   ├── main.py          # Main route definitions
-│   │   │   └── robots.py        # Robots.txt handler route
-│   │   ├── services/            # Service layer, where you put things like slack and github services
-│   │   └── validators/          # Input validation
-│   ├── run.py                   # Script to run the application
-│   ├── static/                  # Static files (images, JS, CSS, fonts)
-│   └── templates/               # HTML templates
-│       ├── components/          # Reusable HTML components
-│       └── pages/               # Page templates
-├── docker-compose.yaml          
-├── docker-test.yaml             
-├── helm/                        # Helm chart for cloud platform deployments
-│   └── application/             
-│       ├── Chart.yaml           # Helm chart metadata
-│       ├── templates/           # Kubernetes resource templates
-│       ├── values-dev.yaml      # Development environment values
-│       └── values-prod.yaml     # Production environment values
-└── makefile                     # Makefile for automating common tasks
+├── app/
+│   ├── app.py                       # Application factory entry point
+│   ├── run.py                       # `python -m app.run` dev runner
+│   └── main/
+│       ├── config/                  # Modular config (auth0, cors, sentry, logging, ...)
+│       ├── middleware/
+│       │   ├── auth.py              # @requires_auth / @requires_admin (Auth0)
+│       │   └── error_handler.py
+│       ├── routes/
+│       │   ├── ai_credits.py        # The dashboard pages
+│       │   ├── auth.py              # Auth0 login/callback/logout
+│       │   └── robots.py
+│       ├── services/
+│       │   ├── ai_credits.py        # View-model builders (no Flask, no I/O)
+│       │   ├── reports_source.py    # ReportsSource abstraction + local backend
+│       │   ├── s3_reports_source.py # S3 backend
+│       │   ├── db_reports_source.py # Athena backend
+│       │   ├── caching_reports_source.py  # TTL cache wrapper
+│       │   ├── weekly_per_user.py   # Weekly roll-up maths
+│       │   └── auth0_service.py
+│       ├── static/                  # JS (Chart.js glue), CSS, images
+│       └── templates/               # GOV.UK-styled Jinja templates
+├── bin/                             # Dev/ops helper scripts (see below)
+├── helm/application/                # Helm chart for MoJ Cloud Platform
+├── reports/                         # Local usage data (gitignored)
+├── test/                            # pytest suite
+├── Dockerfile
+├── docker-compose.yaml
+└── makefile
 ```
 
-## Setup Instructions
+## Running locally
 
-### 1. Clone the Repository
+The quickest path bypasses Auth0 and reads the on-disk `reports/` data.
+
+### Option A — native (no Auth0)
 
 ```bash
-git clone git@github.com:ministryofjustice/operations-engineering-flask-template.git
-cd operations-engineering-flask-template
+pipenv install --dev        # create the virtualenv & install deps
+./bin/run-local.sh          # sets AUTH_DISABLED=true and serves on :4567
 ```
 
-### 2. Install Dependencies with Pipenv
+`AUTH_DISABLED=true` turns the `@requires_auth` decorator into a no-op so you can
+run without a reachable Auth0 tenant. **Never enable it in a deployed env.** With
+auth disabled, the *My usage* page stands in a random top-spender so the page
+renders with real-shaped data; override with `?user=<login>`.
 
-Ensure you have Pipenv installed:
+### Option B — Docker Compose
 
 ```bash
-pip install pipenv
+make build     # docker-compose build
+make up        # docker-compose up -d
+make logs      # tail the app logs
+make down      # stop & remove
 ```
 
-Install the dependencies:
+The app is served at <http://localhost:4567/>.
 
-```bash
-pipenv install --dev
-```
-
-Activate the virtual environment:
-
-```bash
-pipenv shell
-```
-
-### 3. Rename your application
-
-
-After cloning this template repository, you may want to rename the project to your desired application name. This project includes a Python script to help automate the renaming process.
-
-#### Steps to Rename the Project:
-
-1. **Run the rename script**:
-   
-   Once you've cloned the repository, you can rename all instances of the placeholder name (`application`) to your desired project name. Use the following command:
-
-   ```bash
-   make rename NEW_NAME=<your-new-project-name>
-   ```
-
-   For example, to rename the project to `my-flask-app`:
-
-   ```bash
-   make rename NEW_NAME=my-flask-app
-   ```
-
-2. **Verify the renaming**:
-
-   The `rename_project.py` script will replace the placeholder name `application` with your new project name across all relevant files and directories. After running the rename command, you can check that the project structure, files, and configurations have been updated accordingly.
-
-
-### 4. Running the Application
-
-Start the Flask application locally using docker-compose:
-
-```bash
-docker-compose build
-docker-compose up
-```
-
-The application will be available at `http://localhost:4567/`.
-
-### 5. Running Tests
-
-To run the unit tests using `pytest`:
-
-```bash
-pipenv run pytest
-```
-
-## Deployment
-
-### Kubernetes (Helm)
-
-This project includes Helm charts for Kubernetes deployment. You can use the `helm/application/` directory to deploy your application with Helm. Modify `values-dev.yaml` or `values-prod.yaml` as necessary for your environment.
-
-```bash
-helm install my-app ./helm/application
-```
-
-## Linting and Code Style
-
-- **flake8**: Enforces PEP8 style guide for Python code.
-- **pylint**: Provides code analysis and checks for common errors.
-- **black**: Ensures consistent code formatting (automatically run by `pre-commit`).
-
-### Running Linters
-
-```bash
-pipenv run flake8
-pipenv run pylint app
-```
+> You need a populated `reports/` directory locally for the `local` backend to
+> return data. Its layout is `reports/credits_by_{model,user}/day=YYYY-MM-DD/part-0.parquet`.
 
 ## Configuration
 
-The application configuration is modularised in the `app/main/config/` directory. Each aspect of the app’s configuration (e.g., CORS, error handlers, logging) is stored in its own file. Modify the configurations to suit your application needs.
+All config is read from environment variables (see `app/main/config/`).
 
-## Extending the Template
+| Variable | Purpose |
+|----------|---------|
+| `APP_SECRET_KEY` | Flask session signing key |
+| `APP_ENV` | Environment label (`local` / `development` / `production`) |
+| `AUTH_DISABLED` | Local-only escape hatch to bypass Auth0 |
+| `LOGGING_LEVEL` | e.g. `DEBUG`, `INFO` |
+| `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` | Auth0 tenant + app |
+| `SENTRY_DSN_KEY` / `SENTRY_ENV` | Sentry error reporting (optional) |
+| `REPORTS_SOURCE` | `local` (default) \| `s3` \| `db` |
+| `REPORTS_DIR` | Local backend root (default `reports`) |
+| `REPORTS_CACHE_TTL` | Seconds to memoise reads (default `300`, `0` disables) |
+| `REPORTS_S3_BUCKET` / `REPORTS_S3_PREFIX` | S3 backend location |
+| `ATHENA_DATABASE` / `ATHENA_TABLE_MODELS` / `ATHENA_TABLE_USERS` | Athena backend |
+| `ATHENA_WORKGROUP` / `ATHENA_OUTPUT_LOCATION` | Athena execution config |
+| `AWS_DEFAULT_REGION` | AWS region for S3/Athena (default `eu-west-2`) |
 
-Feel free to extend the template by adding more services and blueprints or integrating additional tools such as databases or external APIs.
+No secrets are committed to this repo; deployed environments inject them via
+Kubernetes secrets and GitHub Actions secrets.
 
+## Authentication
 
-### Contributions
+Access is gated by **Auth0**. `@requires_auth` enforces a signed-in session and
+`@requires_admin` checks an org-role claim on the user's `userinfo`. Login,
+callback, and logout are handled in `app/main/routes/auth.py`.
 
-If you have suggestions or improvements to this template, open a pull request or raise an issue.
+## Testing
 
-### License
+```bash
+pipenv run pytest                 # run the suite
+pipenv run tests                  # coverage run -m pytest test
+pipenv run tests_report           # coverage report
+```
 
-This project is licensed under the MIT License.
+## Linting
+
+```bash
+make flake8      # flake8 (config in .flake8)
+make lint        # full MegaLinter run
+pipenv run pylint app
+```
+
+`flake8`, `pylint`, and `black` are enforced, with MegaLinter running in CI.
+
+## Deployment
+
+The app deploys to the **MoJ Cloud Platform** (Kubernetes) via the Helm chart in
+`helm/application/`. Per-environment values live in `values-dev.yaml` and
+`values-prod.yaml`; production reads its data through the Athena (`db`) backend.
+
+CI/CD is defined in `.github/workflows/` (build, test, Trivy scans, MegaLinter,
+and deploy-to-dev / deploy-to-prod). All credentials come from GitHub Actions
+secrets.
+
+```bash
+helm upgrade --install moj-copilot-ai-credits-dashboard ./helm/application \
+  -f ./helm/application/values-<env>.yaml
+```
+
+## Template provenance & helper tooling
+
+This project was bootstrapped from the MoJ Operations Engineering
+[**Flask template**](https://github.com/ministryofjustice/operations-engineering-flask-template),
+and it keeps several useful pieces of that template's scaffolding:
+
+* **Structured Flask layout** — application factory, blueprints, and modular
+  per-concern config under `app/main/config/`.
+* **Dependency management with Pipenv** (`Pipfile` / `Pipfile.lock`).
+* **Docker** support (`Dockerfile`, `docker-compose.yaml`) and a `makefile` that
+  wraps the common build/run/lint tasks.
+* **Helm charts** for Cloud Platform deployments.
+* **Pre-wired linting & testing** — `flake8`, `pylint`, `black`, MegaLinter, and
+  `pytest` with coverage.
+* **Error-handling middleware** and Sentry integration.
+
+The template's helper scripts are retained in `bin/` and exposed via the makefile:
+
+| Command | What it does |
+|---------|--------------|
+| `make rename NEW_NAME=<name>` | Renames the placeholder `application` across the tree (`bin/rename_project.py`) — kept for reference / re-scaffolding. |
+| `make new-namespace REPOSITORY_NAME=<repo> ENVIRONMENT=<env>` | Scaffolds a Cloud Platform namespace (`bin/make_new_cloud_platform_namespace.py`). |
+| `make decode-session-cookie PAYLOAD=<cookie>` | Decodes a Flask session cookie for debugging (`bin/decode_cookie.py`). |
+
+## Contributing
+
+Suggestions and improvements are welcome — open a pull request or raise an issue.
+
+## Licence
+
+Licensed under the [MIT License](LICENSE). © Crown Copyright (Ministry of Justice).
