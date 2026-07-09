@@ -91,6 +91,22 @@ roughly once a day.
 > In production the data lives in S3/Athena and is reached via the pod's IAM
 > role. The pipeline that *builds* the Parquet dataset lives outside this repo.
 
+### Adding a new backend
+
+`ReportsSource` (`app/main/services/reports_source.py`) is an abstract base
+class with two methods: `model_rows()` and `user_rows()`, each returning plain
+dict rows in the shapes described above. To add a backend:
+
+1. Subclass `ReportsSource` and implement both methods, returning rows in the
+   same shape as the existing backends (see `s3_reports_source.py` /
+   `db_reports_source.py` for reference).
+2. Register it in `_build_source()`'s `if backend ==` chain, gated by a new
+   `REPORTS_SOURCE` value.
+
+Nothing else needs to change — `get_reports_source()` wraps any backend in the
+same TTL cache, and `ai_credits.py`'s view-model code only ever sees the plain
+row-lists, so it's backend-agnostic by construction.
+
 ## Directory structure
 
 ```bash
