@@ -12,7 +12,7 @@ tests_report = "coverage report --omit=./test/** --sort=cover --show-missing --s
 email-validator = "==2.1.0.post1"
 authlib= "==1.6.11"
 flask = "==3.0.2"
-flask-cors = "==5.0.0"
+flask-cors = "==6.0.0"
 flask-limiter = "==3.5.0"
 govuk-frontend-jinja = "==3.0.0"
 gunicorn = "==22.0.0"
