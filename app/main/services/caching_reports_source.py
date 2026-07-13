@@ -1,10 +1,10 @@
 """TTL-caching wrapper around any ReportsSource.
 
-The usage data changes about once a day, but the S3 backend re-fetches it on
-every request (one GetObject per file across thousands of per-user JSONs ~= 15s).
-This wraps any source and memoises its three methods for `ttl_seconds`, so repeat
-requests are served from memory. It is itself a `ReportsSource`, so the factory
-can compose it transparently and routes/views are untouched.
+The usage data changes about once a day, but the backends otherwise re-fetch it
+on every request. This wraps any source and memoises its two methods for
+`ttl_seconds`, so repeat requests are served from memory. It is itself a
+`ReportsSource`, so the factory can compose it transparently and routes/views
+are untouched.
 
 The cache is per-process (per gunicorn worker); each worker warms independently.
 The clock is injectable (`time_fn`, default `time.monotonic`) so TTL expiry is

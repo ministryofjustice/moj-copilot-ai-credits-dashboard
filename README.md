@@ -53,8 +53,7 @@ credits-so-far chart:
                  ┌─────────────────────────────────────────┐
    Parquet       │  ReportsSource (abstract)                │
    dataset  ───► │    • LocalFsReportsSource  (reports/)    │ ──► view-model
-  (2 tables)     │    • S3ReportsSource       (S3 bucket)   │     builders ──► Jinja + Chart.js
-                 │    • DbReportsSource       (Athena)      │     (ai_credits.py)
+  (2 tables)     │    • DbReportsSource       (Athena)      │     builders ──► Jinja + Chart.js
                  └─────────────────────────────────────────┘
 ```
 
@@ -78,10 +77,9 @@ the `REPORTS_SOURCE` env var:
 | Value | Backend | Reads from | Used in |
 |-------|---------|------------|---------|
 | `local` (default) | `LocalFsReportsSource` | `reports/` on disk | local dev |
-| `s3` | `S3ReportsSource` | S3 bucket (pyarrow) | — |
 | `db` | `DbReportsSource` | Athena over the Parquet | production |
 
-For `s3`/`db`, AWS credentials are resolved by the default AWS chain (IRSA / the
+For `db`, AWS credentials are resolved by the default AWS chain (IRSA / the
 pod's service-account role) — **no static keys are read or stored**. Reads are
 memoised for `REPORTS_CACHE_TTL` seconds (default 300) since the data updates
 roughly once a day.

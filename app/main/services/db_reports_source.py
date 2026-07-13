@@ -1,7 +1,7 @@
 """Athena-backed reports source.
 
 Queries the two Athena tables over the partitioned Parquet (`credits_by_model`,
-`credits_by_user`) and returns the same row-lists the local and S3 sources return.
+`credits_by_user`) and returns the same row-lists the local source returns.
 Selected when REPORTS_SOURCE=db.
 
 Config (env):
