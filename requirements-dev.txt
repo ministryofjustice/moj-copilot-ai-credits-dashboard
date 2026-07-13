@@ -20,7 +20,7 @@ boto3==1.35.0
 requests==2.32.0
 sentry-sdk==2.8.0
 freezegun==1.5.1
-setuptools==70.0.0
+setuptools==78.1.1
 
 # ---- tests / dev tooling ----
 pytest==9.1.0
