@@ -49,7 +49,7 @@ credits-so-far chart:
 
 ## How it works
 
-```
+```text
                  ┌─────────────────────────────────────────┐
    Parquet       │  ReportsSource (abstract)                │
    dataset  ───► │    • LocalFsReportsSource  (reports/)    │ ──► view-model
@@ -83,11 +83,6 @@ For `db`, AWS credentials are resolved by the default AWS chain (IRSA / the
 pod's service-account role) — **no static keys are read or stored**. Reads are
 memoised for `REPORTS_CACHE_TTL` seconds (default 300) since the data updates
 roughly once a day.
-
-> **Note on the data:** the `reports/` directory (the raw usage data) is
-> `.gitignore`d and is **never committed** — it may contain user/billing data.
-> In production the data lives in S3/Athena and is reached via the pod's IAM
-> role. The pipeline that *builds* the Parquet dataset lives outside this repo.
 
 ## Contributing
 
