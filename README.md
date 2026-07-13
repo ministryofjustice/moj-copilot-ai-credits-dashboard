@@ -1,172 +1,102 @@
-# 🗄️ Flask Application Template
+# 📊 MoJ Copilot AI Credits Dashboard
 
-This repository serves as a template for creating Flask applications with a structured design, best practices, and tooling for development and deployment. It includes Docker support, linting, and configurations to help standardise projects within the team.
+A Flask web app that visualises GitHub Copilot **AI-credit usage** across the
+Ministry of Justice enterprise. It gives individual users a view of their own
+spend against their plan allowance, and gives admins pooled, weekly, and daily
+views across the whole org.
 
-## Features
+The app is **read-only**: it renders usage data that is captured elsewhere and
+handed to it as a partitioned Parquet dataset. It never calls the GitHub API and
+never writes to its data source.
 
-- **Flask Framework**: Organised structure for Flask projects, enabling scalability.
-- **Docker**: Pre-configured Docker support for containerisation.
-- **Pipenv**: Dependency management using Pipenv for virtual environments and package versioning.
-- **Helm**: Helm charts for Kubernetes deployments.
-- **Pre-commit Hooks**: Pre-configured linting and code style enforcement using `flake8`, `pylint`, and `black`.
-- **Testing Setup**: Integrated with `pytest` for testing.
-- **Error Handling**: Custom middleware for error handling.
+## What it shows
 
-## Directory Structure
+| Route | Page | Audience | Key query params |
+|-------|------|----------|------------------|
+| `/` | **My usage** | Any signed-in user | `?user=<login>&plan=<plan>&month=<YYYY-MM>` |
+| `/admin/pooled` | **Org pooled** | Admins | `?period=weekly\|monthly&plan=<plan>&seats=<n>` |
+| `/admin/weekly` | **Org weekly** | Admins | `?plan=<plan>&week=YYYY-Www` |
+| `/admin/daily` | **Org daily** | Admins | `?day=YYYY-MM-DD` |
 
-```bash
-.
-├── Dockerfile                  
-├── LICENSE                      
-├── Pipfile                      # Pipenv dependencies
-├── Pipfile.lock                 # Locked dependencies for Pipenv
-├── README.md                    
-├── app/                         # Application source code
-│   ├── __init__.py              # Application factory
-│   ├── app.py                   # Entry point for the app
-│   ├── main/                    # Main application module
-│   │   ├── config/              # Configuration files for the application
-│   │   │   ├── app_config.py    # Application-specific configurations i.e. env vars
-│   │   │   ├── cors_config.py   # CORS configuration
-│   │   │   ├── error_handlers_config.py
-│   │   │   ├── jinja_config.py  
-│   │   │   ├── limiter_config.py 
-│   │   │   ├── logging_config.py
-│   │   │   ├── routes_config.py 
-│   │   │   └── sentry_config.py 
-│   │   ├── middleware/          # Middleware for request/response handling
-│   │   │   ├── error_handler.py  # Custom error handler middleware
-│   │   ├── routes/              
-│   │   │   ├── main.py          # Main route definitions
-│   │   │   └── robots.py        # Robots.txt handler route
-│   │   ├── services/            # Service layer, where you put things like slack and github services
-│   │   └── validators/          # Input validation
-│   ├── run.py                   # Script to run the application
-│   ├── static/                  # Static files (images, JS, CSS, fonts)
-│   └── templates/               # HTML templates
-│       ├── components/          # Reusable HTML components
-│       └── pages/               # Page templates
-├── docker-compose.yaml          
-├── docker-test.yaml             
-├── helm/                        # Helm chart for cloud platform deployments
-│   └── application/             
-│       ├── Chart.yaml           # Helm chart metadata
-│       ├── templates/           # Kubernetes resource templates
-│       ├── values-dev.yaml      # Development environment values
-│       └── values-prod.yaml     # Production environment values
-└── makefile                     # Makefile for automating common tasks
+All view state is carried in the URL query string (the Flask-idiomatic
+replacement for the reactive widgets of the Streamlit app this was ported from),
+so pages are shareable and bookmarkable. Charts are rendered client-side with
+Chart.js; the server ships plain JSON-serialisable view models.
+
+The **My usage** page also renders a rolling calendar heatmap of daily usage
+(GitHub-contributions-graph style): each day is bucketed into one of 6 levels
+based on its usage as a percentage of the daily allowance (`<25%`, `<50%`,
+`<100%`, `<150%`, `<300%`, `≥300%`), so heavy days stand out at a glance.
+
+### Projected usage
+
+The **My usage** and **Org pooled** pages both project where the month will
+land if the current daily pace continues, alongside the cumulative
+credits-so-far chart:
+
+* Once at least 5 days into the month (and before it's finished), the
+  month-to-date total is extrapolated straight-line to a full-month figure:
+  `mtd ÷ days_elapsed × days_in_month`.
+* The projection is labelled **over** / **under** / **on-track** against the
+  relevant limit (the user's monthly allowance, or the pool's `seats × plan`
+  allowance on the admin page), with a ±2% tolerance band so it doesn't flip
+  labels on small day-to-day swings.
+* The cumulative chart also overlays the **previous calendar month's** curve
+  (aligned by day-of-month) so the current trend can be read against recent
+  history.
+* Completed months, and months with too little data yet (<5 days), show the
+  cumulative curve without a projection.
+
+## How it works
+
+```
+                 ┌─────────────────────────────────────────┐
+   Parquet       │  ReportsSource (abstract)                │
+   dataset  ───► │    • LocalFsReportsSource  (reports/)    │ ──► view-model
+  (2 tables)     │    • S3ReportsSource       (S3 bucket)   │     builders ──► Jinja + Chart.js
+                 │    • DbReportsSource       (Athena)      │     (ai_credits.py)
+                 └─────────────────────────────────────────┘
 ```
 
-## Setup Instructions
+### The data model
 
-### 1. Clone the Repository
+The data is a two-table dataset, Hive-partitioned by `day` (`day=YYYY-MM-DD/`):
 
-```bash
-git clone git@github.com:ministryofjustice/operations-engineering-flask-template.git
-cd operations-engineering-flask-template
-```
+* **`credits_by_model`** → `{day, model, model_family, routed, credits}` — the
+  org-level per-model split (`routed` is `True` for `Auto:`-prefixed models).
+* **`credits_by_user`** → `{day, user_login, credits}` — per-user daily totals
+  (there is **no** per-model breakdown per user in this data).
 
-### 2. Install Dependencies with Pipenv
+Every backend returns these same plain row-lists, so the view-model code in
+`app/main/services/ai_credits.py` is completely backend-agnostic and unit-testable.
 
-Ensure you have Pipenv installed:
+### Data backends (`REPORTS_SOURCE`)
 
-```bash
-pip install pipenv
-```
+The source is resolved per request by `get_reports_source()` and selected with
+the `REPORTS_SOURCE` env var:
 
-Install the dependencies:
+| Value | Backend | Reads from | Used in |
+|-------|---------|------------|---------|
+| `local` (default) | `LocalFsReportsSource` | `reports/` on disk | local dev |
+| `s3` | `S3ReportsSource` | S3 bucket (pyarrow) | — |
+| `db` | `DbReportsSource` | Athena over the Parquet | production |
 
-```bash
-pipenv install --dev
-```
+For `s3`/`db`, AWS credentials are resolved by the default AWS chain (IRSA / the
+pod's service-account role) — **no static keys are read or stored**. Reads are
+memoised for `REPORTS_CACHE_TTL` seconds (default 300) since the data updates
+roughly once a day.
 
-Activate the virtual environment:
+> **Note on the data:** the `reports/` directory (the raw usage data) is
+> `.gitignore`d and is **never committed** — it may contain user/billing data.
+> In production the data lives in S3/Athena and is reached via the pod's IAM
+> role. The pipeline that *builds* the Parquet dataset lives outside this repo.
 
-```bash
-pipenv shell
-```
+## Contributing
 
-### 3. Rename your application
+For running the app locally, configuration, testing, linting, deployment, and
+how to extend it (e.g. adding a new data backend), see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Licence
 
-After cloning this template repository, you may want to rename the project to your desired application name. This project includes a Python script to help automate the renaming process.
-
-#### Steps to Rename the Project:
-
-1. **Run the rename script**:
-   
-   Once you've cloned the repository, you can rename all instances of the placeholder name (`application`) to your desired project name. Use the following command:
-
-   ```bash
-   make rename NEW_NAME=<your-new-project-name>
-   ```
-
-   For example, to rename the project to `my-flask-app`:
-
-   ```bash
-   make rename NEW_NAME=my-flask-app
-   ```
-
-2. **Verify the renaming**:
-
-   The `rename_project.py` script will replace the placeholder name `application` with your new project name across all relevant files and directories. After running the rename command, you can check that the project structure, files, and configurations have been updated accordingly.
-
-
-### 4. Running the Application
-
-Start the Flask application locally using docker-compose:
-
-```bash
-docker-compose build
-docker-compose up
-```
-
-The application will be available at `http://localhost:4567/`.
-
-### 5. Running Tests
-
-To run the unit tests using `pytest`:
-
-```bash
-pipenv run pytest
-```
-
-## Deployment
-
-### Kubernetes (Helm)
-
-This project includes Helm charts for Kubernetes deployment. You can use the `helm/application/` directory to deploy your application with Helm. Modify `values-dev.yaml` or `values-prod.yaml` as necessary for your environment.
-
-```bash
-helm install my-app ./helm/application
-```
-
-## Linting and Code Style
-
-- **flake8**: Enforces PEP8 style guide for Python code.
-- **pylint**: Provides code analysis and checks for common errors.
-- **black**: Ensures consistent code formatting (automatically run by `pre-commit`).
-
-### Running Linters
-
-```bash
-pipenv run flake8
-pipenv run pylint app
-```
-
-## Configuration
-
-The application configuration is modularised in the `app/main/config/` directory. Each aspect of the app’s configuration (e.g., CORS, error handlers, logging) is stored in its own file. Modify the configurations to suit your application needs.
-
-## Extending the Template
-
-Feel free to extend the template by adding more services and blueprints or integrating additional tools such as databases or external APIs.
-
-
-### Contributions
-
-If you have suggestions or improvements to this template, open a pull request or raise an issue.
-
-### License
-
-This project is licensed under the MIT License.
+Licensed under the [MIT License](LICENSE). © Crown Copyright (Ministry of Justice).
