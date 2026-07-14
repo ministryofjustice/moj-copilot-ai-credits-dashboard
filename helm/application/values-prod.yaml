@@ -11,13 +11,18 @@ app:
       APP_ENV: "production"
       FLASK_DEBUG: false
       REPORTS_SOURCE: "db"
-      REPORTS_CACHE_TTL: 300 # seconds; memoise the reads (data updates ~daily). 0 disables.
-    # Athena backend config. Inert until REPORTS_SOURCE is set to "db" above.
-    # Fill these in (confirm names against the deployed Glue table) before switching.
+      REPORTS_CACHE_TTL: 3600 # seconds; memoise the reads. The Glue crawler refreshes
+        # the data once a day (10:00 UTC), so anything shorter just re-queries Athena
+        # for data that cannot have changed. 0 disables.
+    # Athena backend config (live: REPORTS_SOURCE is "db" above).
+    # These are placeholders — the real values are injected at deploy time by
+    # .github/workflows/cicd-deploy-to-prod.yml, which --sets them from the
+    # PROD_ATHENA_{DATABASE,TABLE_MODELS,TABLE_USERS,WORKGROUP} GitHub secrets.
+    # Leave them blank here; do not "fill them in".
     athena:
-      database: "" # Glue database holding the ai-credits tables
-      tableModels: "" # per-model table (partitioned Parquet from build_credit_rows)
-      tableUsers: "" # per-user table (partitioned Parquet from build_credit_rows)
-      # No outputLocation: Athena uses the workgroup's default output location.
-      workgroup: "primary"
+      database: "" # <- set from secret PROD_ATHENA_DATABASE
+      tableModels: "" # <- set from secret PROD_ATHENA_TABLE_MODELS
+      tableUsers: "" # <- set from secret PROD_ATHENA_TABLE_USERS
+      # No outputLocation: the workgroup pins its own and enforces it.
+      workgroup: "primary" # <- overridden by secret PROD_ATHENA_WORKGROUP
       region: "eu-west-2"
