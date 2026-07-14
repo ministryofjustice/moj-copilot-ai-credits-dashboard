@@ -13,12 +13,23 @@ import os
 
 import pytest
 
-from app.main.services.reports_source import ReportsSource
+from app.main.services.reports_source import ReportsSource, reset_reports_source
 
 # Disable Auth0 for the whole test session so auth-protected routes are
 # reachable without a live tenant. `app_config` reads this when create_app
 # first runs (after collection), so setting it here is early enough.
 os.environ.setdefault("AUTH_DISABLED", "true")
+
+
+@pytest.fixture(autouse=True)
+def _reset_reports_source():
+    """The source is memoised for the life of the process, and reads its env vars
+    once at build time. Drop it around every test so a test's REPORTS_SOURCE /
+    REPORTS_CACHE_TTL monkeypatching isn't defeated by an instance an earlier test
+    left behind."""
+    reset_reports_source()
+    yield
+    reset_reports_source()
 
 
 class _FakeSource(ReportsSource):
