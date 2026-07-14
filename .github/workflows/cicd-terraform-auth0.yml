@@ -39,7 +39,7 @@ jobs:
       - name: Configure AWS credentials for Terraform
         uses: aws-actions/configure-aws-credentials@486457dc46e82b9a740ca0ef1dac6a38a3fc272d # v4.0.2
         with:
-          role-to-assume: {${{ secrets.DEV_S3_ROLE_TO_ASSUME }}}
+          role-to-assume: ${{ secrets.DEV_S3_ROLE_TO_ASSUME }}
           aws-region: eu-west-2
 
       - name: Terraform Format Check
@@ -69,7 +69,7 @@ jobs:
                 ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
                 ```
 
-      - name: Terraform Apply
-        if: github.ref == 'refs/heads/main'
-        id: apply
-        run: terraform apply -input=false -no-color -auto-approve | make -f "$GITHUB_WORKSPACE/Makefile" redact-terraform-output
+      # - name: Terraform Apply
+      #   if: github.ref == 'refs/heads/main'
+      #   id: apply
+      #   run: terraform apply -input=false -no-color -auto-approve | make -f "$GITHUB_WORKSPACE/Makefile" redact-terraform-output
