@@ -18,9 +18,3 @@ variable "auth0_client_secret" {
   type        = string
   sensitive   = true
 }
-
-variable "tf_state_s3_bucket_name" {
-  description = "terraform state bucket name"
-  type        = string
-  sensitive   = true
-}
