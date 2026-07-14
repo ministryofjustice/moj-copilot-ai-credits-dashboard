@@ -71,7 +71,7 @@ Every backend returns these same plain row-lists, so the view-model code in
 
 ### Data backends (`REPORTS_SOURCE`)
 
-The source is resolved per request by `get_reports_source()` and selected with
+The source is built once per process by `get_reports_source()` and selected with
 the `REPORTS_SOURCE` env var:
 
 | Value | Backend | Reads from | Used in |
@@ -81,8 +81,12 @@ the `REPORTS_SOURCE` env var:
 
 For `db`, AWS credentials are resolved by the default AWS chain (IRSA / the
 pod's service-account role) — **no static keys are read or stored**. Reads are
-memoised for `REPORTS_CACHE_TTL` seconds (default 300) since the data updates
-roughly once a day.
+memoised for `REPORTS_CACHE_TTL` seconds (default 300; production uses 3600)
+since the data updates roughly once a day. The cache lives in the source, which
+is held for the life of the process, so it is shared across requests — one cache
+per gunicorn worker, each warming independently. Setting the TTL to `0` disables
+caching and rebuilds the source on every call (what local dev does, so file
+edits show up at once).
 
 ## Contributing
 

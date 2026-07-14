@@ -72,7 +72,7 @@ All config is read from environment variables (see `app/main/config/`).
 | `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` | Auth0 tenant + app |
 | `REPORTS_SOURCE` | `local` (default) \| `db` |
 | `REPORTS_DIR` | Local backend root (default `reports`) |
-| `REPORTS_CACHE_TTL` | Seconds to memoise reads (default `300`, `0` disables) |
+| `REPORTS_CACHE_TTL` | Seconds to memoise reads (default `300`, prod `3600`, `0` disables and rebuilds the source per call) |
 | `ATHENA_DATABASE` / `ATHENA_TABLE_MODELS` / `ATHENA_TABLE_USERS` | Athena backend |
 | `ATHENA_WORKGROUP` / `ATHENA_OUTPUT_LOCATION` | Athena execution config |
 | `AWS_DEFAULT_REGION` | AWS region for Athena (default `eu-west-2`) |
