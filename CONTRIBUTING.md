@@ -23,7 +23,6 @@ configuring it, testing it, extending it, and deploying it.
 │       ├── services/
 │       │   ├── ai_credits.py        # View-model builders (no Flask, no I/O)
 │       │   ├── reports_source.py    # ReportsSource abstraction + local backend
-│       │   ├── s3_reports_source.py # S3 backend
 │       │   ├── db_reports_source.py # Athena backend
 │       │   ├── caching_reports_source.py  # TTL cache wrapper
 │       │   ├── weekly_per_user.py   # Weekly roll-up maths
@@ -71,13 +70,12 @@ All config is read from environment variables (see `app/main/config/`).
 | `AUTH_DISABLED` | Local-only escape hatch to bypass Auth0 |
 | `LOGGING_LEVEL` | e.g. `DEBUG`, `INFO` |
 | `AUTH0_DOMAIN` / `AUTH0_CLIENT_ID` / `AUTH0_CLIENT_SECRET` | Auth0 tenant + app |
-| `REPORTS_SOURCE` | `local` (default) \| `s3` \| `db` |
+| `REPORTS_SOURCE` | `local` (default) \| `db` |
 | `REPORTS_DIR` | Local backend root (default `reports`) |
 | `REPORTS_CACHE_TTL` | Seconds to memoise reads (default `300`, `0` disables) |
-| `REPORTS_S3_BUCKET` / `REPORTS_S3_PREFIX` | S3 backend location |
 | `ATHENA_DATABASE` / `ATHENA_TABLE_MODELS` / `ATHENA_TABLE_USERS` | Athena backend |
 | `ATHENA_WORKGROUP` / `ATHENA_OUTPUT_LOCATION` | Athena execution config |
-| `AWS_DEFAULT_REGION` | AWS region for S3/Athena (default `eu-west-2`) |
+| `AWS_DEFAULT_REGION` | AWS region for Athena (default `eu-west-2`) |
 
 No secrets are committed to this repo; deployed environments inject them via
 Kubernetes secrets and GitHub Actions secrets.
@@ -96,8 +94,8 @@ dict rows in the shapes described in the README's data model section. To add
 a backend:
 
 1. Subclass `ReportsSource` and implement both methods, returning rows in the
-   same shape as the existing backends (see `s3_reports_source.py` /
-   `db_reports_source.py` for reference).
+   same shape as the existing backends (see `db_reports_source.py` for
+   reference).
 2. Register it in `_build_source()`'s `if backend ==` chain, gated by a new
    `REPORTS_SOURCE` value.
 

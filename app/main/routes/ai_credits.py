@@ -10,7 +10,7 @@ replacement for Streamlit's reactive widgets):
     /admin/daily   Org daily  — ?day=YYYY-MM-DD
 
 The data backend is resolved per request via `get_reports_source()` (local files
-today, S3/DB later) so these handlers never touch storage directly.
+today, DB later) so these handlers never touch storage directly.
 """
 
 from flask import Blueprint, redirect, render_template, request, session

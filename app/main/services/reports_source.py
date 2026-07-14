@@ -10,11 +10,12 @@ by `day`). Every backend returns plain row-lists that mirror the parquet 1:1:
                   (per-user daily totals; NO per-model breakdown exists in this data).
 
 `day` is the partition column: it lives in the directory path (`day=YYYY-MM-DD/`),
-not inside the file. Local/S3 read it back as a real date via the `DAY` spec below;
-all backends normalise it to an ISO `YYYY-MM-DD` string in the returned rows.
+not inside the file. The local source reads it back as a real date via the `DAY`
+spec below; all backends normalise it to an ISO `YYYY-MM-DD` string in the
+returned rows.
 
-The local source reads `reports/` on disk; `S3ReportsSource` / `DbReportsSource`
-read the same data from S3 / Athena (see s3_reports_source.py, db_reports_source.py).
+The local source reads `reports/` on disk; `DbReportsSource` reads the same data
+from Athena (see db_reports_source.py).
 """
 
 from __future__ import annotations
@@ -54,13 +55,13 @@ def user_rows_from_table(table) -> list[dict]:
 
 
 def read_model_rows(dataset) -> list[dict]:
-    """Read a `credits_by_model` pyarrow dataset into model rows (local + S3)."""
+    """Read a `credits_by_model` pyarrow dataset into model rows."""
     return model_rows_from_table(dataset.to_table(
         columns=["model", "model_family", "routed", "ai_credits_used", "day"]))
 
 
 def read_user_rows(dataset) -> list[dict]:
-    """Read a `credits_by_user` pyarrow dataset into user rows (local + S3)."""
+    """Read a `credits_by_user` pyarrow dataset into user rows."""
     return user_rows_from_table(dataset.to_table(
         columns=["user_login", "ai_credits_used", "day"]))
 
@@ -99,20 +100,16 @@ class LocalFsReportsSource(ReportsSource):
 
 
 def _build_source() -> ReportsSource:
-    """Pick the raw backend from config. REPORTS_SOURCE = local (default)|s3|db."""
+    """Pick the raw backend from config. REPORTS_SOURCE = local (default)|db."""
     # pylint: disable=import-outside-toplevel
     backend = (os.getenv("REPORTS_SOURCE") or "local").lower()
     if backend == "local":
         return LocalFsReportsSource(os.getenv("REPORTS_DIR") or "reports")
-    if backend == "s3":
-        from app.main.services.s3_reports_source import S3ReportsSource
-
-        return S3ReportsSource()
     if backend == "db":
         from app.main.services.db_reports_source import DbReportsSource
 
         return DbReportsSource()
-    raise ValueError(f"Unknown REPORTS_SOURCE: {backend!r} (expected local|s3|db)")
+    raise ValueError(f"Unknown REPORTS_SOURCE: {backend!r} (expected local|db)")
 
 
 def get_reports_source() -> ReportsSource:

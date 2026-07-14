@@ -36,6 +36,12 @@ def test_unknown_backend_raises(monkeypatch):
         get_reports_source()
 
 
+def test_s3_backend_removed(monkeypatch):
+    monkeypatch.setenv("REPORTS_SOURCE", "s3")
+    with pytest.raises(ValueError, match="Unknown REPORTS_SOURCE"):
+        get_reports_source()
+
+
 def test_db_backend_builds_db_source(monkeypatch):
     monkeypatch.setenv("REPORTS_SOURCE", "db")
     monkeypatch.setenv("REPORTS_CACHE_TTL", "0")  # bare source, easier to assert

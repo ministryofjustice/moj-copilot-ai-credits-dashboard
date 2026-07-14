@@ -11,13 +11,6 @@ app:
       APP_ENV: "development"
       FLASK_DEBUG: true
       REPORTS_SOURCE: "db"
-    s3:
-      # Confirm against `kubectl get secrets -n moj-copilot-ai-credits-dashboard-dev`.
-      # Defaults follow the standard Cloud Platform S3 module output secret.
-      secretName: "s3-bucket-output"
-      bucketNameKey: "bucket_name"
-      prefix: "reports"
-      region: "eu-west-2"
     # Athena backend config. Inert until REPORTS_SOURCE is set to "db" above.
     # Fill these in (confirm names against the deployed Glue table) before switching.
     athena:

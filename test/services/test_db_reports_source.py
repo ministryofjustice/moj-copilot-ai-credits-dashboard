@@ -1,7 +1,7 @@
 """Tests for DbReportsSource — Athena SQL backend.
 
 Injects a fake Athena client (boto3 kwargs are PascalCase) and a no-op sleep,
-mirroring the project's DI style (see test_s3_reports_source.py). No real AWS.
+mirroring the project's DI style. No real AWS.
 """
 
 import pytest
