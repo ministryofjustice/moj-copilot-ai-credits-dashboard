@@ -1,11 +1,11 @@
 terraform {
   backend "s3" {
-    acl     = "private"
-    bucket  = var.tf_state_s3_bucket_name
-    encrypt = true
+    acl          = "private"
+    bucket       = var.tf_state_s3_bucket_name
+    encrypt      = true
     use_lockfile = true
-    key     = "terraform/auth0/copilot-credits-dev/terraform.tfstate"
-    region  = "eu-west-2"
+    key          = "terraform/auth0/copilot-credits-dev/terraform.tfstate"
+    region       = "eu-west-2"
   }
   required_providers {
     auth0 = {
