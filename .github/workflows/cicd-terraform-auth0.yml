@@ -55,7 +55,7 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -input=false -no-color | make -f "$GITHUB_WORKSPACE/Makefile" redact-terraform-output
+        run: terraform plan -input=false -no-color
 
       - name: Post Plan to GitHub PR
         if: always() && github.event_name == 'pull_request'
@@ -71,4 +71,4 @@ jobs:
       # - name: Terraform Apply
       #   if: github.ref == 'refs/heads/main'
       #   id: apply
-      #   run: terraform apply -input=false -no-color -auto-approve | make -f "$GITHUB_WORKSPACE/Makefile" redact-terraform-output
+      #   run: terraform apply -input=false -no-color -auto-approve
