@@ -1,7 +1,6 @@
 terraform {
   backend "s3" {
     acl          = "private"
-    bucket       = "cloud-platform-84920c6e8535efa2186a070aa63da176"
     encrypt      = true
     use_lockfile = true
     key          = "terraform/auth0/copilot-credits-dev/terraform.tfstate"
