@@ -25,9 +25,9 @@ exports.onExecutePostLogin = async (event, api) => {
 
     // 3. Query GitHub's API specifically for the user's membership status in this org
     try {
-      const response = await axios.get(`https://api.github.com/user/memberships/orgs/${targetOrg}`, {
+      const response = await axios.get(`https://api.github.com/user/memberships/orgs/$${targetOrg}`, {
         headers: {
-          Authorization: `token ${githubIdentity.access_token}`,
+          Authorization: `token $${githubIdentity.access_token}`,
           'User-Agent': 'Auth0-Action-Org-Enforcer',
           'Accept': 'application/vnd.github.v3+json'
         }
@@ -36,7 +36,7 @@ exports.onExecutePostLogin = async (event, api) => {
       // GitHub returns 'admin' for Owners and 'member' for ordinary members
       githubRole = response.data.role; 
 
-      console.log(`User github role: ${githubRole}`);
+      console.log(`User github role: $${githubRole}`);
     } catch (githubError) {
       // If GitHub returns a 404, they are not a member of the organization
       if (githubError.response && githubError.response.status === 404) {
@@ -55,7 +55,7 @@ exports.onExecutePostLogin = async (event, api) => {
     // Note: Auth0 requires a URI namespace for custom claims to prevent colliding with OIDC standards
     const namespace = "${uri_namespace}";
     
-    api.idToken.setCustomClaim(`${namespace}/org_role`, githubRole);
+    api.idToken.setCustomClaim(`$${namespace}/org_role`, githubRole);
 
   } catch (error) {
     console.error("M2M Verification Loop Failed:", error.message);
