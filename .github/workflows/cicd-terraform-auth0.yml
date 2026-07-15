@@ -82,7 +82,6 @@ jobs:
                 ```
   terraform-apply:
     name: "Auth0 Terraform - Apply"
-    needs: terraform-plan
     runs-on: ubuntu-latest
     defaults:
       run:
