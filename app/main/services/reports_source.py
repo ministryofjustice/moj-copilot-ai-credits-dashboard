@@ -21,6 +21,7 @@ from Athena (see db_reports_source.py).
 from __future__ import annotations
 
 import os
+import threading
 from abc import ABC, abstractmethod
 
 import pyarrow as pa
@@ -112,6 +113,23 @@ def _build_source() -> ReportsSource:
     raise ValueError(f"Unknown REPORTS_SOURCE: {backend!r} (expected local|db)")
 
 
+# The caching source holds its entries in instance state, so it only caches
+# anything if the *same instance* is reused across requests. Hence one per
+# process, built on first use and kept for the process's life.
+_LOCK = threading.Lock()
+_SOURCE: ReportsSource | None = None
+
+
+def reset_reports_source() -> None:
+    """Drop the memoised source so the next call rebuilds it from the env.
+
+    Only needed by tests (the env vars are read once, at build time).
+    """
+    global _SOURCE  # pylint: disable=global-statement
+    with _LOCK:
+        _SOURCE = None
+
+
 def get_reports_source() -> ReportsSource:
     """The configured backend, wrapped in a TTL cache unless disabled.
 
@@ -119,12 +137,23 @@ def get_reports_source() -> ReportsSource:
     default the source is memoised for REPORTS_CACHE_TTL seconds (default 300). Set
     REPORTS_CACHE_TTL=0 to disable caching (e.g. local dev where you want to see
     file edits at once).
-    """
-    # pylint: disable=import-outside-toplevel
-    source = _build_source()
-    ttl = float(os.getenv("REPORTS_CACHE_TTL") or 300)
-    if ttl <= 0:
-        return source
-    from app.main.services.caching_reports_source import CachingReportsSource
 
-    return CachingReportsSource(source, ttl_seconds=ttl)
+    The wrapped source is built once per process and reused, so the cache actually
+    survives between requests. With caching disabled the bare source is rebuilt each
+    call, which keeps local dev reading the files fresh every time.
+    """
+    # pylint: disable=import-outside-toplevel,global-statement
+    global _SOURCE
+    if _SOURCE is not None:
+        return _SOURCE
+    with _LOCK:
+        if _SOURCE is not None:  # another thread built it while we waited
+            return _SOURCE
+        source = _build_source()
+        ttl = float(os.getenv("REPORTS_CACHE_TTL") or 300)
+        if ttl <= 0:
+            return source  # caching off: don't memoise, stay fresh
+        from app.main.services.caching_reports_source import CachingReportsSource
+
+        _SOURCE = CachingReportsSource(source, ttl_seconds=ttl)
+        return _SOURCE
