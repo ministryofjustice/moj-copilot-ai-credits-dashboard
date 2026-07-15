@@ -427,7 +427,7 @@ def _period_days(key: str, period: str) -> list[str]:
     return [str(monday + timedelta(days=i)) for i in range(7)]
 
 
-def _routed_trend(model_rows: list[dict], period: str, key: str,
+def _routed_trend(model_rows: list[dict], period: str, key: str,  # pylint: disable=too-many-locals
                   latest_day: str | None) -> dict | None:
     """Per-day Auto-routed vs explicitly-chosen credits for one pooled period.
 
