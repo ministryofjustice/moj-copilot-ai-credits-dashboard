@@ -65,7 +65,7 @@ def test_admin_weekly_renders_table_without_top_model(monkeypatch, fake_source):
 
 
 def test_admin_pooled_renders_routed_trend(monkeypatch, fake_source,
-                                            model_records):
+                                           model_records):
     source = fake_source(_user_rows(), model_rows=model_records)
     client = _admin_client(monkeypatch, source)
     resp = client.get("/admin/pooled")

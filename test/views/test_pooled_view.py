@@ -1,3 +1,4 @@
+# pylint: disable=protected-access
 from datetime import date
 
 from pytest import approx
