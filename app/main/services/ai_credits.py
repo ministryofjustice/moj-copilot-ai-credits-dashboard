@@ -404,6 +404,50 @@ def _pool_cumulative(month_recs: list[dict], prior_recs: list[dict],  # pylint: 
     }
 
 
+def _trend_day_label(day: str, period: str) -> str:
+    """Compact x-axis label: day-of-month when monthly, 'Mon 01' when weekly."""
+    if period == "monthly":
+        return str(int(day[8:10]))
+    return date.fromisoformat(day).strftime("%a %d")
+
+
+def _routed_trend(model_rows: list[dict], period: str, key: str,
+                  latest_day: str | None) -> dict | None:
+    """Per-day Auto-routed vs explicitly-chosen credits for one pooled period.
+
+    Filters `model_rows` to the selected week/month `key` (via the same
+    `_record_period_key` the pool uses), then buckets each captured day's
+    credits by the `routed` flag. Captured days only, sorted ascending.
+    The `heading` reads 'month/week to date' while the period is still in
+    progress (its key holds the overall latest captured day) and the plain
+    period label once complete. Returns None when no rows match `key`.
+    """
+    rows = [r for r in model_rows
+            if _record_period_key(r["day"], period) == key]
+    if not rows:
+        return None
+    routed_by_day: dict[str, float] = defaultdict(float)
+    chosen_by_day: dict[str, float] = defaultdict(float)
+    for r in rows:
+        bucket = routed_by_day if r["routed"] else chosen_by_day
+        bucket[r["day"]] += r["credits"]
+    days = sorted({r["day"] for r in rows})
+
+    in_progress = (latest_day is not None
+                   and _record_period_key(latest_day, period) == key)
+    if in_progress:
+        heading = "month to date" if period == "monthly" else "week to date"
+    else:
+        heading = _period_text(key, period)
+
+    return {
+        "labels": [_trend_day_label(d, period) for d in days],
+        "routed": [round(routed_by_day.get(d, 0.0), 2) for d in days],
+        "chosen": [round(chosen_by_day.get(d, 0.0), 2) for d in days],
+        "heading": heading,
+    }
+
+
 def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # pylint: disable=too-many-locals
                 plan: str | None, seats) -> dict:
     """Pooled-billing treemap data for one ISO week or calendar month.

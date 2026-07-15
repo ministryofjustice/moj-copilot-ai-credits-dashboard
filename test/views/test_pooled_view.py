@@ -143,3 +143,56 @@ def test_pooled_prior_overlay_aligned_by_day_of_month(fake_source):
     assert prior["cumulative"][14] == approx(1500.0)  # 15 days * 100
     assert prior["cumulative"][29] == approx(3000.0)  # June day 30
     assert prior["cumulative"][30] is None            # no June day 31
+
+
+# ---------------------------------------------------------------------------
+# _routed_trend tests
+# ---------------------------------------------------------------------------
+from datetime import date
+
+from app.main.services import weekly_per_user as wpu
+
+
+def _mr(day, routed, amount, model="M", fam="F"):
+    """One org per-model row for the routed-trend tests."""
+    return {"day": day, "model": model, "model_family": fam,
+            "routed": routed, "credits": amount}
+
+
+def _trend_rows():
+    """Two captured June days: day 1 has both routed+chosen, day 2 both too."""
+    return [
+        _mr("2026-06-01", True, 20.0), _mr("2026-06-01", False, 80.0),
+        _mr("2026-06-02", False, 40.0), _mr("2026-06-02", True, 10.0),
+    ]
+
+
+def test_routed_trend_monthly_sums_and_mtd_heading():
+    t = ac._routed_trend(_trend_rows(), "monthly", "2026-06",
+                         latest_day="2026-06-02")
+    assert t["labels"] == ["1", "2"]
+    assert t["routed"] == [20.0, 10.0]
+    assert t["chosen"] == [80.0, 40.0]
+    assert t["heading"] == "month to date"  # latest day is in this month
+
+
+def test_routed_trend_past_month_uses_plain_label():
+    rows = _trend_rows() + [_mr("2026-07-01", False, 5.0)]
+    t = ac._routed_trend(rows, "monthly", "2026-06", latest_day="2026-07-01")
+    assert t["heading"] == "Jun 2026"  # June is complete, not "to date"
+    assert t["routed"] == [20.0, 10.0]  # July row excluded by period filter
+
+
+def test_routed_trend_weekly_filters_and_labels():
+    key = wpu.iso_week_label("2026-06-01")[0]
+    t = ac._routed_trend(_trend_rows(), "weekly", key, latest_day="2026-06-02")
+    expected = [date.fromisoformat(d).strftime("%a %d")
+                for d in ("2026-06-01", "2026-06-02")]
+    assert t["labels"] == expected
+    assert t["heading"] == "week to date"
+
+
+def test_routed_trend_none_when_period_empty():
+    assert ac._routed_trend(_trend_rows(), "monthly", "2099-01",
+                            latest_day="2026-06-02") is None
+    assert ac._routed_trend([], "monthly", "2026-06", latest_day=None) is None
