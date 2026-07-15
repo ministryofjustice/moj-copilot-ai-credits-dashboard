@@ -38,8 +38,14 @@ jobs:
       - name: Set Environment Variables
         run: |
           echo "TF_VAR_auth0_domain=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_DOMAIN || secrets.DEV_AUTH0_DOMAIN }}" >> $GITHUB_ENV
-          echo "TF_VAR_auth0_client_id=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_CLIENT_ID || secrets.DEV_AUTH0_CLIENT_ID }}" >> $GITHUB_ENV
-          echo "TF_VAR_auth0_client_secret=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_CLIENT_SECRET || secrets.DEV_AUTH0_CLIENT_SECRET }}" >> $GITHUB_ENV
+          echo "TF_VAR_auth0_client_id=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_TERRAFORM_CLIENT_ID || secrets.DEV_AUTH0_TERRAFORM_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "TF_VAR_auth0_client_secret=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_TERRAFORM_CLIENT_SECRET || secrets.DEV_AUTH0_TERRAFORM_CLIENT_SECRET }}" >> $GITHUB_ENV
+
+          echo "TF_VAR_github_oauth_client_id=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_ID || secrets.DEV_GITHUB_OAUTH_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "TF_VAR_github_oauth_client_secret=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_SECRET || secrets.DEV_GITHUB_OAUTH_CLIENT_SECRET }}" >> $GITHUB_ENV
+
+          echo "TF_VAR_webapp_domain=${{ matrix.environment == 'production' && 'moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk' || 'moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk' }}" >> $GITHUB_ENV
+          echo "TF_VAR_environment=${{ matrix.environment == 'production' && 'production' || 'development' }}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials for Terraform
         uses: aws-actions/configure-aws-credentials@486457dc46e82b9a740ca0ef1dac6a38a3fc272d # v4.0.2
@@ -76,6 +82,6 @@ jobs:
                 ```
 
       # - name: Terraform Apply
-      #   if: github.ref == 'refs/heads/main'
+      #   if: github.ref == 'refs/heads/main' || matrix.environment == 'development'
       #   id: apply
       #   run: terraform apply -input=false -no-color -auto-approve
