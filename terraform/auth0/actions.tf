@@ -1,4 +1,4 @@
-resource "auth0_action" "restrict_to_github_org" {
+resource "auth0_action" "enforce_github_identity" {
   code               = templatefile("${path.module}/actions_code/enforce_github_itdentity.js", {
     uri_namespace = "https://${var.webapp_domain}"
   })
@@ -42,6 +42,6 @@ resource "auth0_trigger_actions" "post_login" {
   trigger = "post-login"
   actions {
     display_name = "Enforce GitHub Identity"
-    id           = auth0_action.restrict_to_github_org.id
+    id           = auth0_action.enforce_github_identity.id
   }
 }

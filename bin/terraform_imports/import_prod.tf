@@ -35,7 +35,7 @@ import {
 
 import {
   id = "b90e14dc-5495-410b-8f02-741dd700566a"
-  to = auth0_action.restrict_by_github_org
+  to = auth0_action.enforce_github_identity
 }
 
 import {
