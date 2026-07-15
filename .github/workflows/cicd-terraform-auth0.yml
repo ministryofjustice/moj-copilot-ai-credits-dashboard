@@ -88,9 +88,11 @@ jobs:
         working-directory: "terraform/auth0"
     strategy:
       fail-fast: false
-      max-parallel: 1
       matrix:
         environment: [development, production]
+    concurrency:
+      group: deploy-auth0-terraform-${{ matrix.environment }}
+      cancel-in-progress: false
     environment: 
       name: ${{ matrix.environment }}
     steps:
