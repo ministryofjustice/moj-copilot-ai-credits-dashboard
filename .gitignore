@@ -3,6 +3,7 @@
 coverage/
 venv/
 .venv/
+.venv-lock/
 env/
 .DS_STORE
 .vscode

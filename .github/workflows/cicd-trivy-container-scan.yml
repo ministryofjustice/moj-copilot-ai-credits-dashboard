@@ -11,30 +11,41 @@ on:
 jobs:
   CVE-scan:
     runs-on: ubuntu-latest
-    environment: dev
     permissions:
+      actions: read
+      contents: read
       issues: write
       security-events: write # for github/codeql-action/upload-sarif to upload SARIF results
 
     steps:
       - name: Checkout the code
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11 #v4.1.1
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Build the Docker image
         run: "docker build . --tag localbuild/testimage:latest"
 
+      - name: Install Trivy
+        env:
+          TRIVY_VERSION: "0.69.3"
+          TRIVY_CHECKSUM: "1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75"
+        run: |
+          curl -sSfL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+            -o trivy.tar.gz
+          echo "${TRIVY_CHECKSUM}  trivy.tar.gz" | sha256sum -c -
+          sudo tar -xzf trivy.tar.gz -C /usr/local/bin trivy
+          rm trivy.tar.gz
+          trivy --version
+
       - name: Trivy scan
         id: scan
-        uses: aquasecurity/trivy-action@d43c1f16c00cfd3978dde6c07f4bbcf9eb6993ca # v0.16.1
-        with:
-          image-ref: "localbuild/testimage:latest"
-          format: "sarif"
-          output: "results.sarif"
-        env:
-          ACTIONS_RUNTIME_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          trivy image \
+            --format sarif \
+            --output results.sarif \
+            localbuild/testimage:latest
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@99df26d4f13ea111d4ec1a7dddef6063f76b97e9 # v4.37.0
         with:
           sarif_file: "results.sarif"
 

@@ -1,4 +1,4 @@
-FROM python:3.12.0-alpine3.18
+FROM python:3.12.13-alpine3.22
 
 LABEL maintainer="operations-engineering <operations-engineering@digital.justice.gov.uk>"
 
@@ -14,7 +14,10 @@ RUN apk add --no-cache --no-progress \
   && apk upgrade --no-cache --available
 
 # Install pipenv
-RUN pip install --no-cache-dir pipenv==2026.6.2 awscli==1.45.36
+RUN pip install --no-cache-dir \
+  pipenv==2026.6.2 \
+  awscli==1.45.36 \
+  setuptools==83.0.0
 
 # Create user and group
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup -u 1051
