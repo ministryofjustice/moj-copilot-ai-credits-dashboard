@@ -170,9 +170,9 @@ def _trend_rows():
 def test_routed_trend_monthly_sums_and_mtd_heading():
     t = ac._routed_trend(_trend_rows(), "monthly", "2026-06",
                          latest_day="2026-06-02")
-    assert t["labels"] == ["1", "2"]
-    assert t["routed"] == [20.0, 10.0]
-    assert t["chosen"] == [80.0, 40.0]
+    assert t["labels"] == [str(d) for d in range(1, 31)]  # June has 30 days
+    assert t["routed"] == [20.0, 10.0] + [None] * 28
+    assert t["chosen"] == [80.0, 40.0] + [None] * 28
     assert t["heading"] == "month to date"  # latest day is in this month
 
 
@@ -180,15 +180,21 @@ def test_routed_trend_past_month_uses_plain_label():
     rows = _trend_rows() + [_mr("2026-07-01", False, 5.0)]
     t = ac._routed_trend(rows, "monthly", "2026-06", latest_day="2026-07-01")
     assert t["heading"] == "Jun 2026"  # June is complete, not "to date"
-    assert t["routed"] == [20.0, 10.0]  # July row excluded by period filter
+    # June is fully in the past: every day is real (0.0 fill), no trailing None
+    assert t["labels"] == [str(d) for d in range(1, 31)]
+    assert t["routed"] == [20.0, 10.0] + [0.0] * 28  # July row excluded by period filter
+    assert t["chosen"] == [80.0, 40.0] + [0.0] * 28
 
 
 def test_routed_trend_weekly_filters_and_labels():
     key = wpu.iso_week_label("2026-06-01")[0]
     t = ac._routed_trend(_trend_rows(), "weekly", key, latest_day="2026-06-02")
-    expected = [date.fromisoformat(d).strftime("%a %d")
-                for d in ("2026-06-01", "2026-06-02")]
-    assert t["labels"] == expected
+    week_days = ("2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04",
+                 "2026-06-05", "2026-06-06", "2026-06-07")
+    expected_labels = [date.fromisoformat(d).strftime("%a %d") for d in week_days]
+    assert t["labels"] == expected_labels
+    assert t["routed"] == [20.0, 10.0, None, None, None, None, None]
+    assert t["chosen"] == [80.0, 40.0, None, None, None, None, None]
     assert t["heading"] == "week to date"
 
 
@@ -202,9 +208,23 @@ def test_routed_trend_asymmetric_day_zero_fills_other_series():
     rows = [_mr("2026-06-01", True, 15.0),
             _mr("2026-06-02", False, 30.0)]
     t = ac._routed_trend(rows, "monthly", "2026-06", latest_day="2026-06-02")
-    assert t["labels"] == ["1", "2"]
-    assert t["routed"] == [15.0, 0.0]
-    assert t["chosen"] == [0.0, 30.0]
+    assert t["labels"][:2] == ["1", "2"]
+    assert t["routed"] == [15.0, 0.0] + [None] * 28
+    assert t["chosen"] == [0.0, 30.0] + [None] * 28
+
+
+def test_routed_trend_weekly_zero_fills_and_truncates_midweek():
+    """Data on Mon (day1) and Thu (day4) only; latest_day is Thu.
+
+    Tue/Wed have no usage but have already elapsed, so they must show 0.0 (not
+    None); Fri-Sun haven't happened yet, so they must be None so both lines
+    stop at Thursday instead of running flat to Sunday.
+    """
+    key = wpu.iso_week_label("2026-06-01")[0]
+    rows = [_mr("2026-06-01", True, 12.0), _mr("2026-06-04", False, 8.0)]
+    t = ac._routed_trend(rows, "weekly", key, latest_day="2026-06-04")
+    assert t["routed"] == [12.0, 0.0, 0.0, 0.0, None, None, None]
+    assert t["chosen"] == [0.0, 0.0, 0.0, 8.0, None, None, None]
 
 
 # ---------------------------------------------------------------------------
@@ -217,9 +237,9 @@ def test_pooled_view_surfaces_routed_trend(fake_source, week_records):
                        plan="$70 / month", seats="1")
     rt = v["routed_trend"]
     assert rt is not None
-    assert rt["labels"] == ["1", "2"]
-    assert rt["routed"] == [20.0, 10.0]
-    assert rt["chosen"] == [80.0, 40.0]
+    assert rt["labels"] == [str(d) for d in range(1, 31)]
+    assert rt["routed"] == [20.0, 10.0] + [None] * 28
+    assert rt["chosen"] == [80.0, 40.0] + [None] * 28
     assert rt["heading"] == "month to date"
 
 

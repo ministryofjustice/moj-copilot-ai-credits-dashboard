@@ -411,16 +411,35 @@ def _trend_day_label(day: str, period: str) -> str:
     return date.fromisoformat(day).strftime("%a %d")
 
 
+def _period_days(key: str, period: str) -> list[str]:
+    """All calendar day strings ('YYYY-MM-DD') spanning one week/month key.
+
+    `key` is '2026-06' for a month or '2026-W23' for an ISO week (the same
+    formats `_record_period_key` produces), matching the full-width padding
+    `_pool_cumulative`/`_prior_overlay` already use for the cumulative chart.
+    """
+    if period == "monthly":
+        year, mon = (int(p) for p in key.split("-"))
+        days_in_month = calendar.monthrange(year, mon)[1]
+        return [f"{key}-{d:02d}" for d in range(1, days_in_month + 1)]
+    iso_year, iso_week = (int(p) for p in key.split("-W"))
+    monday, _ = wpu.week_span(iso_year, iso_week)
+    return [str(monday + timedelta(days=i)) for i in range(7)]
+
+
 def _routed_trend(model_rows: list[dict], period: str, key: str,
                   latest_day: str | None) -> dict | None:
     """Per-day Auto-routed vs explicitly-chosen credits for one pooled period.
 
     Filters `model_rows` to the selected week/month `key` (via the same
-    `_record_period_key` the pool uses), then buckets each captured day's
-    credits by the `routed` flag. Captured days only, sorted ascending.
-    The `heading` reads 'month/week to date' while the period is still in
-    progress (its key holds the overall latest captured day) and the plain
-    period label once complete. Returns None when no rows match `key`.
+    `_record_period_key` the pool uses), then buckets each day's credits by
+    the `routed` flag. The x-axis always spans the full period (every day of
+    the month, or all 7 days of the week) via `_period_days`; days after the
+    latest captured day are `None` in both series while the period is still
+    in progress, so the lines stop where the data does instead of running
+    through the rest of the period. The `heading` reads 'month/week to date'
+    while in progress and the plain period label once complete. Returns None
+    when no rows match `key`.
     """
     rows = [r for r in model_rows
             if _record_period_key(r["day"], period) == key]
@@ -431,19 +450,30 @@ def _routed_trend(model_rows: list[dict], period: str, key: str,
     for r in rows:
         bucket = routed_by_day if r["routed"] else chosen_by_day
         bucket[r["day"]] += r["credits"]
-    days = sorted({r["day"] for r in rows})
+    days = _period_days(key, period)
 
     in_progress = (latest_day is not None
                    and _record_period_key(latest_day, period) == key)
+    cutoff = days.index(latest_day) if in_progress else len(days) - 1
     if in_progress:
         heading = "month to date" if period == "monthly" else "week to date"
     else:
         heading = _period_text(key, period)
 
+    labels, routed, chosen = [], [], []
+    for i, d in enumerate(days):
+        labels.append(_trend_day_label(d, period))
+        if i <= cutoff:
+            routed.append(round(routed_by_day.get(d, 0.0), 2))
+            chosen.append(round(chosen_by_day.get(d, 0.0), 2))
+        else:
+            routed.append(None)
+            chosen.append(None)
+
     return {
-        "labels": [_trend_day_label(d, period) for d in days],
-        "routed": [round(routed_by_day.get(d, 0.0), 2) for d in days],
-        "chosen": [round(chosen_by_day.get(d, 0.0), 2) for d in days],
+        "labels": labels,
+        "routed": routed,
+        "chosen": chosen,
         "heading": heading,
     }
 
