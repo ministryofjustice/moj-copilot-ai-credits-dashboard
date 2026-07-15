@@ -462,7 +462,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     seats = resolve_seats(seats)
     records = _user_records(source)
     mrows = source.model_rows()
-    latest_day = max((r["day"] for r in mrows), default=None)
+    model_latest_day = max((r["day"] for r in mrows), default=None)
     keys = sorted({_record_period_key(r["day"], period) for r in records})
 
     base = {
@@ -530,7 +530,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
         "metrics": {"pool": pool, "gross": gross, "overage": overage,
                     "total": total, "headroom": headroom},
         "cumulative": cumulative,
-        "routed_trend": _routed_trend(mrows, period, key, latest_day),
+        "routed_trend": _routed_trend(mrows, period, key, model_latest_day),
         "tiles": tiles,
         "treemap": {"type": "treemap",
                     "root": f"Total bill {total:,.0f} credits (${total / 100:,.0f})",

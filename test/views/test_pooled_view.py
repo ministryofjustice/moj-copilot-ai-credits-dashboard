@@ -227,3 +227,25 @@ def test_pooled_view_routed_trend_none_without_model_rows(fake_source,
     v = ac.pooled_view(fake_source(week_records), period="monthly",
                        key="2026-06", plan="$70 / month", seats="1")
     assert v["routed_trend"] is None
+
+
+def test_pooled_view_routed_trend_heading_uses_model_latest_day(fake_source):
+    # User rows end in June, so the monthly block sets latest_day="2026-06-01"
+    # from user records. Model rows extend into July, so model_latest_day should
+    # be "2026-07-01". The June trend heading must be the plain "Jun 2026" label
+    # (June is complete from the model-data perspective), not "month to date".
+    user_rows = [
+        {"day": "2026-06-01", "user_login": "a", "credits": 100.0},
+    ]
+    model_rows = [
+        {"day": "2026-06-01", "model": "M", "model_family": "F",
+         "routed": True, "credits": 20.0},
+        {"day": "2026-06-01", "model": "M", "model_family": "F",
+         "routed": False, "credits": 80.0},
+        {"day": "2026-07-01", "model": "M", "model_family": "F",
+         "routed": True, "credits": 5.0},
+    ]
+    v = ac.pooled_view(fake_source(user_rows, model_rows=model_rows),
+                       period="monthly", key="2026-06",
+                       plan="$70 / month", seats="1")
+    assert v["routed_trend"]["heading"] == "Jun 2026"
