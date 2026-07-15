@@ -1,6 +1,9 @@
+from datetime import date
+
 from pytest import approx
 
 from app.main.services import ai_credits as ac
+from app.main.services import weekly_per_user as wpu
 
 
 def test_resolve_seats_defaults_and_validates():
@@ -148,10 +151,6 @@ def test_pooled_prior_overlay_aligned_by_day_of_month(fake_source):
 # ---------------------------------------------------------------------------
 # _routed_trend tests
 # ---------------------------------------------------------------------------
-from datetime import date
-
-from app.main.services import weekly_per_user as wpu
-
 
 def _mr(day, routed, amount, model="M", fam="F"):
     """One org per-model row for the routed-trend tests."""
@@ -196,3 +195,12 @@ def test_routed_trend_none_when_period_empty():
     assert ac._routed_trend(_trend_rows(), "monthly", "2099-01",
                             latest_day="2026-06-02") is None
     assert ac._routed_trend([], "monthly", "2026-06", latest_day=None) is None
+
+
+def test_routed_trend_asymmetric_day_zero_fills_other_series():
+    rows = [_mr("2026-06-01", True, 15.0),
+            _mr("2026-06-02", False, 30.0)]
+    t = ac._routed_trend(rows, "monthly", "2026-06", latest_day="2026-06-02")
+    assert t["labels"] == ["1", "2"]
+    assert t["routed"] == [15.0, 0.0]
+    assert t["chosen"] == [0.0, 30.0]
