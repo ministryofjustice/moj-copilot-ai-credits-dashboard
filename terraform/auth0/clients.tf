@@ -161,14 +161,11 @@ resource "auth0_client_grant" "auth0_actions_management_client_grant" {
 
 resource "auth0_client" "copilot_credits" {
   allowed_clients                                      = []
-  allowed_logout_urls                                  = var.environment == "development" ? 
-    ["https://${var.webapp_domain}/", "https://localhost:4567/"] : ["https://${var.webapp_domain}/"]
+  allowed_logout_urls                                  = var.environment == "development" ? ["https://${var.webapp_domain}/", "https://localhost:4567/"] : ["https://${var.webapp_domain}/"]
   allowed_origins                                      = []
   app_type                                             = "regular_web"
   async_approval_notification_channels                 = []
-  callbacks                                            = var.environment == "development" ? 
-    ["https://localhost:4567/auth/callback", "https://${var.webapp_domain}/auth/callback"] : 
-    ["https://${var.webapp_domain}/auth/callback"]
+  callbacks                                            = var.environment == "development" ? ["https://localhost:4567/auth/callback", "https://${var.webapp_domain}/auth/callback"] : ["https://${var.webapp_domain}/auth/callback"]
   client_aliases                                       = []
   client_metadata                                      = {}
   compliance_level                                     = null
@@ -197,8 +194,7 @@ resource "auth0_client" "copilot_credits" {
   sso                                                  = true
   sso_disabled                                         = false
   third_party_security_mode                            = null
-  web_origins                                          = var.environment == "development" ? 
-    ["https://${var.webapp_domain}", "https://localhost:4567"] : ["https://${var.webapp_domain}"]
+  web_origins                                          = var.environment == "development" ? ["https://${var.webapp_domain}", "https://localhost:4567"] : ["https://${var.webapp_domain}"]
   default_organization {
     disable         = true
     flows           = []
