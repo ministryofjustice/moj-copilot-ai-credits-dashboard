@@ -191,7 +191,7 @@ resource "auth0_client" "copilot_credits" {
   require_pushed_authorization_requests                = false
   resource_server_identifier                           = null
   skip_non_verifiable_callback_uri_confirmation_prompt = "null"
-  sso                                                  = true
+  sso                                                  = var.environment == "development" ? true : false
   sso_disabled                                         = false
   third_party_security_mode                            = null
   web_origins                                          = var.environment == "development" ? ["https://${var.webapp_domain}", "https://localhost:4567"] : ["https://${var.webapp_domain}"]
@@ -206,15 +206,19 @@ resource "auth0_client" "copilot_credits" {
     scopes              = {}
     secret_encoded      = false
   }
-  native_social_login {
-    apple {
-      enabled = false
-    }
-    facebook {
-      enabled = false
-    }
-    google {
-      enabled = false
+  dynamic "native_social_login" {
+    for_each = var.environment == "development" ? [1] : []
+
+    content {
+      apple {
+        enabled = false
+      }
+      facebook {
+        enabled = false
+      }
+      google {
+        enabled = false
+      }
     }
   }
   refresh_token {

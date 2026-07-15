@@ -26,7 +26,7 @@ resource "auth0_tenant" "tenant" {
   flags {
     allow_legacy_delegation_grant_types    = true
     allow_legacy_ro_grant_types            = true
-    allow_legacy_tokeninfo_endpoint        = true
+    allow_legacy_tokeninfo_endpoint        = var.environment == "development" ? true : false
     dashboard_insights_view                = false
     dashboard_log_streams_next             = false
     disable_clickjack_protection_headers   = false
@@ -34,14 +34,14 @@ resource "auth0_tenant" "tenant" {
     disable_management_api_sms_obfuscation = true
     enable_adfs_waad_email_verification    = false
     enable_apis_section                    = false
-    enable_client_connections              = false
+    enable_client_connections              = var.environment == "development" ? false : true
     enable_custom_domain_in_emails         = false
     enable_dynamic_client_registration     = false
-    enable_idtoken_api2                    = true
+    enable_idtoken_api2                    = var.environment == "development" ? true : false
     enable_legacy_logs_search_v2           = false
-    enable_legacy_profile                  = true
+    enable_legacy_profile                  = var.environment == "development" ? true : false
     enable_pipeline2                       = true
-    enable_public_signup_user_exists_error = true
+    enable_public_signup_user_exists_error = var.environment == "development" ? true : false
     enable_sso                             = true
     mfa_show_factor_list_on_enrollment     = false
     no_disclose_enterprise_connections     = false
