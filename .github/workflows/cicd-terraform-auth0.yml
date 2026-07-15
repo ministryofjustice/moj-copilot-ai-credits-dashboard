@@ -118,7 +118,7 @@ jobs:
 
       - name: Configure terraform imports
         working-directory: "./"
-        run: cp ./bin/terraform_imports/${{ matrix.environment == 'production' && 'import_prod' || 'import_dev' }} ./terraform/auth0
+        run: cp ./bin/terraform_imports/${{ matrix.environment == 'production' && 'import_prod.tf' || 'import_dev.tf' }} ./terraform/auth0
 
       - name: Configure AWS credentials for Terraform
         uses: aws-actions/configure-aws-credentials@486457dc46e82b9a740ca0ef1dac6a38a3fc272d # v4.0.2
