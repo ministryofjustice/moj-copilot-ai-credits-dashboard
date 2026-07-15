@@ -90,6 +90,8 @@ jobs:
       fail-fast: false
       matrix:
         environment: [development, production]
+        exclude:
+          - environment: ${{ github.ref == 'refs/heads/main' && 'production' || '' }}
     concurrency:
       group: deploy-auth0-terraform-${{ matrix.environment }}
       cancel-in-progress: false
@@ -148,7 +150,6 @@ jobs:
                 ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
                 ```
 
-      # - name: Terraform Apply
-      #   if: github.ref == 'refs/heads/main' || matrix.environment == 'development'
-      #   id: apply
-      #   run: terraform apply -input=false -no-color -auto-approve
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -input=false -no-color -auto-approve
