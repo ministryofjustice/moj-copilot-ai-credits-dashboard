@@ -204,3 +204,26 @@ def test_routed_trend_asymmetric_day_zero_fills_other_series():
     assert t["labels"] == ["1", "2"]
     assert t["routed"] == [15.0, 0.0]
     assert t["chosen"] == [0.0, 30.0]
+
+
+# ---------------------------------------------------------------------------
+# pooled_view routed_trend integration tests
+# ---------------------------------------------------------------------------
+
+def test_pooled_view_surfaces_routed_trend(fake_source, week_records):
+    src = fake_source(week_records, model_rows=_trend_rows())
+    v = ac.pooled_view(src, period="monthly", key="2026-06",
+                       plan="$70 / month", seats="1")
+    rt = v["routed_trend"]
+    assert rt is not None
+    assert rt["labels"] == ["1", "2"]
+    assert rt["routed"] == [20.0, 10.0]
+    assert rt["chosen"] == [80.0, 40.0]
+    assert rt["heading"] == "month to date"
+
+
+def test_pooled_view_routed_trend_none_without_model_rows(fake_source,
+                                                          week_records):
+    v = ac.pooled_view(fake_source(week_records), period="monthly",
+                       key="2026-06", plan="$70 / month", seats="1")
+    assert v["routed_trend"] is None
