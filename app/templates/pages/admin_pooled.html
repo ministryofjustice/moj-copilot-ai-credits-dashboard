@@ -81,6 +81,11 @@
   (Power = top 5%, Heavy = next 15%, Typical = middle 55%, Light = bottom 25%).
 </p>
 
+{% if v.routed_trend %}
+<h3 class="govuk-heading-s govuk-!-margin-top-6">Auto-routed vs explicitly chosen — {{ v.routed_trend.heading }}</h3>
+<div style="height:360px;"><canvas data-chart="routedTrend"></canvas></div>
+{% endif %}
+
 {% if v.cumulative %}
 <h3 class="govuk-heading-s govuk-!-margin-top-6">Cumulative usage — {{ v.cumulative.month_label }}</h3>
 {% if v.cumulative.pace %}
@@ -94,6 +99,14 @@
 {% endif %}
 
 {% set charts = {"pooledTree": v.treemap} %}
+{% if v.routed_trend %}
+  {{- charts.update({"routedTrend": {
+        "type": "line", "labels": v.routed_trend.labels,
+        "datasets": [
+          {"label": "Auto-routed", "data": v.routed_trend.routed},
+          {"label": "Explicitly chosen", "data": v.routed_trend.chosen}
+        ]}}) or "" -}}
+{% endif %}
 {% if v.cumulative %}
   {% set cumdatasets = [{"label": "Cumulative (this month)", "data": v.cumulative.current}] %}
   {% if v.cumulative.prior %}

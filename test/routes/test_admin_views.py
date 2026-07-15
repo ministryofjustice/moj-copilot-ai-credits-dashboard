@@ -62,3 +62,14 @@ def test_admin_weekly_renders_table_without_top_model(monkeypatch, fake_source):
     body = resp.get_data(as_text=True)
     assert "Top model" not in body
     assert 'data-chart="topUsers"' in body
+
+
+def test_admin_pooled_renders_routed_trend(monkeypatch, fake_source,
+                                            model_records):
+    source = fake_source(_user_rows(), model_rows=model_records)
+    client = _admin_client(monkeypatch, source)
+    resp = client.get("/admin/pooled")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Auto-routed vs explicitly chosen" in body
+    assert 'data-chart="routedTrend"' in body
