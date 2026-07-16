@@ -37,7 +37,7 @@ jobs:
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: "1.15.8"
-      
+
       - name: Set Environment Variables
         run: |
           echo "TF_VAR_auth0_domain=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_DOMAIN || secrets.DEV_AUTH0_DOMAIN }}" >> $GITHUB_ENV
@@ -73,12 +73,12 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
-            header: auth0-terraform-plan-results-${{ matrix.environment }}
-            message: |
-                ## Auth0 Terraform Plan - ${{ matrix.environment }}
-                ```
-                ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
-                ```
+          header: auth0-terraform-plan-results-${{ matrix.environment }}
+          message: |
+            ## Auth0 Terraform Plan - ${{ matrix.environment }}
+            ```
+            ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
+            ```
   terraform-apply:
     name: "Auth0 Terraform - Apply"
     runs-on: ubuntu-latest
@@ -94,7 +94,7 @@ jobs:
     concurrency:
       group: deploy-auth0-terraform-${{ matrix.environment }}
       cancel-in-progress: false
-    environment: 
+    environment:
       name: ${{ matrix.environment }}
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -102,7 +102,7 @@ jobs:
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
           terraform_version: "1.15.8"
-      
+
       - name: Set Environment Variables
         run: |
           echo "TF_VAR_auth0_domain=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_DOMAIN || secrets.DEV_AUTH0_DOMAIN }}" >> $GITHUB_ENV
