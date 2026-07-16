@@ -74,7 +74,7 @@ jobs:
         if: always() && github.event_name == 'pull_request'
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
-            header: auth0-terraform-plan-results
+            header: auth0-terraform-plan-results-${{ matrix.environment }}
             message: |
                 ## Terraform ${{ inputs.name }} plan
                 ```
@@ -90,8 +90,8 @@ jobs:
       fail-fast: false
       matrix:
         environment: [development, production]
-        # exclude:
-        #   - environment: ${{ github.ref != 'refs/heads/main' && 'production' || '' }}
+        exclude:
+          - environment: ${{ github.ref != 'refs/heads/main' && 'production' || '' }}
     concurrency:
       group: deploy-auth0-terraform-${{ matrix.environment }}
       cancel-in-progress: false
@@ -138,17 +138,6 @@ jobs:
       - name: Terraform Plan
         id: plan
         run: terraform plan -input=false -no-color
-
-      - name: Post Plan to GitHub PR
-        if: always() && github.event_name == 'pull_request'
-        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-        with:
-            header: auth0-terraform-plan-results
-            message: |
-                ## Terraform ${{ inputs.name }} plan
-                ```
-                ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
-                ```
 
       - name: Terraform Apply
         id: apply
