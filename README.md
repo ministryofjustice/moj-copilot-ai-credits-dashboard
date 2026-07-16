@@ -93,8 +93,8 @@ This module is deployed via the `♻️ Terraform Auth0` pipeline.
 | Input | Description | Required | Default |
 | ------- | ------------- | ---------- | --------- |
 | `auth0_domain` | value of the Auth0 domain | Yes | `''` |
-| `auth0_client_id` | value of the Auth0 client id | Yes | `''` |
-| `auth0_client_secret` | value of the Auth0 client secret | Yes | `''` |
+| `auth0_client_id` | value of the Auth0 terraform client id | Yes | `''` |
+| `auth0_client_secret` | value of the Auth0 terraform client secret | Yes | `''` |
 | `github_oauth_client_id` | value of the GitHub OAuth client id | Yes | `''` |
 | `github_oauth_client_secret` | value of the GitHub OAuth client secret | Yes | `''` |
 | `webapp_domain` | Domain name of web application | Yes | `''` |
