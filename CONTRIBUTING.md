@@ -157,7 +157,7 @@ The app deploys to the **MoJ Cloud Platform** (Kubernetes) via the Helm chart in
 `helm/application/`. Per-environment values live in `values-dev.yaml` and
 `values-prod.yaml`; production reads its data through the Athena (`db`) backend.
 
-CI/CD is defined in `.github/workflows/` (build, test, Trivy scans, MegaLinter,
+CI/CD is defined in `.github/workflows/` (build, test, SCA, MegaLinter,
 and deploy-to-dev / deploy-to-prod). All credentials come from GitHub Actions
 secrets.
 
