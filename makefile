@@ -14,11 +14,6 @@ flake8: venv
 	venv/bin/pip3 install flake8
 	venv/bin/flake8 --config=./.flake8 --exclude=venv,__pycache__,.pytest_cache,.venv .
 
-trivy-scan:
-	@echo "Running Trivy scan..."
-	docker build -t localbuild/testimage:latest .
-	trivy image --severity HIGH,CRITICAL localbuild/testimage:latest
-
 # Build the Docker image
 build:
 	docker-compose build
@@ -57,4 +52,4 @@ rename:
 	@echo "Renaming project from '$(OLD_NAME)' to '$(NEW_NAME)'"
 	pipenv run python -m bin.rename_project . $(OLD_NAME) $(NEW_NAME)
 
-.PHONY: build up down logs shell trivy-scan lint all new-namespace rename clean
+.PHONY: build up down logs shell lint all new-namespace rename clean
