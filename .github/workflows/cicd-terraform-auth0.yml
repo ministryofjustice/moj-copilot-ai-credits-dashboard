@@ -90,8 +90,8 @@ jobs:
       fail-fast: false
       matrix:
         environment: [development, production]
-        exclude:
-          - environment: ${{ github.ref != 'refs/heads/main' && 'production' || '' }}
+        # exclude:
+        #   - environment: ${{ github.ref != 'refs/heads/main' && 'production' || '' }}
     concurrency:
       group: deploy-auth0-terraform-${{ matrix.environment }}
       cancel-in-progress: false
