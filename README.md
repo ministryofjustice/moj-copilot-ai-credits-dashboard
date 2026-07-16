@@ -84,6 +84,22 @@ pod's service-account role) — **no static keys are read or stored**. Reads are
 memoised for `REPORTS_CACHE_TTL` seconds (default 300) since the data updates
 roughly once a day.
 
+### Auth0 Identity Solution
+The Terraform for the identity solution can be found at `terrraform/auth0`.
+This module is deployed via the `♻️ Terraform Auth0` pipeline.
+
+## Module Inputs
+
+| Input | Description | Required | Default |
+| ------- | ------------- | ---------- | --------- |
+| `auth0_domain` | value of the Auth0 domain | Yes | `''` |
+| `auth0_client_id` | value of the Auth0 client id | Yes | `''` |
+| `auth0_client_secret` | value of the Auth0 client secret | Yes | `''` |
+| `github_oauth_client_id` | value of the GitHub OAuth client id | Yes | `''` |
+| `github_oauth_client_secret` | value of the GitHub OAuth client secret | Yes | `''` |
+| `webapp_domain` | Domain name of web application | Yes | `''` |
+| `environment` | Application environment | Yes | `''` |
+
 ## Contributing
 
 For running the app locally, configuration, testing, linting, deployment, and
