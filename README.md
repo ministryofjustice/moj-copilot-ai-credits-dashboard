@@ -88,7 +88,7 @@ roughly once a day.
 The Terraform for the identity solution can be found at `terrraform/auth0`.
 This module is deployed via the `♻️ Terraform Auth0` pipeline.
 
-### Module Inputs
+#### Module Inputs
 
 | Input | Description | Required | Default |
 | ------- | ------------- | ---------- | --------- |
