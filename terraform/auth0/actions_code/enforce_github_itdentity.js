@@ -45,7 +45,7 @@ exports.onExecutePostLogin = async (event, api) => {
     // Dev: Verify user memership of approved teams
     if ("${environment}" == "development") {
        const allowedTeamSlugs = [
-        // "cloud-optimisation-and-accountability",
+        "cloud-optimisation-and-accountability",
         "octo-developer-experience"
       ];
       
