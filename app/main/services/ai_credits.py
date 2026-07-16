@@ -326,12 +326,20 @@ def _record_period_key(day: str, period: str) -> str:
     return wpu.month_label(day)
 
 
-def _period_text(key: str, period: str) -> str:
-    """Selector/headline text: '2026-W23 (1–7 Jun)' or 'Jun 2026'."""
+def _period_text(key: str, period: str, note: str = "") -> str:
+    """Selector/headline text: '2026-W23 (1–7 Jun)' or 'Jun 2026'.
+
+    An optional `note` ('week to date') is folded into the parenthetical:
+    '2026-W23 (1–7 Jun, week to date)' or 'Jun 2026 (month to date)'.
+    """
     if period == "weekly":
         iso_year, iso_week = key.split("-W")
-        return f"{key} ({wpu.format_week_range(int(iso_year), int(iso_week))})"
-    return wpu.format_month_label(key)
+        inner = wpu.format_week_range(int(iso_year), int(iso_week))
+        if note:
+            inner = f"{inner}, {note}"
+        return f"{key} ({inner})"
+    label = wpu.format_month_label(key)
+    return f"{label} ({note})" if note else label
 
 
 def _prior_overlay(prior_recs: list[dict], days_in_month: int) -> dict | None:
@@ -379,10 +387,12 @@ def _pool_cumulative(month_recs: list[dict], prior_recs: list[dict],  # pylint: 
     by_day: dict[str, float] = defaultdict(float)
     for r in month_recs:
         by_day[r["day"]] += r["credits"]
-    labels, current, running = [], [], 0.0
+    labels, tooltip_labels, current, running = [], [], [], 0.0
     for d in range(1, days_in_month + 1):
-        running += by_day.get(f"{selected_month}-{d:02d}", 0.0)
+        day = f"{selected_month}-{d:02d}"
+        running += by_day.get(day, 0.0)
         labels.append(str(d))
+        tooltip_labels.append(_full_day_label(day))
         current.append(round(running, 1) if d <= cutoff else None)
 
     pace = _month_pace(month_recs, selected_month, latest_day, pool)
@@ -396,11 +406,97 @@ def _pool_cumulative(month_recs: list[dict], prior_recs: list[dict],  # pylint: 
         "month": selected_month,
         "month_label": wpu.format_month_label(selected_month),
         "labels": labels,
+        "tooltip_labels": tooltip_labels,
         "current": current,
         "pool": pool,
         "pace": pace,
         "projection": projection,
         "prior": _prior_overlay(prior_recs, days_in_month),
+    }
+
+
+def _trend_day_label(day: str, period: str) -> str:
+    """Compact x-axis label: day-of-month when monthly, 'Mon 01' when weekly."""
+    if period == "monthly":
+        return str(int(day[8:10]))
+    return date.fromisoformat(day).strftime("%a %d")
+
+
+def _full_day_label(day: str) -> str:
+    """Unambiguous tooltip date: 'Mon 01 Jun 2026'.
+
+    The x-axis labels are deliberately terse so a month's worth fits across
+    the chart; the tooltip has room for the whole date, so it carries one.
+    """
+    return date.fromisoformat(day).strftime("%a %d %b %Y")
+
+
+def _period_days(key: str, period: str) -> list[str]:
+    """All calendar day strings ('YYYY-MM-DD') spanning one week/month key.
+
+    `key` is '2026-06' for a month or '2026-W23' for an ISO week (the same
+    formats `_record_period_key` produces), matching the full-width padding
+    `_pool_cumulative`/`_prior_overlay` already use for the cumulative chart.
+    """
+    if period == "monthly":
+        year, mon = (int(p) for p in key.split("-"))
+        days_in_month = calendar.monthrange(year, mon)[1]
+        return [f"{key}-{d:02d}" for d in range(1, days_in_month + 1)]
+    iso_year, iso_week = (int(p) for p in key.split("-W"))
+    monday, _ = wpu.week_span(iso_year, iso_week)
+    return [str(monday + timedelta(days=i)) for i in range(7)]
+
+
+def _routed_trend(model_rows: list[dict], period: str, key: str,  # pylint: disable=too-many-locals
+                  latest_day: str | None) -> dict | None:
+    """Per-day Auto-routed vs explicitly-chosen credits for one pooled period.
+
+    Filters `model_rows` to the selected week/month `key` (via the same
+    `_record_period_key` the pool uses), then buckets each day's credits by
+    the `routed` flag. The x-axis always spans the full period (every day of
+    the month, or all 7 days of the week) via `_period_days`; days after the
+    latest captured day are `None` in both series while the period is still
+    in progress, so the lines stop where the data does instead of running
+    through the rest of the period. The `heading` always names the period the
+    way the cumulative chart does ('Jun 2026'), with a 'month/week to date'
+    note added while it is still in progress. Returns None when no rows match
+    `key`.
+    """
+    rows = [r for r in model_rows
+            if _record_period_key(r["day"], period) == key]
+    if not rows:
+        return None
+    routed_by_day: dict[str, float] = defaultdict(float)
+    chosen_by_day: dict[str, float] = defaultdict(float)
+    for r in rows:
+        bucket = routed_by_day if r["routed"] else chosen_by_day
+        bucket[r["day"]] += r["credits"]
+    days = _period_days(key, period)
+
+    in_progress = (latest_day is not None
+                   and _record_period_key(latest_day, period) == key)
+    cutoff = days.index(latest_day) if in_progress else len(days) - 1
+    note = ("month to date" if period == "monthly" else "week to date") \
+        if in_progress else ""
+    heading = _period_text(key, period, note)
+
+    labels, tooltip_labels, routed, chosen = [], [], [], []
+    for i, d in enumerate(days):
+        labels.append(_trend_day_label(d, period))
+        tooltip_labels.append(_full_day_label(d))
+        if i <= cutoff:
+            routed.append(round(routed_by_day.get(d, 0.0), 2))
+            chosen.append(round(chosen_by_day.get(d, 0.0), 2))
+        else:
+            routed.append(None)
+            chosen.append(None)
+
+    return {
+        "labels": labels,
+        "tooltip_labels": tooltip_labels,
+        "routed": routed,
+        "chosen": chosen,
+        "heading": heading,
     }
 
 
@@ -417,6 +513,8 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     plan = resolve_plan(plan)
     seats = resolve_seats(seats)
     records = _user_records(source)
+    mrows = source.model_rows()
+    model_latest_day = max((r["day"] for r in mrows), default=None)
     keys = sorted({_record_period_key(r["day"], period) for r in records})
 
     base = {
@@ -484,6 +582,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
         "metrics": {"pool": pool, "gross": gross, "overage": overage,
                     "total": total, "headroom": headroom},
         "cumulative": cumulative,
+        "routed_trend": _routed_trend(mrows, period, key, model_latest_day),
         "tiles": tiles,
         "treemap": {"type": "treemap",
                     "root": f"Total bill {total:,.0f} credits (${total / 100:,.0f})",
