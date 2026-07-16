@@ -103,6 +103,143 @@ Nothing else needs to change — `get_reports_source()` wraps any backend in the
 same TTL cache, and `ai_credits.py`'s view-model code only ever sees the plain
 row-lists, so it's backend-agnostic by construction.
 
+### The contract
+
+The row shape is the whole contract. Return exactly these keys, with `day` an
+ISO `YYYY-MM-DD` **string**, `routed` a real `bool`, and `credits` a `float`:
+
+```python
+model_rows() -> [{"day": "2026-07-15", "model": "gpt-4o",
+                  "model_family": "gpt-4o", "routed": False, "credits": 12.5}, ...]
+user_rows()  -> [{"day": "2026-07-15", "user_login": "alice", "credits": 3.0}, ...]
+```
+
+Get those types right and every page, chart, and roll-up works unchanged. The
+two existing backends are the reference: `LocalFsReportsSource` reads the
+on-disk parquet tree, `DbReportsSource` runs two Athena queries.
+
+### Sketch: a SQL backend
+
+The most likely thing a fork needs is a database that isn't Athena — Postgres,
+RDS/Aurora, Redshift, DuckDB. That is one new file and one factory branch. Below
+is an illustrative sketch (SQLAlchemy Core, so one code path covers every
+dialect); it is **not implemented here** and is not on our roadmap, but the seam
+is designed to take it:
+
+```python
+# app/main/services/sql_reports_source.py
+import os
+
+from sqlalchemy import URL, create_engine, text
+
+from app.main.services.reports_source import ReportsSource
+
+
+def _iso(day) -> str:
+    return day.isoformat() if hasattr(day, "isoformat") else str(day)
+
+
+def _as_bool(value) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in ("true", "1", "t", "yes")
+
+
+class SqlReportsSource(ReportsSource):
+    def __init__(self, engine=None) -> None:
+        self._engine = engine or create_engine(URL.create(
+            "postgresql+psycopg",
+            username=os.getenv("REPORTS_DB_USER"),
+            password=os.getenv("REPORTS_DB_PASSWORD"),
+            host=os.getenv("REPORTS_DB_HOST"),
+            port=int(os.getenv("REPORTS_DB_PORT") or 5432),
+            database=os.getenv("REPORTS_DB_NAME"),
+        ), pool_pre_ping=True)
+        self._model_table = os.getenv("REPORTS_TABLE_MODELS") or "credits_by_model"
+        self._user_table = os.getenv("REPORTS_TABLE_USERS") or "credits_by_user"
+
+    def model_rows(self) -> list[dict]:
+        sql = text("SELECT model, model_family, routed, ai_credits_used, day "
+                   f"FROM {self._model_table}")
+        with self._engine.connect() as conn:
+            return [{"day": _iso(r.day), "model": r.model,
+                     "model_family": r.model_family, "routed": _as_bool(r.routed),
+                     "credits": float(r.ai_credits_used)}
+                    for r in conn.execute(sql)]
+
+    def user_rows(self) -> list[dict]:
+        sql = text(f"SELECT user_login, ai_credits_used, day FROM {self._user_table}")
+        with self._engine.connect() as conn:
+            return [{"day": _iso(r.day), "user_login": r.user_login,
+                     "credits": float(r.ai_credits_used)}
+                    for r in conn.execute(sql)]
+```
+
+Prefer explicit named env vars (`REPORTS_DB_HOST`, `REPORTS_DB_PORT`, …) over a
+single opaque `REPORTS_DB_URL`, and build the URL internally — operators then set
+clearly-named fields rather than a magic blob, and the password comes from a
+Kubernetes secret like every other credential here.
+
+**The one real trap is type coercion.** Athena's `GetQueryResults` API is
+string-typed, so `db_reports_source.py` coerces everything by hand. SQLAlchemy
+dialects hand back *typed* values instead, and the types differ per database:
+`routed` arrives as a real `bool` from Postgres but often as `0/1` from
+SQLite/DuckDB, and `day` may be a `date` object or a string depending on the
+column type. Hence `_as_bool()` above, and the existing `_iso()`
+(`day.isoformat() if hasattr(day, "isoformat") else str(day)`). Everything else
+is boilerplate; this is the part to test.
+
+### Sketch: DuckDB reading the Parquet directly
+
+DuckDB is worth calling out because it can query the same S3 Parquet tree Athena
+reads, with no managed service in front of it — a functional equivalent of the
+`db` backend. It's embedded, so it takes a file path (or `:memory:`) rather than
+host/port, and two things differ from the SQL sketch above.
+
+The "table" stops being a table name and becomes an expression —
+`hive_partitioning=1` is what recovers `day` from the `day=YYYY-MM-DD/`
+directories (the same partition column the `local` backend reads via its `DAY`
+spec):
+
+```python
+def _table_ref(name: str, *, duckdb_s3: bool) -> str:
+    if duckdb_s3:  # name is an S3 prefix, e.g. s3://bucket/prefix/credits_by_model
+        return f"read_parquet('{name}/**/*.parquet', hive_partitioning=1)"
+    return name    # a real SQL table for every other engine
+```
+
+And every *physical* connection needs the `httpfs` extension plus credentials,
+since a fresh DuckDB connection starts with neither:
+
+```python
+from sqlalchemy import event
+
+engine = create_engine("duckdb:///:memory:")  # only ever reads remote parquet
+
+
+@event.listens_for(engine, "connect")
+def _prepare(dbapi_conn, _record):
+    cur = dbapi_conn.cursor()
+    cur.execute("INSTALL httpfs; LOAD httpfs;")
+    # credential_chain resolves the pod's IRSA role via the same boto3 chain the
+    # Athena backend uses — no static keys.
+    cur.execute("CREATE SECRET IF NOT EXISTS s3read "
+                "(TYPE S3, PROVIDER credential_chain, REGION 'eu-west-2');")
+    cur.close()
+```
+
+Everything after the `FROM` — the column list, `_as_bool(r.routed)`, `_iso(r.day)`
+— is unchanged, because `read_parquet` exposes the parquet columns plus the Hive
+partition column under the same names. That's the point of freezing the row
+shape: DuckDB-over-S3 is a different `FROM`, not a different dashboard.
+
+### Testing a new backend
+
+Point it at a real in-memory SQLite or DuckDB database rather than mocking a
+client: create the two tables, insert a couple of rows, assert both row-lists,
+and add a factory test that your `REPORTS_SOURCE` value builds your class. That
+exercises the coercion above, which a mock would paper over.
+
 ## Frontend assets
 
 GOV.UK Frontend, MoJ Frontend, Chart.js, and the `chartjs-chart-treemap`
@@ -184,6 +321,40 @@ and it keeps several useful pieces of that template's scaffolding:
 
 Helper scripts are retained in `bin/`
 
-## Submitting changes
+## Contributions, forks, and governance
 
-Suggestions and improvements are welcome — open a pull request or raise an issue.
+This dashboard is built and maintained for the Ministry of Justice's own use, and
+its direction is set by our internal roadmap and governance plans. That shapes
+what we can take from outside:
+
+* **Issues are always welcome.** Bug reports, questions, and "have you
+  considered…" are useful to us regardless of whether we act on them.
+* **Pull requests are welcome, but we can only merge what coincides with our
+  roadmap.** Every line we merge is a line we maintain and deploy, so a PR is
+  judged on whether it fits where we're already going — not just on whether it's
+  good work. If you're planning anything beyond a small fix, **open an issue
+  first** and let's check the fit before you spend the effort. We'd rather say
+  "not for us" early than after you've written it.
+* **Fork it.** It's [MIT](LICENSE) — you're free to take it, run it, and change
+  it, and you don't need our permission or our agreement. If your needs diverge
+  from ours, forking is a legitimate answer rather than a consolation prize.
+
+### Diverging without pain
+
+If you fork, the seam designed for you is `ReportsSource`. Your data almost
+certainly doesn't live where ours does, and that's the one thing the app is
+explicitly built to let you swap: subclass the ABC, return the two row-lists,
+register your backend in `_build_source()` (see [Adding a new
+backend](#adding-a-new-backend), which sketches SQL and DuckDB backends we
+haven't built ourselves).
+
+Keeping your changes behind that seam is the difference between a fork you can
+rebase and a fork you can't. Everything downstream — the view-model builders, the
+caching wrapper, the templates, the charts — only ever sees the plain row-lists,
+so a new backend touches one new file and one factory branch. Changes scattered
+through `ai_credits.py` or the templates will fight every upstream pull; a
+backend won't.
+
+And if you build a backend you think we'd want, the roadmap caveat still applies
+— but a self-contained backend is about the most mergeable thing you could send
+us, so do open that issue.
