@@ -76,7 +76,7 @@ jobs:
         with:
             header: auth0-terraform-plan-results-${{ matrix.environment }}
             message: |
-                ## Terraform ${{ inputs.name }} plan
+                ## Auth0 Terraform Plan - ${{ matrix.environment }}
                 ```
                 ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
                 ```
