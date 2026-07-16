@@ -110,6 +110,13 @@ For running the app locally, configuration, testing, linting, deployment, and
 how to extend it (e.g. adding a new data backend), see
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
+This dashboard is maintained for the Ministry of Justice's own use and steered by
+our internal roadmap, so we can only merge pull requests that coincide with where
+we're already going — please open an issue first for anything beyond a small fix.
+You are free to fork it under the [MIT licence](LICENSE) and point it at your own
+data by subclassing `ReportsSource`; see
+[Contributions, forks, and governance](CONTRIBUTING.md#contributions-forks-and-governance).
+
 ## Licence
 
 Licensed under the [MIT License](LICENSE). © Crown Copyright (Ministry of Justice).
