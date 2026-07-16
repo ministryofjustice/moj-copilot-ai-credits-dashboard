@@ -102,6 +102,7 @@
 {% if v.routed_trend %}
   {{- charts.update({"routedTrend": {
         "type": "line", "labels": v.routed_trend.labels,
+        "tooltip_labels": v.routed_trend.tooltip_labels,
         "datasets": [
           {"label": "Auto-routed", "data": v.routed_trend.routed},
           {"label": "Explicitly chosen", "data": v.routed_trend.chosen}
@@ -116,7 +117,8 @@
     {{- cumdatasets.append({"label": "Projection", "data": v.cumulative.projection, "dash": true}) or "" -}}
   {% endif %}
   {{- charts.update({"pooledCumulative": {
-        "type": "line", "labels": v.cumulative.labels, "datasets": cumdatasets,
+        "type": "line", "labels": v.cumulative.labels,
+        "tooltip_labels": v.cumulative.tooltip_labels, "datasets": cumdatasets,
         "limit": {"value": v.cumulative.pool, "label": "Pool budget"}}}) or "" -}}
 {% endif %}
 <script type="application/json" id="chart-data">{{ charts | tojson }}</script>

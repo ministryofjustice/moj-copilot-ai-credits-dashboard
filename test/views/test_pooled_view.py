@@ -95,6 +95,16 @@ def test_pooled_cumulative_reconciles_to_gross(fake_source, week_records):
     assert cum["pool"] == v["metrics"]["pool"]
 
 
+def test_pooled_cumulative_tooltip_labels_are_full_dates(fake_source, week_records):
+    """Axis labels stay compact; the tooltip gets the unambiguous full date."""
+    v = ac.pooled_view(fake_source(week_records), period="monthly", key="2026-06",
+                       plan="$70 / month", seats="1")
+    cum = v["cumulative"]
+    assert cum["tooltip_labels"][0] == "Mon 01 Jun 2026"
+    assert cum["tooltip_labels"][29] == "Tue 30 Jun 2026"
+    assert len(cum["tooltip_labels"]) == len(cum["labels"])
+
+
 def test_pooled_projection_hidden_before_five_days(fake_source):
     recs = _month_recs("2026-07", 4)  # only 4 elapsed days
     v = ac.pooled_view(fake_source(recs), period="monthly", key="2026-07",
@@ -173,7 +183,8 @@ def test_routed_trend_monthly_sums_and_mtd_heading():
     assert t["labels"] == [str(d) for d in range(1, 31)]  # June has 30 days
     assert t["routed"] == [20.0, 10.0] + [None] * 28
     assert t["chosen"] == [80.0, 40.0] + [None] * 28
-    assert t["heading"] == "month to date"  # latest day is in this month
+    # names the month as the cumulative chart does, plus the in-progress note
+    assert t["heading"] == "Jun 2026 (month to date)"
 
 
 def test_routed_trend_past_month_uses_plain_label():
@@ -195,7 +206,24 @@ def test_routed_trend_weekly_filters_and_labels():
     assert t["labels"] == expected_labels
     assert t["routed"] == [20.0, 10.0, None, None, None, None, None]
     assert t["chosen"] == [80.0, 40.0, None, None, None, None, None]
-    assert t["heading"] == "week to date"
+    week_range = wpu.format_week_range(*(int(p) for p in key.split("-W")))
+    assert t["heading"] == f"{key} ({week_range}, week to date)"
+
+
+def test_routed_trend_tooltip_labels_are_full_dates():
+    """Axis labels stay compact; the tooltip gets the unambiguous full date."""
+    t = ac._routed_trend(_trend_rows(), "monthly", "2026-06",
+                         latest_day="2026-06-02")
+    assert t["tooltip_labels"][0] == "Mon 01 Jun 2026"
+    assert t["tooltip_labels"][29] == "Tue 30 Jun 2026"
+    assert len(t["tooltip_labels"]) == len(t["labels"])
+
+
+def test_routed_trend_weekly_tooltip_labels_are_full_dates():
+    key = wpu.iso_week_label("2026-06-01")[0]
+    t = ac._routed_trend(_trend_rows(), "weekly", key, latest_day="2026-06-02")
+    assert t["tooltip_labels"][0] == "Mon 01 Jun 2026"
+    assert len(t["tooltip_labels"]) == 7
 
 
 def test_routed_trend_none_when_period_empty():
@@ -240,7 +268,7 @@ def test_pooled_view_surfaces_routed_trend(fake_source, week_records):
     assert rt["labels"] == [str(d) for d in range(1, 31)]
     assert rt["routed"] == [20.0, 10.0] + [None] * 28
     assert rt["chosen"] == [80.0, 40.0] + [None] * 28
-    assert rt["heading"] == "month to date"
+    assert rt["heading"] == "Jun 2026 (month to date)"
 
 
 def test_pooled_view_routed_trend_none_without_model_rows(fake_source,

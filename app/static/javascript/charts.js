@@ -87,13 +87,31 @@
       });
     }
 
+    // The x-axis labels are terse so a whole month fits across the chart. When
+    // the server also sends full dates, the tooltip shows those instead — it
+    // has the room, and "Mon 01 Jun 2026" beats a bare "1".
+    var tips = spec.tooltip_labels;
+    var tooltip = Array.isArray(tips)
+      ? {
+          callbacks: {
+            title: function (items) {
+              var i = items.length ? items[0].dataIndex : -1;
+              return tips[i] !== undefined ? tips[i] : "";
+            },
+          },
+        }
+      : {};
+
     new Chart(canvas.getContext("2d"), {
       type: type,
       data: { labels: spec.labels || [], datasets: datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { display: datasets.length > 1 } },
+        plugins: {
+          legend: { display: datasets.length > 1 },
+          tooltip: tooltip,
+        },
         scales: { y: { beginAtZero: true } },
       },
     });
