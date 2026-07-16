@@ -1,0 +1,139 @@
+name: "♻️ Terraform Auth0"
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "terraform/auth0/**"
+    branches:
+      - main
+  push:
+    paths:
+      - "terraform/auth0/**"
+    branches: ["main"]
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  terraform-plan:
+    name: "Auth0 Terraform - Plan"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: "terraform/auth0"
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [development, production]
+    concurrency:
+      group: deploy-auth0-terraform-${{ matrix.environment }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.15.8"
+
+      - name: Set Environment Variables
+        run: |
+          echo "TF_VAR_auth0_domain=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_DOMAIN || secrets.DEV_AUTH0_DOMAIN }}" >> $GITHUB_ENV
+          echo "TF_VAR_auth0_client_id=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_TERRAFORM_CLIENT_ID || secrets.DEV_AUTH0_TERRAFORM_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "TF_VAR_auth0_client_secret=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_TERRAFORM_CLIENT_SECRET || secrets.DEV_AUTH0_TERRAFORM_CLIENT_SECRET }}" >> $GITHUB_ENV
+
+          echo "TF_VAR_github_oauth_client_id=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_ID || secrets.DEV_GITHUB_OAUTH_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "TF_VAR_github_oauth_client_secret=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_SECRET || secrets.DEV_GITHUB_OAUTH_CLIENT_SECRET }}" >> $GITHUB_ENV
+
+          echo "TF_VAR_webapp_domain=${{ matrix.environment == 'production' && 'moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk' || 'moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk' }}" >> $GITHUB_ENV
+          echo "TF_VAR_environment=${{ matrix.environment == 'production' && 'production' || 'development' }}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials for Terraform
+        uses: aws-actions/configure-aws-credentials@486457dc46e82b9a740ca0ef1dac6a38a3fc272d # v4.0.2
+        with:
+          role-to-assume: ${{ matrix.environment == 'production' && secrets.PROD_S3_ROLE_TO_ASSUME || secrets.DEV_S3_ROLE_TO_ASSUME }}
+          aws-region: eu-west-2
+
+      - name: Terraform Init
+        id: init
+        run: |
+          terraform init -backend-config="bucket=${{ matrix.environment == 'production' && vars.PROD_S3_BUCKET_NAME || vars.DEV_S3_BUCKET_NAME }}" -input=false -no-color
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -input=false -no-color
+
+      - name: Post Plan to GitHub PR
+        if: always() && github.event_name == 'pull_request'
+        uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
+        with:
+          header: auth0-terraform-plan-results-${{ matrix.environment }}
+          message: |
+            ## Auth0 Terraform Plan - ${{ matrix.environment }}
+            ```
+            ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
+            ```
+  terraform-apply:
+    name: "Auth0 Terraform - Apply"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: "terraform/auth0"
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [development, production]
+        exclude:
+          - environment: ${{ github.ref != 'refs/heads/main' && 'production' || '' }}
+    concurrency:
+      group: deploy-auth0-terraform-${{ matrix.environment }}
+      cancel-in-progress: false
+    environment:
+      name: ${{ matrix.environment }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: "1.15.8"
+
+      - name: Set Environment Variables
+        run: |
+          echo "TF_VAR_auth0_domain=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_DOMAIN || secrets.DEV_AUTH0_DOMAIN }}" >> $GITHUB_ENV
+          echo "TF_VAR_auth0_client_id=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_TERRAFORM_CLIENT_ID || secrets.DEV_AUTH0_TERRAFORM_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "TF_VAR_auth0_client_secret=${{ matrix.environment == 'production' && secrets.PROD_AUTH0_TERRAFORM_CLIENT_SECRET || secrets.DEV_AUTH0_TERRAFORM_CLIENT_SECRET }}" >> $GITHUB_ENV
+
+          echo "TF_VAR_github_oauth_client_id=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_ID || secrets.DEV_GITHUB_OAUTH_CLIENT_ID }}" >> $GITHUB_ENV
+          echo "TF_VAR_github_oauth_client_secret=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_SECRET || secrets.DEV_GITHUB_OAUTH_CLIENT_SECRET }}" >> $GITHUB_ENV
+
+          echo "TF_VAR_webapp_domain=${{ matrix.environment == 'production' && 'moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk' || 'moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk' }}" >> $GITHUB_ENV
+          echo "TF_VAR_environment=${{ matrix.environment == 'production' && 'production' || 'development' }}" >> $GITHUB_ENV
+
+      - name: Configure AWS credentials for Terraform
+        uses: aws-actions/configure-aws-credentials@486457dc46e82b9a740ca0ef1dac6a38a3fc272d # v4.0.2
+        with:
+          role-to-assume: ${{ matrix.environment == 'production' && secrets.PROD_S3_ROLE_TO_ASSUME || secrets.DEV_S3_ROLE_TO_ASSUME }}
+          aws-region: eu-west-2
+
+      - name: Terraform Init
+        id: init
+        run: |
+          terraform init -backend-config="bucket=${{ matrix.environment == 'production' && vars.PROD_S3_BUCKET_NAME || vars.DEV_S3_BUCKET_NAME }}" -input=false -no-color
+
+      - name: Terraform Validate
+        id: validate
+        run: terraform validate -no-color
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -input=false -no-color
+
+      - name: Terraform Apply
+        id: apply
+        run: terraform apply -input=false -no-color -auto-approve

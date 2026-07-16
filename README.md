@@ -88,6 +88,22 @@ per gunicorn worker, each warming independently. Setting the TTL to `0` disables
 caching and rebuilds the source on every call (what local dev does, so file
 edits show up at once).
 
+### Auth0 Identity Solution
+The Terraform for the identity solution can be found at `terrraform/auth0`.
+This module is deployed via the `♻️ Terraform Auth0` pipeline.
+
+#### Module Inputs
+
+| Input | Description | Required | Default |
+| ------- | ------------- | ---------- | --------- |
+| `auth0_domain` | value of the Auth0 domain | Yes | `''` |
+| `auth0_client_id` | value of the Auth0 terraform client id | Yes | `''` |
+| `auth0_client_secret` | value of the Auth0 terraform client secret | Yes | `''` |
+| `github_oauth_client_id` | value of the GitHub OAuth client id | Yes | `''` |
+| `github_oauth_client_secret` | value of the GitHub OAuth client secret | Yes | `''` |
+| `webapp_domain` | Domain name of web application | Yes | `''` |
+| `environment` | Application environment | Yes | `''` |
+
 ## Contributing
 
 For running the app locally, configuration, testing, linting, deployment, and
