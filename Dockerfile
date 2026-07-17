@@ -1,6 +1,6 @@
 FROM python:3.12.13-alpine3.22
 
-LABEL maintainer="operations-engineering <operations-engineering@digital.justice.gov.uk>"
+LABEL maintainer="cloud-optimisation-and-accountability <CloudOptimisationandAccountabilityTeam@justice.gov.uk>"
 
 # Install system dependencies
 RUN apk add --no-cache --no-progress \
@@ -23,10 +23,10 @@ RUN pip install --no-cache-dir \
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup -u 1051
 
 # Set working directory
-WORKDIR /home/operations-engineering-application
+WORKDIR /home/moj-copilot-ai-credits-dashboard
 
 # Change ownership of the working directory
-RUN chown -R appuser:appgroup /home/operations-engineering-application
+RUN chown -R appuser:appgroup /home/moj-copilot-ai-credits-dashboard
 
 # Switch to non-root user
 USER 1051

@@ -32,7 +32,7 @@ logs:
 
 # Open a shell inside the running app container
 shell:
-	docker exec -it operations-engineering-flask-application /bin/sh
+	docker exec -it moj-copilot-ai-credits-dashboard /bin/sh
 
 # Target to run the Python script with pipenv, passing the reposiotry name and environment as an argument
 # make new-namespace REPOSITORY_NAME=example-repo ENVIRONMENT=dev

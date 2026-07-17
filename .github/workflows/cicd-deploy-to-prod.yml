@@ -62,7 +62,7 @@ jobs:
           kubectl config get-contexts
           kubectl config use-context ${KUBE_CLUSTER}
 
-      - name: Deploy helm chart to operations-engineering-join-github-prod
+      - name: Deploy helm chart to moj-copilot-ai-credits-dashboard-prod
         run: |
           helm upgrade application \
             helm/application \
