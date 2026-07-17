@@ -30,7 +30,7 @@ configuring it, testing it, extending it, and deploying it.
 │       ├── static/                  # JS (Chart.js glue), CSS, images
 │       └── templates/               # GOV.UK-styled Jinja templates
 ├── bin/                             # Dev/ops helper scripts (see below)
-├── helm/application/                # Helm chart for MoJ Cloud Platform
+├── helm/moj-copilot-ai-credits-dashboard/                # Helm chart for MoJ Cloud Platform
 ├── reports/                         # Local usage data (gitignored)
 ├── test/                            # pytest suite
 ├── Dockerfile
@@ -291,7 +291,7 @@ pipenv run pylint app
 ## Deployment
 
 The app deploys to the **MoJ Cloud Platform** (Kubernetes) via the Helm chart in
-`helm/application/`. Per-environment values live in `values-dev.yaml` and
+`helm/moj-copilot-ai-credits-dashboard/`. Per-environment values live in `values-dev.yaml` and
 `values-prod.yaml`; production reads its data through the Athena (`db`) backend.
 
 CI/CD is defined in `.github/workflows/` (build, test, SCA, MegaLinter,
@@ -299,8 +299,8 @@ and deploy-to-dev / deploy-to-prod). All credentials come from GitHub Actions
 secrets.
 
 ```bash
-helm upgrade --install moj-copilot-ai-credits-dashboard ./helm/application \
-  -f ./helm/application/values-<env>.yaml
+helm upgrade --install moj-copilot-ai-credits-dashboard ./helm/moj-copilot-ai-credits-dashboard \
+  -f ./helm/moj-copilot-ai-credits-dashboard/values-<env>.yaml
 ```
 
 ## Template provenance & helper tooling

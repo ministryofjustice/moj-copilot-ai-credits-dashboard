@@ -2,8 +2,8 @@ version: "3.9"
 services:
   app:
     build: .
-    image: "operations-engineering-flask-application"
-    container_name: "operations-engineering-flask-application"
+    image: "moj-copilot-ai-credits-dashboard"
+    container_name: "moj-copilot-ai-credits-dashboard"
     environment:
       # GitHub
       ADMIN_GITHUB_TOKEN: fake
