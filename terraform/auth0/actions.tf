@@ -1,6 +1,7 @@
 resource "auth0_action" "enforce_github_identity" {
   code               = templatefile("${path.module}/actions_code/enforce_github_itdentity.js", {
-    uri_namespace = "https://${var.webapp_domain}"
+    uri_namespace = "https://${var.webapp_domain}",
+    environment = var.environment
   })
   deploy             = true
   name               = "Enforce GitHub Identity"
