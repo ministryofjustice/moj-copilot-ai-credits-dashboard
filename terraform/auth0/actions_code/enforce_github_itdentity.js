@@ -74,7 +74,7 @@ exports.onExecutePostLogin = async (event, api) => {
       for (const teamSlug of allowedTeamSlugs) {
         try {
           await axios.get(
-            `https://api.github.com/orgs/$${targetOrg}/teams/$${teamSlug}/memberships/$${githubUsername}`,
+            `https://api.github.com/orgs/ministryofjustice/teams/$${teamSlug}/memberships/$${githubUsername}`,
             {
               headers: {
                 Authorization: `token $${githubIdentity.access_token}`,
@@ -112,6 +112,6 @@ exports.onExecutePostLogin = async (event, api) => {
     api.idToken.setCustomClaim(`$${namespace}/org_role`, githubRole);
   } catch (error) {
     console.error("M2M Verification Loop Failed:", error.message);
-    return api.access.deny('Authentication failed during organization authorization verification.');
+    return api.access.deny('Authentication failed during github identity verification.');
   }
 };
