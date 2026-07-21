@@ -19,8 +19,7 @@ exports.onExecutePostLogin = async (event, api) => {
     }
 
     // Verify GitHub Organisation membership
-    // const allowedOrgs = ["ministryofjustice", "jac-uk"];
-    const allowedOrgs = ["ministryofjustice"];
+    const allowedOrgs = ["ministryofjustice", "jac-uk"];
     let isOrgMember = false;
     let githubRole = null;
 
@@ -47,7 +46,6 @@ exports.onExecutePostLogin = async (event, api) => {
       } catch (githubError) {
         if (githubError.response && githubError.response.status === 404) {
           console.log(`User is not a member of the organisation: $${org}`);
-          console.log(`error message: $${githubError}`)
           continue
         }
         throw githubError;
