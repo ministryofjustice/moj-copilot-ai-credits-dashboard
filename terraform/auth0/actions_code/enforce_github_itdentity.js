@@ -18,29 +18,43 @@ exports.onExecutePostLogin = async (event, api) => {
       return api.access.deny('Could not verify your GitHub identity permissions.');
     }
 
-    const targetOrg = "ministryofjustice";
+    // Verify GitHub Organisation membership
+    const allowedOrgs = ["ministryofjustice", "jac-uk"];
+    let isOrgMember = false;
     let githubRole = null;
 
-    // Verify GitHub Organisation membership
-    try {
-      const response = await axios.get(`https://api.github.com/user/memberships/orgs/$${targetOrg}`, {
-        headers: {
-          Authorization: `token $${githubIdentity.access_token}`,
-          'User-Agent': 'Auth0-Action-Org-Enforcer',
-          'Accept': 'application/vnd.github.v3+json'
-        }
-      });
-      
-      // Extract role of user in organisation
-      githubRole = response.data.role; 
+    for (const org of allowedOrgs) {
+      try {
+        const response = await axios.get(`https://api.github.com/user/memberships/orgs/$${org}`, {
+          headers: {
+            Authorization: `token $${githubIdentity.access_token}`,
+            'User-Agent': 'Auth0-Action-Org-Enforcer',
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        });
+        
+        isOrgMember = true;
 
-      console.log(`User github role: $${githubRole}`);
-    } catch (githubError) {
-      if (githubError.response && githubError.response.status === 404) {
-        return api.access.deny('Access Denied: You must be a member of the Ministry of Justice GitHub organization.');
+        // Extract role of user in organisation
+        if (org == "ministryofjustice") {
+          githubRole = response.data.role;
+        } else {
+          githubRole = "member"
+        };
+
+        console.log(`User github role: $${githubRole}`);
+      } catch (githubError) {
+        if (githubError.response && githubError.response.status === 404) {
+          console.log(`User is not a member of the organisation: $${org}`);
+          continue
+        }
+        throw githubError;
       }
-      throw githubError;
     }
+
+    if (!isOrgMember) {
+      return api.access.deny(`Access Denied: You are not a member of an authorised organisation:$${allowedOrgs.join(', ')}`);
+    };
 
     // Dev: Verify user memership of approved teams
     if ("${environment}" == "development") {
