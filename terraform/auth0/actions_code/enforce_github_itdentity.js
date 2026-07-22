@@ -50,6 +50,7 @@ exports.onExecutePostLogin = async (event, api) => {
     // Set user application role
     let githubRole = 'member';
     let adminTeam = 'moj-copilot-credits-dashboard-admin'
+    const githubUsername = githubIdentity.profileData ? githubIdentity.profileData.nickname : event.user.nickname;
 
     try {
       await axios.get(
@@ -80,8 +81,6 @@ exports.onExecutePostLogin = async (event, api) => {
         "cloud-optimisation-and-accountability",
         "octo-developer-experience"
       ];
-      
-      const githubUsername = githubIdentity.profileData ? githubIdentity.profileData.nickname : event.user.nickname;
       
       if (!githubUsername) {
         return api.access.deny('Authentication failed: Could not determine your GitHub username.');
