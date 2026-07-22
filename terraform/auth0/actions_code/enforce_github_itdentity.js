@@ -67,8 +67,9 @@ exports.onExecutePostLogin = async (event, api) => {
     } catch (teamError) {
       if (teamError.response && teamError.response.status === 404) {
         console.log(`User is not a member of the team: $${adminTeam}`);
+      } else {
+        throw teamError;
       }
-      throw teamError;
     }
 
     console.log(`User github role: $${githubRole}`);
