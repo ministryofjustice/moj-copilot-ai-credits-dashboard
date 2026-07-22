@@ -21,7 +21,6 @@ exports.onExecutePostLogin = async (event, api) => {
     // Verify GitHub Organisation membership
     const allowedOrgs = ["ministryofjustice", "jac-uk"];
     let isOrgMember = false;
-    let githubRole = null;
 
     for (const org of allowedOrgs) {
       try {
@@ -34,15 +33,6 @@ exports.onExecutePostLogin = async (event, api) => {
         });
         
         isOrgMember = true;
-
-        // Extract role of user in organisation
-        if (org == "ministryofjustice") {
-          githubRole = response.data.role;
-        } else {
-          githubRole = "member"
-        };
-
-        console.log(`User github role: $${githubRole}`);
         break
       } catch (githubError) {
         if (githubError.response && githubError.response.status === 404) {
@@ -57,14 +47,40 @@ exports.onExecutePostLogin = async (event, api) => {
       return api.access.deny(`Access Denied: You are not a member of an authorised organisation:$${allowedOrgs.join(', ')}`);
     };
 
+    // Set user application role
+    let githubRole = 'member';
+    let adminTeam = 'moj-copilot-credits-dashboard-admin'
+    const githubUsername = githubIdentity.profileData ? githubIdentity.profileData.nickname : event.user.nickname;
+
+    try {
+      await axios.get(
+        `https://api.github.com/orgs/ministryofjustice/teams/$${adminTeam}/memberships/$${githubUsername}`,
+        {
+          headers: {
+            Authorization: `token $${githubIdentity.access_token}`,
+            'User-Agent': 'Auth0-Action-Org-Enforcer',
+            'Accept': 'application/vnd.github.v3+json'
+          }
+        }
+      );
+          
+      githubRole = 'admin';
+    } catch (teamError) {
+      if (teamError.response && teamError.response.status === 404) {
+        console.log(`User is not a member of the team: $${adminTeam}`);
+      } else {
+        throw teamError;
+      }
+    }
+
+    console.log(`User github role: $${githubRole}`);
+
     // Dev: Verify user memership of approved teams
     if ("${environment}" == "development") {
        const allowedTeamSlugs = [
         "cloud-optimisation-and-accountability",
         "octo-developer-experience"
       ];
-      
-      const githubUsername = githubIdentity.profileData ? githubIdentity.profileData.nickname : event.user.nickname;
       
       if (!githubUsername) {
         return api.access.deny('Authentication failed: Could not determine your GitHub username.');
