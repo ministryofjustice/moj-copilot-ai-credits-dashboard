@@ -43,6 +43,7 @@ exports.onExecutePostLogin = async (event, api) => {
         };
 
         console.log(`User github role: $${githubRole}`);
+        break
       } catch (githubError) {
         if (githubError.response && githubError.response.status === 404) {
           console.log(`User is not a member of the organisation: $${org}`);
