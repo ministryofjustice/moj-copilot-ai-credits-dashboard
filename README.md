@@ -1,7 +1,5 @@
 # 📊 MoJ Copilot AI Credits Dashboard
 
-[![Ministry of Justice Repository Compliance Badge](https://github-community.service.justice.gov.uk/repository-standards/api/moj-copilot-ai-credits-dashboard/badge)](https://github-community.service.justice.gov.uk/repository-standards/moj-copilot-ai-credits-dashboard)
-
 A Flask web app that visualises GitHub Copilot **AI-credit usage** across the
 Ministry of Justice enterprise. It gives individual users a view of their own
 spend against their plan allowance, and gives admins pooled, weekly, and daily
