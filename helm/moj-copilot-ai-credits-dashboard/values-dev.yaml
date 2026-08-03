@@ -1,6 +1,7 @@
 app:
   ingress:
     host: "moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk" # This should be changed as appropriate
+    cert_secret: "ssl-certificate"
 
   deployment:
     replicaCount: 1

@@ -15,7 +15,7 @@ spec:
   tls:
     - hosts:
         - {{ .Values.app.ingress.host }}
-      secretName: "cmcaicu-prod-cert"
+      secretName: {{ .Values.app.ingress.cert_secret }}
   rules:
     - host: {{ .Values.app.ingress.host }}
       http:
