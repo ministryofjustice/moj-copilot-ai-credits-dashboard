@@ -1,7 +1,6 @@
 app:
   ingress:
     host: "check-my-copilot-ai-credits-usage.service.justice.gov.uk" # This should be changed as appropriate
-    cert_secret: "cmcaicu-prod-cert"
 
   deployment:
     replicaCount: 3
