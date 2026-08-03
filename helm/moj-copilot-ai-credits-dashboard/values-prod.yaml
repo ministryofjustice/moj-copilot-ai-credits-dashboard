@@ -1,6 +1,8 @@
 app:
   ingress:
-    host: "moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk" # This should be changed as appropriate
+    hosts: 
+      - "moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk"
+      - "check-my-copilot-ai-credits-usage.service.justice.gov.uk"
 
   deployment:
     replicaCount: 3

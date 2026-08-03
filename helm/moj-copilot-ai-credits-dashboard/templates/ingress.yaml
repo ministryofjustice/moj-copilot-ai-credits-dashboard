@@ -14,10 +14,13 @@ spec:
   ingressClassName: "default"
   tls:
     - hosts:
-        - {{ .Values.app.ingress.host }}
-      secretName: "ssl-certificate"
+      {{- range .Values.app.ingress.hosts }}
+        - {{ . }}
+      {{- end }}
+      secretName: "cmcaicu-prod-cert"
   rules:
-    - host: {{ .Values.app.ingress.host }}
+    {{- range .Values.app.ingress.hosts }}
+    - host: {{ . }}
       http:
         paths:
           - path: /
@@ -27,3 +30,4 @@ spec:
                 name: {{ $fullName }}
                 port:
                   number: 80
+    {{- end }}
