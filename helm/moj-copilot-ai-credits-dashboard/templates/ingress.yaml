@@ -45,12 +45,12 @@ spec:
   tls:
     - hosts:
       {{- range .Values.app.ingress.redirectHosts }}
-        - {{ . | quote }}
+        - {{ . }}
       {{- end }}
       secretName: "cmcaicu-prod-cert"
   rules:
     {{- range .Values.app.ingress.redirectHosts }}
-    - host: {{ . | quote }}
+    - host: {{ . }}
       http:
         paths:
           - path: /
