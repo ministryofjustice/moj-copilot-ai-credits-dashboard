@@ -27,8 +27,8 @@ spec:
                 name: {{ $fullName }}
                 port:
                   number: 80
-
 {{- if .Values.app.ingress.redirectHosts }}
+---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
