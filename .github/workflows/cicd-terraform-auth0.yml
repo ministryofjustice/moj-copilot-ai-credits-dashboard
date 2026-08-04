@@ -47,7 +47,7 @@ jobs:
           echo "TF_VAR_github_oauth_client_id=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_ID || secrets.DEV_GITHUB_OAUTH_CLIENT_ID }}" >> $GITHUB_ENV
           echo "TF_VAR_github_oauth_client_secret=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_SECRET || secrets.DEV_GITHUB_OAUTH_CLIENT_SECRET }}" >> $GITHUB_ENV
 
-          echo "TF_VAR_webapp_domain=${{ matrix.environment == 'production' && 'moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk' || 'moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk' }}" >> $GITHUB_ENV
+          echo "TF_VAR_webapp_domain=${{ matrix.environment == 'production' && 'check-my-copilot-ai-credits-usage.service.justice.gov.uk' || 'moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk' }}" >> $GITHUB_ENV
           echo "TF_VAR_environment=${{ matrix.environment == 'production' && 'production' || 'development' }}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials for Terraform
@@ -112,7 +112,7 @@ jobs:
           echo "TF_VAR_github_oauth_client_id=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_ID || secrets.DEV_GITHUB_OAUTH_CLIENT_ID }}" >> $GITHUB_ENV
           echo "TF_VAR_github_oauth_client_secret=${{ matrix.environment == 'production' && secrets.PROD_GITHUB_OAUTH_CLIENT_SECRET || secrets.DEV_GITHUB_OAUTH_CLIENT_SECRET }}" >> $GITHUB_ENV
 
-          echo "TF_VAR_webapp_domain=${{ matrix.environment == 'production' && 'moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk' || 'moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk' }}" >> $GITHUB_ENV
+          echo "TF_VAR_webapp_domain=${{ matrix.environment == 'production' && 'check-my-copilot-ai-credits-usage.service.justice.gov.uk' || 'moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk' }}" >> $GITHUB_ENV
           echo "TF_VAR_environment=${{ matrix.environment == 'production' && 'production' || 'development' }}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials for Terraform
