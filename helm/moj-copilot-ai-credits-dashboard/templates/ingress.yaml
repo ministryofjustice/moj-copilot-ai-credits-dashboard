@@ -14,13 +14,43 @@ spec:
   ingressClassName: "default"
   tls:
     - hosts:
-      {{- range .Values.app.ingress.hosts }}
-        - {{ . }}
+        - {{ .Values.app.ingress.primaryHost }}
+      secretName: "cmcaicu-prod-cert"
+  rules:
+    - host: {{ .Values.app.ingress.primaryHost }}
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ $fullName }}
+                port:
+                  number: 80
+
+{{- if .Values.app.ingress.redirectHosts }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}-redirect
+  labels:
+    {{- include "application.labels" . | nindent 4 }}
+  annotations:
+    external-dns.alpha.kubernetes.io/set-identifier: {{ $fullName }}-redirect-green
+    external-dns.alpha.kubernetes.io/aws-weight: "100"
+    cloud-platform.justice.gov.uk/ignore-external-dns-weight: "true"
+    nginx.ingress.kubernetes.io/permanent-redirect: https://{{ .Values.app.ingress.primaryHost }}
+spec:
+  ingressClassName: "default"
+  tls:
+    - hosts:
+      {{- range .Values.app.ingress.redirectHosts }}
+        - {{ . | quote }}
       {{- end }}
       secretName: "cmcaicu-prod-cert"
   rules:
-    {{- range .Values.app.ingress.hosts }}
-    - host: {{ . }}
+    {{- range .Values.app.ingress.redirectHosts }}
+    - host: {{ . | quote }}
       http:
         paths:
           - path: /
@@ -31,3 +61,4 @@ spec:
                 port:
                   number: 80
     {{- end }}
+{{- end }}
