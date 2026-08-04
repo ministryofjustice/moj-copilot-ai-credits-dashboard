@@ -37,7 +37,7 @@ def requires_admin(function_f):
         if app_config.flask.app_env == "development":
             role = "admin"
         else:
-            role = session["user"].get("userinfo", {}).get(f"https://moj-copilot-ai-credits-dashboard-prod.cloud-platform.service.justice.gov.uk/org_role", "")
+            role = session["user"].get("userinfo", {}).get(f"https://check-my-copilot-ai-credits-usage.service.justice.gov.uk/org_role", "")
 
         print(f"APP_ENV: {app_config.flask.app_env}")
         print(f"User role: {role}")
