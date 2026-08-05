@@ -36,7 +36,7 @@
       {{ govukSelect({"id": "plan", "name": "plan", "label": {"text": "Plan budget"}, "items": plan_items}) }}
     </div>
     <div class="govuk-grid-column-one-quarter">
-      {{ govukInput({"id": "seats", "name": "seats", "label": {"text": "Licensed seats"}, "value": v.seats, "classes": "govuk-input--width-5", "inputmode": "numeric"}) }}
+      {{ govukInput({"id": "seats", "name": "seats", "label": {"text": "Licensed seats"}, "value": v.seats, "classes": "govuk-input--width-5", "inputmode": "numeric", "pattern": "[0-9]*", "attributes": {"maxlength": "4"}}) }}
     </div>
   </div>
 </form>

@@ -74,3 +74,31 @@ def test_admin_pooled_chart_data_carries_full_date_tooltips(
         tips = spec[name]["tooltip_labels"]
         assert tips[0] == "Mon 01 Jun 2026"
         assert len(tips) == len(spec[name]["labels"])
+
+
+def test_admin_pooled_seats_input_is_sanitised(monkeypatch, fake_source, week_records):
+    source = fake_source(week_records)
+    monkeypatch.setattr(routes, "get_reports_source", lambda: source)
+    app = create_app(False)
+    app.config["SECRET_KEY"] = "test_flask"
+    client = app.test_client()
+
+    @app.before_request
+    def inject_mock_session():
+        session["user"] = {
+            "userinfo": {
+                "https://moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk/org_role": "admin"
+            }
+        }
+
+    probe = "<script>alert(1)</script>"
+    resp = client.get(f"/admin/pooled?seats={probe}")
+    body = resp.get_data(as_text=True)
+    assert resp.status_code == 200
+    assert probe not in body  # raw value must never be reflected
+    assert 'name="seats"' in body and 'value="480"' in body  # fell back to default
+
+    # client-side hints on the seats input (server check stays authoritative)
+    seats_input = re.search(r'<input[^>]*id="seats"[^>]*>', body).group(0)
+    assert 'pattern="[0-9]*"' in seats_input
+    assert 'maxlength="4"' in seats_input

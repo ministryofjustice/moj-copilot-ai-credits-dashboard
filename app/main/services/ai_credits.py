@@ -48,6 +48,7 @@ WEEKS_PER_MONTH = 4.33
 PLAN_TIERS_USD_PER_MONTH = {"$70 / month": 70.0, "$39 / month": 39.0}
 DEFAULT_PLAN = "$70 / month"
 DEFAULT_SEATS = 480
+MAX_SEATS = 2000
 # The dataset has no scope column; the enterprise it covers is fixed.
 ENTERPRISE = "ministryofjustice"
 
@@ -59,12 +60,17 @@ def _user_records(source: ReportsSource) -> list[dict]:
 
 
 def resolve_seats(raw) -> int:
-    """Coerce a seat-count query value to a positive int, else DEFAULT_SEATS."""
-    try:
-        seats = int(raw)
-    except (TypeError, ValueError):
+    """Allowlist a seat-count query value to 1..MAX_SEATS, else DEFAULT_SEATS.
+
+    Stricter than int(): only plain ASCII digit strings are accepted, so
+    values like "1_000", " 12 " or non-ASCII digits fall back to the default.
+    """
+    if not isinstance(raw, str) or not raw.isascii() or not raw.isdigit():
         return DEFAULT_SEATS
-    return seats if seats > 0 else DEFAULT_SEATS
+    if len(raw) > len(str(MAX_SEATS)):
+        return DEFAULT_SEATS
+    seats = int(raw)
+    return seats if 1 <= seats <= MAX_SEATS else DEFAULT_SEATS
 
 
 def plan_labels() -> list[str]:
