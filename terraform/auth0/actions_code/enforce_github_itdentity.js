@@ -1,4 +1,3 @@
-const axios = require('axios');
 const ManagementClient = require('auth0').ManagementClient;
 
 exports.onExecutePostLogin = async (event, api) => {
@@ -13,105 +12,30 @@ exports.onExecutePostLogin = async (event, api) => {
 
     const userProfile = await management.users.get({ id: event.user.user_id });
     const githubIdentity = userProfile.identities.find(id => id.provider === 'github');
+    const access_token = githubIdentity.access_token
+    const githubUsername = githubIdentity.profileData ? githubIdentity.profileData.nickname : event.user.nickname;
 
     if (!githubIdentity || !githubIdentity.access_token) {
       return api.access.deny('Could not verify your GitHub identity permissions.');
     }
 
-    // Verify GitHub Organisation membership
-    const allowedOrgs = ["ministryofjustice", "jac-uk"];
-    let isOrgMember = false;
-
-    for (const org of allowedOrgs) {
-      try {
-        const response = await axios.get(`https://api.github.com/user/memberships/orgs/$${org}`, {
-          headers: {
-            Authorization: `token $${githubIdentity.access_token}`,
-            'User-Agent': 'Auth0-Action-Org-Enforcer',
-            'Accept': 'application/vnd.github.v3+json'
-          }
-        });
-        
-        isOrgMember = true;
-        break
-      } catch (githubError) {
-        if (githubError.response && githubError.response.status === 404) {
-          console.log(`User is not a member of the organisation: $${org}`);
-          continue
-        }
-        throw githubError;
-      }
+    if (!githubUsername) {
+      return api.access.deny('Authentication failed: Could not determine your GitHub username.');
     }
+
+    // Verify GitHub Organisation membership
+    let isOrgMember = checkOrgsMembershipAtLeastOne(access_token, allowedOrgs);
 
     if (!isOrgMember) {
       return api.access.deny(`Access Denied: You are not a member of an authorised organisation:$${allowedOrgs.join(', ')}`);
     };
 
     // Set user application role
-    let githubRole = 'member';
-    let adminTeam = 'moj-copilot-credits-dashboard-admin'
-    const githubUsername = githubIdentity.profileData ? githubIdentity.profileData.nickname : event.user.nickname;
+    const githubRole = assignUserRole(access_token, githubUsername);
 
-    try {
-      await axios.get(
-        `https://api.github.com/orgs/ministryofjustice/teams/$${adminTeam}/memberships/$${githubUsername}`,
-        {
-          headers: {
-            Authorization: `token $${githubIdentity.access_token}`,
-            'User-Agent': 'Auth0-Action-Org-Enforcer',
-            'Accept': 'application/vnd.github.v3+json'
-          }
-        }
-      );
-          
-      githubRole = 'admin';
-    } catch (teamError) {
-      if (teamError.response && teamError.response.status === 404) {
-        console.log(`User is not a member of the team: $${adminTeam}`);
-      } else {
-        throw teamError;
-      }
-    }
-
-    console.log(`User github role: $${githubRole}`);
-
-    // Dev: Verify user memership of approved teams
+    // Dev: Verify user membership of approved teams
     if ("${environment}" == "development") {
-       const allowedTeamSlugs = [
-        "cloud-optimisation-and-accountability",
-        "octo-developer-experience"
-      ];
-      
-      if (!githubUsername) {
-        return api.access.deny('Authentication failed: Could not determine your GitHub username.');
-      }
-
-      let isTeamMember = false;
-
-      for (const teamSlug of allowedTeamSlugs) {
-        try {
-          await axios.get(
-            `https://api.github.com/orgs/ministryofjustice/teams/$${teamSlug}/memberships/$${githubUsername}`,
-            {
-              headers: {
-                Authorization: `token $${githubIdentity.access_token}`,
-                'User-Agent': 'Auth0-Action-Org-Enforcer',
-                'Accept': 'application/vnd.github.v3+json'
-              }
-            }
-          );
-          
-          isTeamMember = true;
-          console.log(`User is a member of the team: $${teamSlug}`);
-          break;
-        } catch (teamError) {
-          if (teamError.response && teamError.response.status === 404) {
-            console.log(`User is not a member of the team: $${teamSlug}`);
-            continue;
-          }
-          throw teamError;
-        }
-      }
+      const isTeamMember = checkTeamMembershipAtLeastOne(access_token, username, coreGitHubOrg, devTeamSlugs);
 
       if (!isTeamMember) {
         return api.access.deny('Access Denied: You are not authorized under the required GitHub teams.');
