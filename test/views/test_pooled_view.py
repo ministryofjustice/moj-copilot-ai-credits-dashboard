@@ -15,6 +15,23 @@ def test_resolve_seats_defaults_and_validates():
     assert ac.resolve_seats("0") == 480
 
 
+def test_resolve_seats_enforces_upper_bound():
+    assert ac.resolve_seats("2000") == 2000
+    assert ac.resolve_seats("2001") == 480
+    assert ac.resolve_seats("999999999999999999") == 480
+
+
+def test_resolve_seats_accepts_only_plain_digit_strings():
+    assert ac.resolve_seats("1_000") == 480
+    assert ac.resolve_seats(" 12 ") == 480
+    assert ac.resolve_seats("+5") == 480
+    assert ac.resolve_seats("١٢") == 480  # non-ASCII digits int() would accept
+    assert ac.resolve_seats("12.0") == 480
+    assert ac.resolve_seats("<script>alert(1)</script>") == 480
+    assert ac.resolve_seats("1e3") == 480
+    assert ac.resolve_seats("0" * 5000) == 480  # absurdly long digit string
+
+
 def test_pooled_view_no_data(fake_source):
     v = ac.pooled_view(fake_source([]), period="weekly", key=None, plan=None, seats=None)
     assert v["has_data"] is False
