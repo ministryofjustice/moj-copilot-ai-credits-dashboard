@@ -64,6 +64,11 @@ resource "auth0_action" "enforce_github_identity" {
     name  = "AUTH0_MANAGEMENT_CLIENT_SECRET"
     value = auth0_client_credentials.auth0_actions_management_client.client_secret
   }
+
+  depends_on = [
+    auth0_action_module.config,
+    auth0_action_module.validate_github_profile
+  ]
 }
 
 resource "auth0_trigger_actions" "post_login" {
