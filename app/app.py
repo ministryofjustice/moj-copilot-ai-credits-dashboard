@@ -4,7 +4,6 @@ import logging
 from flask import Flask
 
 from app.main.config.app_config import app_config
-from app.main.config.cors_config import configure_cors
 from app.main.config.error_handlers_config import configure_error_handlers
 from app.main.config.jinja_config import configure_jinja
 from app.main.config.limiter_config import configure_limiter
@@ -36,7 +35,6 @@ def create_app(is_rate_limit_enabled=True) -> Flask:
     configure_sentry(app_config.sentry.dsn_key, app_config.sentry.environment)
     configure_limiter(app, is_rate_limit_enabled)
     configure_jinja(app)
-    configure_cors(app)
 
     logger.info("Running app...")
 
