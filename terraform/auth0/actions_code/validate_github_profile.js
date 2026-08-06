@@ -79,8 +79,8 @@ function checkTeamMembershipAtLeastOne(access_token, username, org, teams) {
   return false;
 };
 
-function assignUserRole(access_token, username) {
-  const githubRole = checkGitHubTeamMembership(access_token, username, coreGitHubOrg, adminTeam) ? "admin" : "member";
+function assignUserRole(access_token, org, adminTeam, username) {
+  const githubRole = checkGitHubTeamMembership(access_token, username, org, adminTeam) ? "admin" : "member";
 
   console.log(`User github role: $${githubRole}`);
 

@@ -1,4 +1,6 @@
 const ManagementClient = require('auth0').ManagementClient;
+const vghp = require('validate_github_profile');
+const config = require('config');
 
 exports.onExecutePostLogin = async (event, api) => {
   if (event.connection.strategy !== 'github') return;
@@ -10,6 +12,13 @@ exports.onExecutePostLogin = async (event, api) => {
       clientSecret: event.secrets.AUTH0_MANAGEMENT_CLIENT_SECRET,
     });
 
+    // Config
+    const coreGitHubOrg = config.coreGitHubOrg;
+    const allowedOrgs = config.allowedOrgs;
+    const adminTeam = config.adminTeam;
+    const devTeamSlugs = config.devTeamSlugs;
+
+    // Set github profile variables
     const userProfile = await management.users.get({ id: event.user.user_id });
     const githubIdentity = userProfile.identities.find(id => id.provider === 'github');
     const access_token = githubIdentity.access_token
@@ -24,18 +33,18 @@ exports.onExecutePostLogin = async (event, api) => {
     }
 
     // Verify GitHub Organisation membership
-    let isOrgMember = checkOrgsMembershipAtLeastOne(access_token, allowedOrgs);
+    let isOrgMember = vghp.checkOrgsMembershipAtLeastOne(access_token, allowedOrgs);
 
     if (!isOrgMember) {
       return api.access.deny(`Access Denied: You are not a member of an authorised organisation:$${allowedOrgs.join(', ')}`);
     };
 
     // Set user application role
-    const githubRole = assignUserRole(access_token, githubUsername);
+    const githubRole = vghp.assignUserRole(access_token, coreGitHubOrg, adminTeam, githubUsername);
 
     // Dev: Verify user membership of approved teams
     if ("${environment}" == "development") {
-      const isTeamMember = checkTeamMembershipAtLeastOne(access_token, username, coreGitHubOrg, devTeamSlugs);
+      const isTeamMember = vghp.checkTeamMembershipAtLeastOne(access_token, username, coreGitHubOrg, devTeamSlugs);
 
       if (!isTeamMember) {
         return api.access.deny('Access Denied: You are not authorized under the required GitHub teams.');
