@@ -23,6 +23,13 @@ def create_app(is_rate_limit_enabled=True) -> Flask:
     app = Flask(__name__, static_folder="static", static_url_path="/assets")
 
     app.secret_key = app_config.flask.app_secret_key
+    app.config.update(
+        SESSION_COOKIE_SECURE=True,
+        SESSION_COOKIE_HTTPONLY=True,
+        # Lax, not Strict: the Auth0 callback is a top-level cross-site
+        # redirect and Authlib reads the OAuth state from the session there.
+        SESSION_COOKIE_SAMESITE="Lax",
+    )
 
     configure_routes(app)
     configure_error_handlers(app)
