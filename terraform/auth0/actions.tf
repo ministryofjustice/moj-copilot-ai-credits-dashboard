@@ -1,3 +1,25 @@
+resource "auth0_action_module" "config" {
+  name    = "config"
+  publish = true
+  code    = file("${path.module}/actions_code/config.js")
+}
+
+resource "auth0_action_module" "validate_github_profile" {
+  name    = "validate_github_profile"
+  publish = true
+  code    = file("${path.module}/actions_code/validate_github_profile.js")
+
+  dependencies {
+    name    = "axios"
+    version = "1.18.1"
+  }
+
+  secrets {
+    name  = "API_KEY"
+    value = "my-secret-api-key"
+  }
+}
+
 resource "auth0_action" "enforce_github_identity" {
   code               = templatefile("${path.module}/actions_code/enforce_github_itdentity.js", {
     uri_namespace = "https://${var.webapp_domain}",
@@ -13,13 +35,18 @@ resource "auth0_action" "enforce_github_identity" {
   }
 
   dependencies {
-    name    = "axios"
-    version = "1.18.1"
-  }
-
-  dependencies {
     name    = "auth0"
     version = "3.3.0"
+  }
+
+  modules {
+    module_id         = auth0_action_module.config.id
+    module_version_id = auth0_action_module.config.version_id
+  }
+
+  modules {
+    module_id         = auth0_action_module.validate_github_profile.id
+    module_version_id = auth0_action_module.validate_github_profile.version_id
   }
 
   secrets_wo_version = 1
