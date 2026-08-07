@@ -5,7 +5,7 @@ async function checkGitHubOrganisationMembership(access_token, org) {
     console.log("Sending request for membership check");
     const response = await axios.get(`https://api.github.com/user/memberships/orgs/${org}`, {
       headers: {
-        Authorization: `token $${access_token}`,
+        Authorization: `token ${access_token}`,
         'User-Agent': 'Auth0-Action-Org-Enforcer',
         'Accept': 'application/vnd.github.v3+json'
       }
@@ -46,7 +46,7 @@ async function checkGitHubTeamMembership(access_token, username, org, team) {
       `https://api.github.com/orgs/${org}/teams/${team}/memberships/${username}`,
       {
         headers: {
-          Authorization: `token $${access_token}`,
+          Authorization: `token ${access_token}`,
           'User-Agent': 'Auth0-Action-Org-Enforcer',
           'Accept': 'application/vnd.github.v3+json'
         }
