@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-function checkGitHubOrganisationMembership(access_token, org) {
+async function checkGitHubOrganisationMembership(access_token, org) {
   try {
     const response = await axios.get(`https://api.github.com/user/memberships/orgs/$${org}`, {
       headers: {
@@ -24,9 +24,9 @@ function checkGitHubOrganisationMembership(access_token, org) {
   return false;
 };
 
-function checkOrgsMembershipAtLeastOne(access_token, orgs) {
+async function checkOrgsMembershipAtLeastOne(access_token, orgs) {
   for (const org of orgs) {
-    const isMember = checkGitHubOrganisationMembership(org);
+    const isMember = await checkGitHubOrganisationMembership(org);
 
     if (isMember) {
       return true;
@@ -38,7 +38,7 @@ function checkOrgsMembershipAtLeastOne(access_token, orgs) {
   return false;
 }
 
-function checkGitHubTeamMembership(access_token, username, org, team) {
+async function checkGitHubTeamMembership(access_token, username, org, team) {
   try {
     await axios.get(
       `https://api.github.com/orgs/$${org}/teams/$${team}/memberships/$${username}`,
@@ -65,9 +65,9 @@ function checkGitHubTeamMembership(access_token, username, org, team) {
   return false;
 };
 
-function checkTeamMembershipAtLeastOne(access_token, username, org, teams) {
+async function checkTeamMembershipAtLeastOne(access_token, username, org, teams) {
   for (const team of teams) {
-    const isMember = checkGitHubTeamMembership(access_token, username, org, team);
+    const isMember = await checkGitHubTeamMembership(access_token, username, org, team);
 
     if (isMember) {
       return true;
@@ -79,8 +79,8 @@ function checkTeamMembershipAtLeastOne(access_token, username, org, teams) {
   return false;
 };
 
-function assignUserRole(access_token, org, adminTeam, username) {
-  const githubRole = checkGitHubTeamMembership(access_token, username, org, adminTeam) ? "admin" : "member";
+async function assignUserRole(access_token, org, adminTeam, username) {
+  const githubRole = await checkGitHubTeamMembership(access_token, username, org, adminTeam) ? "admin" : "member";
 
   console.log(`User github role: $${githubRole}`);
 
