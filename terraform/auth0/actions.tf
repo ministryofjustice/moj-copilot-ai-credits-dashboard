@@ -13,11 +13,6 @@ resource "auth0_action_module" "validate_github_profile" {
     name    = "axios"
     version = "1.18.1"
   }
-
-  secrets {
-    name  = "API_KEY"
-    value = "my-secret-api-key"
-  }
 }
 
 resource "auth0_action" "enforce_github_identity" {
