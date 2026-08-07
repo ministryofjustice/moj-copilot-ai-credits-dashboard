@@ -44,7 +44,7 @@ exports.onExecutePostLogin = async (event, api) => {
 
     // Dev: Verify user membership of approved teams
     if ("${environment}" == "development") {
-      const isTeamMember = vghp.checkTeamMembershipAtLeastOne(access_token, username, coreGitHubOrg, devTeamSlugs);
+      const isTeamMember = vghp.checkTeamMembershipAtLeastOne(access_token, githubUsername, coreGitHubOrg, devTeamSlugs);
 
       if (!isTeamMember) {
         return api.access.deny('Access Denied: You are not authorized under the required GitHub teams.');
