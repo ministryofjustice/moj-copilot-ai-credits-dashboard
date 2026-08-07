@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 def client_error(err: Exception):
     logger.info("There was an error with the client request %s", err)
-    return render_template("pages/errors/400.html", error_message=str(err)), 400
+    return render_template("pages/errors/400.html"), 400
 
 
 def page_not_found(err: Exception):
@@ -21,13 +21,17 @@ def server_forbidden(err: Exception):
 
 
 def unknown_server_error(err: Exception):
-    logger.info("An unknown server error occurred: %s", err)
+    # The detail stays server-side: the page must not carry paths, table names
+    # or query text back to the user (CWE-209). Log the original exception
+    # rather than the wrapper, whose message is only "500 Internal Server Error".
     original = getattr(err, "original_exception", None) or err
-    error_detail = f"{type(original).__name__}: {original}"
-    return (
-        render_template("pages/errors/500.html", error_detail=error_detail),
-        500,
+    logger.error(
+        "An unknown server error occurred: %s: %s",
+        type(original).__name__,
+        original,
+        exc_info=original,
     )
+    return render_template("pages/errors/500.html"), 500
 
 
 def gateway_timeout(err: Exception):
