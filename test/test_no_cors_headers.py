@@ -14,6 +14,6 @@ def client():
     return create_app(False).test_client()
 
 
-def test_no_cors_headers_on_cross_origin_request(client):
+def test_no_cors_headers_on_cross_origin_request(client):  # pylint: disable=redefined-outer-name
     response = client.get("/", headers={"Origin": "https://evil.example"})
     assert "Access-Control-Allow-Origin" not in response.headers

@@ -17,13 +17,13 @@ def app():
     return create_app(False)
 
 
-def test_session_cookie_is_secure(app):
+def test_session_cookie_is_secure(app):  # pylint: disable=redefined-outer-name
     assert app.config["SESSION_COOKIE_SECURE"] is True
 
 
-def test_session_cookie_is_httponly(app):
+def test_session_cookie_is_httponly(app):  # pylint: disable=redefined-outer-name
     assert app.config["SESSION_COOKIE_HTTPONLY"] is True
 
 
-def test_session_cookie_samesite_is_lax(app):
+def test_session_cookie_samesite_is_lax(app):  # pylint: disable=redefined-outer-name
     assert app.config["SESSION_COOKIE_SAMESITE"] == "Lax"
