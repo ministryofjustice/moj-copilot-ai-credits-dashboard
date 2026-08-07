@@ -45,6 +45,7 @@ resource "auth0_action" "enforce_github_identity" {
   }
 
   secrets_wo_version = 1
+  
   secrets_wo {
     name  = "AUTH0_DOMAIN"
     value = var.auth0_domain
