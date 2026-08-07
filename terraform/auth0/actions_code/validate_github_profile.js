@@ -2,6 +2,7 @@ const axios = require('axios');
 
 async function checkGitHubOrganisationMembership(access_token, org) {
   try {
+    console.log("Sending request for membership check");
     const response = await axios.get(`https://api.github.com/user/memberships/orgs/$${org}`, {
       headers: {
         Authorization: `token $${access_token}`,
@@ -12,8 +13,9 @@ async function checkGitHubOrganisationMembership(access_token, org) {
         
     return true
   } catch (githubError) {
+    console.log(`Error from org check: ${githubError}`);
     if (githubError.response && githubError.response.status === 404) {
-      console.log(`User is not a member of the organisation: $${org}`);
+      console.log(`User is not a member of the organisation: ${org}`);
       return false
     }
     throw githubError;
@@ -32,7 +34,7 @@ async function checkOrgsMembershipAtLeastOne(access_token, orgs) {
       return true;
     }
 
-    console.log(`User is not a member of the organisation: $${org}`);
+    console.log(`User is not a member of the organisation: ${org}`);
   }
 
   return false;
@@ -73,7 +75,7 @@ async function checkTeamMembershipAtLeastOne(access_token, username, org, teams)
       return true;
     }
 
-    console.log(`User is not a member of the team: $${team}`);
+    console.log(`User is not a member of the team: ${team}`);
   }
 
   return false;
@@ -82,7 +84,7 @@ async function checkTeamMembershipAtLeastOne(access_token, username, org, teams)
 async function assignUserRole(access_token, org, adminTeam, username) {
   const githubRole = await checkGitHubTeamMembership(access_token, username, org, adminTeam) ? "admin" : "member";
 
-  console.log(`User github role: $${githubRole}`);
+  console.log(`User github role: ${githubRole}`);
 
   return githubRole;
 };
