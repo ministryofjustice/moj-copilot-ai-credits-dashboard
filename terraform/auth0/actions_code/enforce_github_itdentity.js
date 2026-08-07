@@ -42,14 +42,14 @@ exports.onExecutePostLogin = async (event, api) => {
     // Set user application role
     const githubRole = await vghp.assignUserRole(access_token, coreGitHubOrg, adminTeam, githubUsername);
 
-    // // Dev: Verify user membership of approved teams
-    // if ("${environment}" == "development") {
-    //   const isTeamMember = await vghp.checkTeamMembershipAtLeastOne(access_token, githubUsername, coreGitHubOrg, devTeamSlugs);
+    // Dev: Verify user membership of approved teams
+    if ("${environment}" == "development") {
+      const isTeamMember = await vghp.checkTeamMembershipAtLeastOne(access_token, githubUsername, coreGitHubOrg, devTeamSlugs);
 
-    //   if (!isTeamMember) {
-    //     return api.access.deny('Access Denied: You are not authorized under the required GitHub teams.');
-    //   }
-    // }
+      if (!isTeamMember) {
+        return api.access.deny('Access Denied: You are not authorized under the required GitHub teams.');
+      }
+    }
 
     // Add user role to user session token
     await management.users.update(
