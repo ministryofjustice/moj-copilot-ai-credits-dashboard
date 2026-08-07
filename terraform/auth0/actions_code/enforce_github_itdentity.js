@@ -39,8 +39,8 @@ exports.onExecutePostLogin = async (event, api) => {
       return api.access.deny(`Access Denied: You are not a member of an authorised organisation:$${allowedOrgs.join(', ')}`);
     };
 
-    // // Set user application role
-    // const githubRole = await vghp.assignUserRole(access_token, coreGitHubOrg, adminTeam, githubUsername);
+    // Set user application role
+    const githubRole = await vghp.assignUserRole(access_token, coreGitHubOrg, adminTeam, githubUsername);
 
     // // Dev: Verify user membership of approved teams
     // if ("${environment}" == "development") {
@@ -50,8 +50,6 @@ exports.onExecutePostLogin = async (event, api) => {
     //     return api.access.deny('Access Denied: You are not authorized under the required GitHub teams.');
     //   }
     // }
-
-    githubRole = "admin";
 
     // Add user role to user session token
     await management.users.update(

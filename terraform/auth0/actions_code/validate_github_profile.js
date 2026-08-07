@@ -2,7 +2,6 @@ const axios = require('axios');
 
 async function checkGitHubOrganisationMembership(access_token, org) {
   try {
-    console.log("Sending request for membership check");
     const response = await axios.get(`https://api.github.com/user/memberships/orgs/${org}`, {
       headers: {
         Authorization: `token ${access_token}`,
@@ -13,7 +12,6 @@ async function checkGitHubOrganisationMembership(access_token, org) {
 
     return true
   } catch (githubError) {
-    console.log(`Error from org check: ${githubError}`);
     if (githubError.response && githubError.response.status === 404) {
       console.log(`User is not a member of the organisation: ${org}`);
       return false
