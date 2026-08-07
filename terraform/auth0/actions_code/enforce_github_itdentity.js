@@ -33,18 +33,18 @@ exports.onExecutePostLogin = async (event, api) => {
     }
 
     // Verify GitHub Organisation membership
-    let isOrgMember = vghp.checkOrgsMembershipAtLeastOne(access_token, allowedOrgs);
+    let isOrgMember = await vghp.checkOrgsMembershipAtLeastOne(access_token, allowedOrgs);
 
     if (!isOrgMember) {
       return api.access.deny(`Access Denied: You are not a member of an authorised organisation:$${allowedOrgs.join(', ')}`);
     };
 
     // Set user application role
-    const githubRole = vghp.assignUserRole(access_token, coreGitHubOrg, adminTeam, githubUsername);
+    const githubRole = await vghp.assignUserRole(access_token, coreGitHubOrg, adminTeam, githubUsername);
 
     // Dev: Verify user membership of approved teams
     if ("${environment}" == "development") {
-      const isTeamMember = vghp.checkTeamMembershipAtLeastOne(access_token, githubUsername, coreGitHubOrg, devTeamSlugs);
+      const isTeamMember = await vghp.checkTeamMembershipAtLeastOne(access_token, githubUsername, coreGitHubOrg, devTeamSlugs);
 
       if (!isTeamMember) {
         return api.access.deny('Access Denied: You are not authorized under the required GitHub teams.');
