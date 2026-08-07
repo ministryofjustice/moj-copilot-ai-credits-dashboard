@@ -1,6 +1,6 @@
 const ManagementClient = require('auth0').ManagementClient;
-const vghp = require('validate_github_profile');
-const config = require('config');
+const vghp = require('actions:validate_github_profile');
+const config = require('actions:config');
 
 exports.onExecutePostLogin = async (event, api) => {
   if (event.connection.strategy !== 'github') return;
