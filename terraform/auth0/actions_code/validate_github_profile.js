@@ -28,7 +28,7 @@ async function checkGitHubOrganisationMembership(access_token, org) {
 
 async function checkOrgsMembershipAtLeastOne(access_token, orgs) {
   for (const org of orgs) {
-    const isMember = await checkGitHubOrganisationMembership(org);
+    const isMember = await checkGitHubOrganisationMembership(access_token, org);
 
     if (isMember) {
       return true;

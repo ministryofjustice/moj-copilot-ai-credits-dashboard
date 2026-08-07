@@ -21,7 +21,7 @@ exports.onExecutePostLogin = async (event, api) => {
     // Set github profile variables
     const userProfile = await management.users.get({ id: event.user.user_id });
     const githubIdentity = userProfile.identities.find(id => id.provider === 'github');
-    const access_token = githubIdentity.access_token
+    const access_token = githubIdentity.access_token;
     const githubUsername = githubIdentity.profileData ? githubIdentity.profileData.nickname : event.user.nickname;
 
     if (!githubIdentity || !githubIdentity.access_token) {
