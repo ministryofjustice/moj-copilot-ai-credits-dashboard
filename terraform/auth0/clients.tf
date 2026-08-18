@@ -185,7 +185,7 @@ resource "auth0_client" "copilot_credits" {
   is_first_party                                       = true
   is_token_endpoint_ip_header_trusted                  = false
   logo_uri                                             = null
-  name                                                 = "CoPilot Credits"
+  name                                                 = "CoPilot Creditss"
   oidc_conformant                                      = true
   organization_discovery_methods                       = []
   organization_require_behavior                        = null
