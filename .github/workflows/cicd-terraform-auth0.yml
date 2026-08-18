@@ -50,6 +50,25 @@ jobs:
           echo "TF_VAR_webapp_domain=${{ matrix.environment == 'production' && 'check-my-copilot-ai-credits-usage.service.justice.gov.uk' || 'moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk' }}" >> $GITHUB_ENV
           echo "TF_VAR_environment=${{ matrix.environment == 'production' && 'production' || 'development' }}" >> $GITHUB_ENV
 
+      - name: Debug role ARN metadata (safe)
+        shell: bash
+        env:
+          ROLE_ARN: ${{ matrix.environment == 'production' && secrets.PROD_S3_ROLE_TO_ASSUME || secrets.DEV_S3_ROLE_TO_ASSUME }}
+        run: |
+          echo "env=${{ matrix.environment }}"
+          echo "role_arn_length=${#ROLE_ARN}"
+          echo "account_id=$(echo "$ROLE_ARN" | cut -d: -f5)"
+          echo "role_name=$(echo "$ROLE_ARN" | cut -d/ -f2-)"
+
+      - name: Debug OIDC claims
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const token = await core.getIDToken('sts.amazonaws.com');
+            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
+            core.info(`sub=${payload.sub}`);
+            core.info(`aud=${payload.aud}`);
+
       - name: Configure AWS credentials for Terraform
         uses: aws-actions/configure-aws-credentials@486457dc46e82b9a740ca0ef1dac6a38a3fc272d # v4.0.2
         with:
