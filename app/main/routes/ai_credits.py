@@ -9,10 +9,12 @@ replacement for Streamlit's reactive widgets):
     /admin/weekly  Org weekly — ?plan=<plan>&week=YYYY-Www
     /admin/daily   Org daily  — ?day=YYYY-MM-DD
 
-`plan` takes different values per page: "/" accepts the My Usage budgets
-($200 / month, the default, or $39 / month), while the two admin pages accept
-the pooled budgets ($70 / month, the default, or $39 / month). An unrecognised
-value falls back to that page's default.
+`plan` takes different values per page. "/" and /admin/weekly measure a person
+against what we allocate them out of the pool, so they accept $200 / month (the
+default) or $39 / month. /admin/pooled sizes the pool from what GitHub bills per
+seat, so it accepts $39 / month only. An unrecognised value — including the
+$70 / month tier withdrawn in September 2026 — falls back to that page's
+default.
 
 The data backend is resolved per request via `get_reports_source()` (local files
 today, DB later) so these handlers never touch storage directly.
