@@ -14,7 +14,7 @@ def _rows():
 
 
 def test_summary_anchors_to_latest_day(fake_source):
-    v = ac.user_view(fake_source(_rows()), "a", "$70 / month", None)
+    v = ac.user_view(fake_source(_rows()), "a", "$200 / month", None)
     s = v["summary"]
     assert s["as_of"] == "2026-06-23"
     assert s["last_day"]["credits"] == approx(50.0)
@@ -25,13 +25,13 @@ def test_summary_anchors_to_latest_day(fake_source):
 
 
 def test_summary_pct_against_allowances(fake_source):
-    v = ac.user_view(fake_source(_rows()), "a", "$70 / month", None)
+    v = ac.user_view(fake_source(_rows()), "a", "$200 / month", None)
     s = v["summary"]
-    weekly = 70 * 100 / 4.33
+    weekly = 200 * 100 / 4.33
     assert s["wtd"]["allowance"] == approx(weekly)
     assert s["wtd"]["pct"] == approx(150.0 / weekly)
     assert s["wtd"]["remaining"] == approx(weekly - 150.0)
-    assert s["mtd"]["allowance"] == approx(70 * 100)
+    assert s["mtd"]["allowance"] == approx(200 * 100)
     assert s["last_day"]["allowance"] == approx(weekly / 7.0)
 
 
@@ -50,7 +50,7 @@ def test_example_login_empty_when_no_data(fake_source):
 
 
 def test_user_view_drops_top_model(fake_source):
-    v = ac.user_view(fake_source(_rows()), "a", "$70 / month", None)
+    v = ac.user_view(fake_source(_rows()), "a", "$200 / month", None)
     assert "top_model" not in v
     assert all("top_model" not in w for w in v["weekly"])
     assert all("usd" not in w for w in v["weekly"])

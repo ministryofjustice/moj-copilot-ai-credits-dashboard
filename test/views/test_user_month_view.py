@@ -25,7 +25,7 @@ def _rows(make_record):
 
 
 def test_months_selector_defaults_to_latest_month(fake_source, make_record):
-    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$70 / month")
+    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$200 / month")
     assert v["months"] == ["2026-05", "2026-06", "2026-07"]
     assert v["month"] == "2026-07"
     assert v["month_label"] == "Jul 2026"
@@ -41,33 +41,33 @@ def test_month_selectable_before_first_full_iso_week(fake_source, make_record):
     July record still sits in a week whose Monday falls in June (the bug that
     hid July from the menu)."""
     rows = _rows(make_record)[:-1]  # drop 2026-07-06; only 2026-07-01 remains
-    v = ac.user_view(fake_source(rows), "alice", "$70 / month")
+    v = ac.user_view(fake_source(rows), "alice", "$200 / month")
     assert v["months"] == ["2026-05", "2026-06", "2026-07"]
     assert v["month"] == "2026-07"
 
 
 def test_month_weeks_lists_each_week_touching_selected_month(fake_source, make_record):
-    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$70 / month", "2026-06")
+    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$200 / month", "2026-06")
     assert [w["week_label"] for w in v["month_weeks"]] == [
         "2026-W23", "2026-W24", "2026-W27",
     ]
     assert [w["credits"] for w in v["month_weeks"]] == approx([20.0, 30.0, 45.0])
     w27 = v["month_weeks"][-1]
     assert w27["range"] == "29 Jun – 5 Jul"
-    weekly = 70 * 100 / 4.33
+    weekly = 200 * 100 / 4.33
     assert w27["pct"] == approx(45.0 / weekly)
     assert w27["remaining"] == approx(weekly - 45.0)
 
 
 def test_straddling_week_appears_under_both_months(fake_source, make_record):
-    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$70 / month", "2026-07")
+    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$200 / month", "2026-07")
     assert [w["week_label"] for w in v["month_weeks"]] == ["2026-W27", "2026-W28"]
     # Whole-week credits (the allowance is weekly), not just the July days.
     assert [w["credits"] for w in v["month_weeks"]] == approx([45.0, 7.0])
 
 
 def test_month_weekly_chart_labels_and_credits(fake_source, make_record):
-    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$70 / month", "2026-06")
+    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$200 / month", "2026-06")
     assert v["month_weekly_chart"]["labels"] == [
         "2026-W23 (1–7 Jun)",
         "2026-W24 (8–14 Jun)",
@@ -79,7 +79,7 @@ def test_month_weekly_chart_labels_and_credits(fake_source, make_record):
 def test_month_cumulative_scoped_to_calendar_days(fake_source, make_record):
     """June's cumulative chart must contain June days only — no July spill-over
     from the straddling week (the bug that showed July data under Jun 2026)."""
-    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$70 / month", "2026-06")
+    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$200 / month", "2026-06")
     mc = v["month_cumulative"]
     assert mc["chart"]["labels"] == ["2026-06-01", "2026-06-08", "2026-06-29"]
     assert mc["chart"]["cumulative"] == approx([20.0, 50.0, 90.0])
@@ -87,7 +87,7 @@ def test_month_cumulative_scoped_to_calendar_days(fake_source, make_record):
 
 
 def test_month_cumulative_resets_at_month_start(fake_source, make_record):
-    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$70 / month", "2026-07")
+    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$200 / month", "2026-07")
     mc = v["month_cumulative"]
     assert mc["chart"]["labels"] == ["2026-07-01", "2026-07-06"]
     assert mc["chart"]["cumulative"] == approx([5.0, 12.0])
@@ -95,11 +95,11 @@ def test_month_cumulative_resets_at_month_start(fake_source, make_record):
 
 
 def test_unknown_month_falls_back_to_latest(fake_source, make_record):
-    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$70 / month", "1999-01")
+    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$200 / month", "1999-01")
     assert v["month"] == "2026-07"
 
 
 def test_user_view_drops_single_week_daily_breakdown(fake_source, make_record):
-    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$70 / month", "2026-06")
+    v = ac.user_view(fake_source(_rows(make_record)), "alice", "$200 / month", "2026-06")
     assert "daily" not in v
     assert "daily_chart" not in v

@@ -23,7 +23,7 @@
 <form method="get" action="/admin/weekly" class="govuk-!-margin-bottom-4" data-auto-submit>
   <div class="govuk-grid-row">
     <div class="govuk-grid-column-one-third">
-      {{ govukSelect({"id": "plan", "name": "plan", "label": {"text": "Plan budget"}, "items": plan_items}) }}
+      {{ govukSelect({"id": "plan", "name": "plan", "label": {"text": "Monthly budget per user"}, "items": plan_items}) }}
     </div>
     <div class="govuk-grid-column-one-third">
       {{ govukSelect({"id": "week", "name": "week", "label": {"text": "ISO week"}, "items": week_items}) }}

@@ -44,9 +44,15 @@ def example_login(source: ReportsSource) -> str:
 # to get the weekly denominator for the "% used / remaining" view.
 CREDITS_PER_USD = 100.0
 WEEKS_PER_MONTH = 4.33
-# Selectable monthly per-seat AI-credit budgets (USD).
-PLAN_TIERS_USD_PER_MONTH = {"$70 / month": 70.0, "$39 / month": 39.0}
-DEFAULT_PLAN = "$70 / month"
+# Selectable monthly per-seat AI-credit budgets (USD) for the My Usage page and
+# the admin weekly per-user table: how much we choose to allocate a seat out of
+# the pool. The $70 tier ceased to exist in September 2026.
+PLAN_TIERS_USD_PER_MONTH = {"$200 / month": 200.0, "$39 / month": 39.0}
+DEFAULT_PLAN = "$200 / month"
+# The pooled page sizes the pool from what GitHub actually bills per seat, which
+# is $39 and does not vary — so it offers that one value only.
+POOL_PLAN_TIERS_USD_PER_MONTH = {"$39 / month": 39.0}
+POOL_DEFAULT_PLAN = "$39 / month"
 DEFAULT_SEATS = 480
 MAX_SEATS = 2000
 # The dataset has no scope column; the enterprise it covers is fixed.
@@ -73,29 +79,43 @@ def resolve_seats(raw) -> int:
     return seats if 1 <= seats <= MAX_SEATS else DEFAULT_SEATS
 
 
-def plan_labels() -> list[str]:
-    return list(PLAN_TIERS_USD_PER_MONTH)
+def plan_labels(tiers: dict | None = None) -> list[str]:
+    """Budget labels for a dropdown; the admin list unless `tiers` says otherwise."""
+    return list(tiers if tiers is not None else PLAN_TIERS_USD_PER_MONTH)
 
 
-def resolve_plan(plan: str | None) -> str:
-    return plan if plan in PLAN_TIERS_USD_PER_MONTH else DEFAULT_PLAN
+def resolve_plan(plan: str | None, tiers: dict | None = None,
+                 default: str | None = None) -> str:
+    """Allowlist a ?plan= value against one budget list, else that list's default.
+
+    Callers pass USER_PLAN_TIERS_USD_PER_MONTH / USER_DEFAULT_PLAN for the My
+    Usage page, so an admin-only label arriving in the query string falls back
+    rather than being honoured.
+    """
+    tiers = tiers if tiers is not None else PLAN_TIERS_USD_PER_MONTH
+    default = default if default is not None else DEFAULT_PLAN
+    return plan if plan in tiers else default
 
 
-def weekly_allowance(plan: str) -> float:
+def weekly_allowance(plan: str, tiers: dict | None = None,
+                     default: str | None = None) -> float:
     """Weekly per-seat credit allowance for a plan label."""
-    monthly_usd = PLAN_TIERS_USD_PER_MONTH[resolve_plan(plan)]
+    tiers = tiers if tiers is not None else PLAN_TIERS_USD_PER_MONTH
+    monthly_usd = tiers[resolve_plan(plan, tiers, default)]
     return monthly_usd * CREDITS_PER_USD / WEEKS_PER_MONTH
 
 
-def plan_limits(plan: str) -> dict:
+def plan_limits(plan: str, tiers: dict | None = None,
+                default: str | None = None) -> dict:
     """Per-seat credit allowance at each timeframe, derived from the plan.
 
     Monthly is the headline budget ($1 = 100 credits); weekly spreads it over an
     average ISO week (month / 4.33); daily is the weekly figure / 7.
     """
-    plan = resolve_plan(plan)
-    weekly = weekly_allowance(plan)
-    monthly = PLAN_TIERS_USD_PER_MONTH[plan] * CREDITS_PER_USD
+    tiers = tiers if tiers is not None else PLAN_TIERS_USD_PER_MONTH
+    plan = resolve_plan(plan, tiers, default)
+    weekly = weekly_allowance(plan, tiers, default)
+    monthly = tiers[plan] * CREDITS_PER_USD
     return {"daily": weekly / 7.0, "weekly": weekly, "monthly": monthly}
 
 
@@ -516,7 +536,8 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     figures are AI credits.
     """
     period = "weekly" if period == "weekly" else "monthly"
-    plan = resolve_plan(plan)
+    tiers, tier_default = POOL_PLAN_TIERS_USD_PER_MONTH, POOL_DEFAULT_PLAN
+    plan = resolve_plan(plan, tiers, tier_default)
     seats = resolve_seats(seats)
     records = _user_records(source)
     mrows = source.model_rows()
@@ -524,8 +545,8 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     keys = sorted({_record_period_key(r["day"], period) for r in records})
 
     base = {
-        "period": period, "plans": plan_labels(), "plan": plan, "seats": seats,
-        "periods": keys,
+        "period": period, "plans": plan_labels(tiers), "plan": plan,
+        "seats": seats, "periods": keys,
     }
     if not keys:
         return {**base, "has_data": False, "key": None}
@@ -536,7 +557,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
         if _record_period_key(r["day"], period) == key:
             user_credits[r["user"]] = user_credits.get(r["user"], 0.0) + float(r["credits"])
 
-    allowance = plan_limits(plan)[period]
+    allowance = plan_limits(plan, tiers, tier_default)[period]
     pool = seats * allowance
     gross = sum(user_credits.values())
     overage = max(0.0, gross - pool)
