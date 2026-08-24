@@ -52,6 +52,10 @@ DEFAULT_PLAN = "$70 / month"
 # the personal view can move without moving the pooled/weekly maths.
 USER_PLAN_TIERS_USD_PER_MONTH = {"$200 / month": 200.0, "$39 / month": 39.0}
 USER_DEFAULT_PLAN = "$200 / month"
+# The pooled page sizes the pool from what GitHub actually bills per seat, which
+# is $39 and does not vary — so it offers that one value only.
+POOL_PLAN_TIERS_USD_PER_MONTH = {"$39 / month": 39.0}
+POOL_DEFAULT_PLAN = "$39 / month"
 DEFAULT_SEATS = 480
 MAX_SEATS = 2000
 # The dataset has no scope column; the enterprise it covers is fixed.
@@ -535,7 +539,8 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     figures are AI credits.
     """
     period = "weekly" if period == "weekly" else "monthly"
-    plan = resolve_plan(plan)
+    tiers, tier_default = POOL_PLAN_TIERS_USD_PER_MONTH, POOL_DEFAULT_PLAN
+    plan = resolve_plan(plan, tiers, tier_default)
     seats = resolve_seats(seats)
     records = _user_records(source)
     mrows = source.model_rows()
@@ -543,8 +548,8 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
     keys = sorted({_record_period_key(r["day"], period) for r in records})
 
     base = {
-        "period": period, "plans": plan_labels(), "plan": plan, "seats": seats,
-        "periods": keys,
+        "period": period, "plans": plan_labels(tiers), "plan": plan,
+        "seats": seats, "periods": keys,
     }
     if not keys:
         return {**base, "has_data": False, "key": None}
@@ -555,7 +560,7 @@ def pooled_view(source: ReportsSource, period: str | None, key: str | None,  # p
         if _record_period_key(r["day"], period) == key:
             user_credits[r["user"]] = user_credits.get(r["user"], 0.0) + float(r["credits"])
 
-    allowance = plan_limits(plan)[period]
+    allowance = plan_limits(plan, tiers, tier_default)[period]
     pool = seats * allowance
     gross = sum(user_credits.values())
     overage = max(0.0, gross - pool)

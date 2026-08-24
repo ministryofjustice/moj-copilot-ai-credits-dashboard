@@ -64,16 +64,22 @@ def test_admin_weekly_renders_table_without_top_model(monkeypatch, fake_source):
     assert 'data-chart="topUsers"' in body
 
 
-def test_admin_pages_keep_the_70_and_39_budgets(monkeypatch, fake_source,
-                                                model_records):
-    """The $200 budget belongs to My Usage only; admin stays on $70/$39."""
+def test_admin_weekly_keeps_the_70_and_39_budgets(monkeypatch, fake_source):
+    client = _admin_client(monkeypatch, fake_source(_user_rows()))
+    body = client.get("/admin/weekly").get_data(as_text=True)
+    assert '$70 / month" selected' in body
+    assert "$39 / month" in body
+
+
+def test_admin_pooled_offers_only_the_39_we_are_billed(monkeypatch, fake_source,
+                                                       model_records):
+    """The pool is sized on GitHub's actual per-seat charge, which is fixed."""
     source = fake_source(_user_rows(), model_rows=model_records)
     client = _admin_client(monkeypatch, source)
-    for path in ("/admin/weekly", "/admin/pooled"):
-        body = client.get(path).get_data(as_text=True)
-        assert '$70 / month" selected' in body, path
-        assert "$39 / month" in body, path
-        assert "$200 / month" not in body, path
+    body = client.get("/admin/pooled").get_data(as_text=True)
+    assert '$39 / month" selected' in body
+    assert "$70 / month" not in body
+    assert "$200 / month" not in body
 
 
 def test_admin_pooled_renders_routed_trend(monkeypatch, fake_source,

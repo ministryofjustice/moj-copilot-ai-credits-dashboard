@@ -41,13 +41,13 @@ def test_pooled_view_no_data(fake_source):
 def test_pooled_view_weekly_overage_maths(fake_source, week_records):
     v = ac.pooled_view(
         fake_source(week_records), period="weekly", key="2026-W23",
-        plan="$70 / month", seats="1",
+        plan="$39 / month", seats="1",
     )
     assert v["has_data"] is True
     assert v["key"] == "2026-W23"
-    # weekly allowance = 70 * 100 / 4.33 per seat; pool = seats * allowance
-    assert v["allowance"] == approx(70 * 100 / 4.33)
-    assert v["metrics"]["pool"] == approx(70 * 100 / 4.33)
+    # weekly allowance = 39 * 100 / 4.33 per seat; pool = seats * allowance
+    assert v["allowance"] == approx(39 * 100 / 4.33)
+    assert v["metrics"]["pool"] == approx(39 * 100 / 4.33)
     assert v["metrics"]["gross"] == approx(2100.0)
     assert v["metrics"]["overage"] > 0
     assert v["metrics"]["total"] == approx(2100.0)
@@ -59,7 +59,7 @@ def test_pooled_view_weekly_overage_maths(fake_source, week_records):
 def test_pooled_view_weekly_headroom_tile(fake_source, week_records):
     v = ac.pooled_view(
         fake_source(week_records), period="weekly", key="2026-W23",
-        plan="$70 / month", seats="405",
+        plan="$39 / month", seats="405",
     )
     assert v["metrics"]["headroom"] > 0
     assert v["tiles"][-1]["name"] == "Unused pool"
@@ -70,11 +70,11 @@ def test_pooled_view_weekly_headroom_tile(fake_source, week_records):
 def test_pooled_view_monthly_allowance(fake_source, week_records):
     v = ac.pooled_view(
         fake_source(week_records), period="monthly", key="2026-06",
-        plan="$70 / month", seats="1",
+        plan="$39 / month", seats="1",
     )
     assert v["period"] == "monthly"
     assert v["key"] == "2026-06"
-    assert v["allowance"] == approx(70 * 100)  # monthly = plan$ * 100
+    assert v["allowance"] == approx(39 * 100)  # monthly = plan$ * 100
 
 
 def test_pooled_view_seats_override_invalid_falls_back(fake_source, week_records):
@@ -95,13 +95,13 @@ def _month_recs(month, days, user="u1", amount=100.0):
 
 def test_pooled_cumulative_none_in_weekly_mode(fake_source, week_records):
     v = ac.pooled_view(fake_source(week_records), period="weekly", key="2026-W23",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     assert v["cumulative"] is None
 
 
 def test_pooled_cumulative_reconciles_to_gross(fake_source, week_records):
     v = ac.pooled_view(fake_source(week_records), period="monthly", key="2026-06",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     cum = v["cumulative"]
     assert cum is not None
     assert cum["month"] == "2026-06"
@@ -115,7 +115,7 @@ def test_pooled_cumulative_reconciles_to_gross(fake_source, week_records):
 def test_pooled_cumulative_tooltip_labels_are_full_dates(fake_source, week_records):
     """Axis labels stay compact; the tooltip gets the unambiguous full date."""
     v = ac.pooled_view(fake_source(week_records), period="monthly", key="2026-06",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     cum = v["cumulative"]
     assert cum["tooltip_labels"][0] == "Mon 01 Jun 2026"
     assert cum["tooltip_labels"][29] == "Tue 30 Jun 2026"
@@ -125,7 +125,7 @@ def test_pooled_cumulative_tooltip_labels_are_full_dates(fake_source, week_recor
 def test_pooled_projection_hidden_before_five_days(fake_source):
     recs = _month_recs("2026-07", 4)  # only 4 elapsed days
     v = ac.pooled_view(fake_source(recs), period="monthly", key="2026-07",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     assert v["cumulative"]["pace"] is None
     assert v["cumulative"]["projection"] is None
 
@@ -133,7 +133,7 @@ def test_pooled_projection_hidden_before_five_days(fake_source):
 def test_pooled_projection_present_and_linear_at_five_days(fake_source):
     recs = _month_recs("2026-07", 5, amount=100.0)  # mtd=500 over 5 days
     v = ac.pooled_view(fake_source(recs), period="monthly", key="2026-07",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     cum = v["cumulative"]
     assert cum["pace"] is not None
     # 31-day July, rate = 500/5 = 100/day -> projected 3100 at day 31
@@ -149,7 +149,7 @@ def test_pooled_projection_none_on_completed_month(fake_source):
     # July is the latest month in data, so June is complete -> no projection
     recs = _month_recs("2026-06", 30) + _month_recs("2026-07", 3)
     v = ac.pooled_view(fake_source(recs), period="monthly", key="2026-06",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     assert v["cumulative"]["pace"] is None
     assert v["cumulative"]["projection"] is None
     assert all(x is not None for x in v["cumulative"]["current"])
@@ -158,14 +158,14 @@ def test_pooled_projection_none_on_completed_month(fake_source):
 def test_pooled_prior_none_without_prior_data(fake_source):
     recs = _month_recs("2026-07", 5)  # no June data
     v = ac.pooled_view(fake_source(recs), period="monthly", key="2026-07",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     assert v["cumulative"]["prior"] is None
 
 
 def test_pooled_prior_overlay_aligned_by_day_of_month(fake_source):
     recs = _month_recs("2026-06", 30, amount=100.0) + _month_recs("2026-07", 5)
     v = ac.pooled_view(fake_source(recs), period="monthly", key="2026-07",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     prior = v["cumulative"]["prior"]
     assert prior["month"] == "2026-06"
     assert prior["month_label"] == "Jun 2026"
@@ -279,7 +279,7 @@ def test_routed_trend_weekly_zero_fills_and_truncates_midweek():
 def test_pooled_view_surfaces_routed_trend(fake_source, week_records):
     src = fake_source(week_records, model_rows=_trend_rows())
     v = ac.pooled_view(src, period="monthly", key="2026-06",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     rt = v["routed_trend"]
     assert rt is not None
     assert rt["labels"] == [str(d) for d in range(1, 31)]
@@ -291,7 +291,7 @@ def test_pooled_view_surfaces_routed_trend(fake_source, week_records):
 def test_pooled_view_routed_trend_none_without_model_rows(fake_source,
                                                           week_records):
     v = ac.pooled_view(fake_source(week_records), period="monthly",
-                       key="2026-06", plan="$70 / month", seats="1")
+                       key="2026-06", plan="$39 / month", seats="1")
     assert v["routed_trend"] is None
 
 
@@ -313,5 +313,5 @@ def test_pooled_view_routed_trend_heading_uses_model_latest_day(fake_source):
     ]
     v = ac.pooled_view(fake_source(user_rows, model_rows=model_rows),
                        period="monthly", key="2026-06",
-                       plan="$70 / month", seats="1")
+                       plan="$39 / month", seats="1")
     assert v["routed_trend"]["heading"] == "Jun 2026"

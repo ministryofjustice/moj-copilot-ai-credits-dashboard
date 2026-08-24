@@ -50,3 +50,12 @@ def test_user_plan_limits_for_200():
     assert limits["monthly"] == approx(20000.0)
     assert limits["weekly"] == approx(200 * 100 / 4.33)
     assert limits["daily"] == approx(200 * 100 / 4.33 / 7.0)
+
+
+POOL_ARGS = (ac.POOL_PLAN_TIERS_USD_PER_MONTH, ac.POOL_DEFAULT_PLAN)
+
+
+def test_pooled_list_holds_only_the_39_we_are_billed():
+    assert ac.plan_labels(ac.POOL_PLAN_TIERS_USD_PER_MONTH) == ["$39 / month"]
+    assert ac.resolve_plan(None, *POOL_ARGS) == "$39 / month"
+    assert ac.resolve_plan("$200 / month", *POOL_ARGS) == "$39 / month"
