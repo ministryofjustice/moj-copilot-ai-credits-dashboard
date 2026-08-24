@@ -669,11 +669,12 @@ def user_view(  # pylint: disable=too-many-locals
     every ISO week with usage in the month, keeping whole-week credits, so a
     straddling week appears under both months. All figures are in AI credits.
     """
-    plan = resolve_plan(plan)
-    allowance = weekly_allowance(plan)
-    limits = plan_limits(plan)
+    tiers, tier_default = USER_PLAN_TIERS_USD_PER_MONTH, USER_DEFAULT_PLAN
+    plan = resolve_plan(plan, tiers, tier_default)
+    allowance = weekly_allowance(plan, tiers, tier_default)
+    limits = plan_limits(plan, tiers, tier_default)
     base = {
-        "plans": plan_labels(), "plan": plan, "allowance": allowance,
+        "plans": plan_labels(tiers), "plan": plan, "allowance": allowance,
         "limits": limits, "login": (login or "").strip(),
     }
     if not base["login"]:
