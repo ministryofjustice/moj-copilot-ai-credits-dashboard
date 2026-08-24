@@ -68,6 +68,7 @@ def test_admin_weekly_measures_users_against_200(monkeypatch, fake_source):
     """The per-user % column uses the same $200 basis as the My Usage page."""
     client = _admin_client(monkeypatch, fake_source(_user_rows()))
     body = client.get("/admin/weekly").get_data(as_text=True)
+    assert "Monthly budget per user" in body
     assert '$200 / month" selected' in body
     assert "$39 / month" in body
     assert "$70 / month" not in body
