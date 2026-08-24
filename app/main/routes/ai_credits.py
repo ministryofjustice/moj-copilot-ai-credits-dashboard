@@ -9,6 +9,11 @@ replacement for Streamlit's reactive widgets):
     /admin/weekly  Org weekly — ?plan=<plan>&week=YYYY-Www
     /admin/daily   Org daily  — ?day=YYYY-MM-DD
 
+`plan` takes different values per page: "/" accepts the My Usage budgets
+($200 / month, the default, or $39 / month), while the two admin pages accept
+the pooled budgets ($70 / month, the default, or $39 / month). An unrecognised
+value falls back to that page's default.
+
 The data backend is resolved per request via `get_reports_source()` (local files
 today, DB later) so these handlers never touch storage directly.
 """
