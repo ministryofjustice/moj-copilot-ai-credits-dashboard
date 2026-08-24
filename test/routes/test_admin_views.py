@@ -64,6 +64,18 @@ def test_admin_weekly_renders_table_without_top_model(monkeypatch, fake_source):
     assert 'data-chart="topUsers"' in body
 
 
+def test_admin_pages_keep_the_70_and_39_budgets(monkeypatch, fake_source,
+                                                model_records):
+    """The $200 budget belongs to My Usage only; admin stays on $70/$39."""
+    source = fake_source(_user_rows(), model_rows=model_records)
+    client = _admin_client(monkeypatch, source)
+    for path in ("/admin/weekly", "/admin/pooled"):
+        body = client.get(path).get_data(as_text=True)
+        assert '$70 / month" selected' in body, path
+        assert "$39 / month" in body, path
+        assert "$200 / month" not in body, path
+
+
 def test_admin_pooled_renders_routed_trend(monkeypatch, fake_source,
                                            model_records):
     source = fake_source(_user_rows(), model_rows=model_records)

@@ -55,6 +55,25 @@ class MainRouteTestCase(unittest.TestCase):
         self.assertIn("Your usage so far", body)
         self.assertIn("This week (WTD)", body)
 
+    def test_index_budget_dropdown_offers_200_and_39_only(self):
+        """My Usage measures against $200/seat/month; $70 is admin-only."""
+        self._inject("ignored")
+        rows = [{"day": "2026-06-22", "user_login": "alice", "credits": 120.0}]
+        self._use_source(rows)
+        body = self.client.get("/?user=alice").get_data(as_text=True)
+        self.assertIn("$200 / month", body)
+        self.assertIn("$39 / month", body)
+        self.assertNotIn("$70 / month", body)
+
+    def test_index_ignores_an_admin_only_plan_in_the_query(self):
+        """A bookmarked ?plan=$70 falls back to the $200 default."""
+        self._inject("ignored")
+        rows = [{"day": "2026-06-22", "user_login": "alice", "credits": 120.0}]
+        self._use_source(rows)
+        body = self.client.get(
+            "/?user=alice&plan=%2470+%2F+month").get_data(as_text=True)
+        self.assertIn('value="$200 / month" selected', body)
+
     def test_index_in_progress_month_renders_pace_panel(self):
         self._inject("ignored")
         rows = [{"day": "2026-06-22", "user_login": "alice", "credits": 120.0},
