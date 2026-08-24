@@ -10,7 +10,7 @@ def test_weekly_view_no_data(fake_source):
 
 
 def test_weekly_view_rows_have_no_top_model(fake_source, week_records):
-    v = ac.weekly_view(fake_source(week_records), plan="$70 / month", week="2026-W23")
+    v = ac.weekly_view(fake_source(week_records), plan="$200 / month", week="2026-W23")
     assert v["has_data"] is True
     assert v["week"] == "2026-W23"
     top = max(v["rows"], key=lambda r: r["credits"])
@@ -37,6 +37,6 @@ def test_weekly_view_accepts_lowercased_week(fake_source, make_record):
         make_record("2026-06-01", "a", 100.0),  # ISO week 2026-W23
         make_record("2026-06-10", "b", 200.0),  # ISO week 2026-W24
     ]
-    v = ac.weekly_view(fake_source(rows), plan="$70 / month", week="2026-w23")
+    v = ac.weekly_view(fake_source(rows), plan="$200 / month", week="2026-w23")
     assert v["week"] == "2026-W23"
     assert {r["user"] for r in v["rows"]} == {"a"}

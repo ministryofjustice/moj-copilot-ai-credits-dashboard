@@ -44,14 +44,11 @@ def example_login(source: ReportsSource) -> str:
 # to get the weekly denominator for the "% used / remaining" view.
 CREDITS_PER_USD = 100.0
 WEEKS_PER_MONTH = 4.33
-# Selectable monthly per-seat AI-credit budgets (USD) for the admin pooled and
-# weekly pages.
-PLAN_TIERS_USD_PER_MONTH = {"$70 / month": 70.0, "$39 / month": 39.0}
-DEFAULT_PLAN = "$70 / month"
-# Selectable budgets on the My Usage page. Kept separate from the admin list so
-# the personal view can move without moving the pooled/weekly maths.
-USER_PLAN_TIERS_USD_PER_MONTH = {"$200 / month": 200.0, "$39 / month": 39.0}
-USER_DEFAULT_PLAN = "$200 / month"
+# Selectable monthly per-seat AI-credit budgets (USD) for the My Usage page and
+# the admin weekly per-user table: how much we choose to allocate a seat out of
+# the pool. The $70 tier ceased to exist in September 2026.
+PLAN_TIERS_USD_PER_MONTH = {"$200 / month": 200.0, "$39 / month": 39.0}
+DEFAULT_PLAN = "$200 / month"
 # The pooled page sizes the pool from what GitHub actually bills per seat, which
 # is $39 and does not vary — so it offers that one value only.
 POOL_PLAN_TIERS_USD_PER_MONTH = {"$39 / month": 39.0}
@@ -674,12 +671,11 @@ def user_view(  # pylint: disable=too-many-locals
     every ISO week with usage in the month, keeping whole-week credits, so a
     straddling week appears under both months. All figures are in AI credits.
     """
-    tiers, tier_default = USER_PLAN_TIERS_USD_PER_MONTH, USER_DEFAULT_PLAN
-    plan = resolve_plan(plan, tiers, tier_default)
-    allowance = weekly_allowance(plan, tiers, tier_default)
-    limits = plan_limits(plan, tiers, tier_default)
+    plan = resolve_plan(plan)
+    allowance = weekly_allowance(plan)
+    limits = plan_limits(plan)
     base = {
-        "plans": plan_labels(tiers), "plan": plan, "allowance": allowance,
+        "plans": plan_labels(), "plan": plan, "allowance": allowance,
         "limits": limits, "login": (login or "").strip(),
     }
     if not base["login"]:

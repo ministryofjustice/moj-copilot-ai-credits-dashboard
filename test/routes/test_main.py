@@ -56,7 +56,7 @@ class MainRouteTestCase(unittest.TestCase):
         self.assertIn("This week (WTD)", body)
 
     def test_index_budget_dropdown_offers_200_and_39_only(self):
-        """My Usage measures against $200/seat/month; $70 is admin-only."""
+        """My Usage measures against $200/seat/month; $70 was withdrawn."""
         self._inject("ignored")
         rows = [{"day": "2026-06-22", "user_login": "alice", "credits": 120.0}]
         self._use_source(rows)
@@ -65,7 +65,7 @@ class MainRouteTestCase(unittest.TestCase):
         self.assertIn("$39 / month", body)
         self.assertNotIn("$70 / month", body)
 
-    def test_index_ignores_an_admin_only_plan_in_the_query(self):
+    def test_index_ignores_a_withdrawn_plan_in_the_query(self):
         """A bookmarked ?plan=$70 falls back to the $200 default."""
         self._inject("ignored")
         rows = [{"day": "2026-06-22", "user_login": "alice", "credits": 120.0}]

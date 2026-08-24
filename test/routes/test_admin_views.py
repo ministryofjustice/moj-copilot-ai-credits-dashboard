@@ -64,11 +64,14 @@ def test_admin_weekly_renders_table_without_top_model(monkeypatch, fake_source):
     assert 'data-chart="topUsers"' in body
 
 
-def test_admin_weekly_keeps_the_70_and_39_budgets(monkeypatch, fake_source):
+def test_admin_weekly_measures_users_against_200(monkeypatch, fake_source):
+    """The per-user % column uses the same $200 basis as the My Usage page."""
     client = _admin_client(monkeypatch, fake_source(_user_rows()))
     body = client.get("/admin/weekly").get_data(as_text=True)
-    assert '$70 / month" selected' in body
+    assert '$200 / month" selected' in body
     assert "$39 / month" in body
+    assert "$70 / month" not in body
+    assert "weekly allowance 4619 credits/seat" in body
 
 
 def test_admin_pooled_offers_only_the_39_we_are_billed(monkeypatch, fake_source,
