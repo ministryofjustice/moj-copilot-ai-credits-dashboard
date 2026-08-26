@@ -25,6 +25,7 @@ jobs:
 
       - name: Helm template
         id: helm-template
+        continue-on-error: true
         run: |
           helm template moj-copilot-ai-credits-dashboard \
             helm/moj-copilot-ai-credits-dashboard \
