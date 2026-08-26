@@ -57,24 +57,8 @@ jobs:
             --set app.deployment.athena.database=${{ matrix.environment == 'production' && '${PROD_ATHENA_DATABASE}' || '${DEV_ATHENA_DATABASE}' }} \
             --set app.deployment.athena.tableUsers=${{ matrix.environment == 'production' && '${PROD_ATHENA_TABLE_USERS}' || '${DEV_ATHENA_TABLE_USERS}' }} \
             --set app.deployment.athena.tableModels=${{ matrix.environment == 'production' && '${PROD_ATHENA_TABLE_MODELS}' || '${DEV_ATHENA_TABLE_MODELS}' }} \
-            --set app.deployment.athena.workgroup=${{ matrix.environment == 'production' && '${PROD_ATHENA_WORKGROUP}' || '${DEV_ATHENA_WORKGROUP}' }}
-
-      - name: Test helm template
-        id: helm-template-test
-        run: |
-          helm template moj-copilot-ai-credits-dashboard \
-            helm/moj-copilot-ai-credits-dashboard \
-            --namespace "KUBE_NAMESPACE" \
-            --values=helm/moj-copilot-ai-credits-dashboard/values-dev.yaml \
-            --set app.deployment.env.AUTH0_CLIENT_ID="MOCK_AUTH0_CLIENT_ID" \
-            --set app.deployment.env.AUTH0_CLIENT_SECRET="MOCK_AUTH0_CLIENT_SECRET" \
-            --set app.deployment.image.repository="ECR_REGISTRY/ECR_REPOSITORY" \
-            --set app.deployment.image.tag="IMAGE_TAG" \
-            --set app.deployment.env.APP_SECRET_KEY="MOCK_FLASK_APP_SECRET" \
-            --set app.deployment.athena.database="ATHENA_DATABASE" \
-            --set app.deployment.athena.tableUsers="ATHENA_TABLE_USERS" \
-            --set app.deployment.athena.tableModels="ATHENA_TABLE_MODELS" \
-            --set app.deployment.athena.workgroup="ATHENA_WORKGROUP"
+            --set app.deployment.athena.workgroup=${{ matrix.environment == 'production' && '${PROD_ATHENA_WORKGROUP}' || '${DEV_ATHENA_WORKGROUP}' }} \
+            >> $GITHUB_OUTPUT
 
       - name: Post chart to GitHub PR
         if: always() && github.event_name == 'pull_request'
