@@ -27,10 +27,6 @@ jobs:
         run: |
           helm template moj-copilot-ai-credits-dashboard \
             helm/moj-copilot-ai-credits-dashboard \
-            --install \
-            --force \
-            --wait \
-            --timeout 10m \
             --namespace ${KUBE_NAMESPACE} \
             --values=helm/moj-copilot-ai-credits-dashboard/${{ matrix.environment == 'production' && 'values-prod.yaml' || 'values-dev.yaml' }} \
             --set app.deployment.env.AUTH0_CLIENT_ID="MOCK_AUTH0_CLIENT_ID" \
