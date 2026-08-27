@@ -85,9 +85,9 @@ jobs:
               return comment.user.type === 'Bot' && comment.body.includes('helm-template-comment-${{ matrix.environment }}')
             })
 
-            const header = "## helm-template-comment-${{ matrix.environment }}";
+            const header = "## Helm chart template - moj-copilot-ai-credits-dashboard (${{ matrix.environment }})";
 
-            const output = header + `\`\`\`${process.env.CHART_OUTPUT}\`\`\``;
+            const output = header + `\n\`\`\`\n${process.env.CHART_OUTPUT}\n\`\`\``;
 
             console.log(output);
 
