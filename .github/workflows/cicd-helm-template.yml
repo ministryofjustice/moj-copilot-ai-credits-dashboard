@@ -1,0 +1,108 @@
+name: "Helm Template"
+
+on:
+  pull_request:
+    paths:
+      - "helm/moj-copilot-ai-credits-dashboard/**"
+    branches:
+      - main
+
+env:
+  DEV_KUBE_NAMESPACE: ${{ secrets.DEV_KUBE_NAMESPACE }}
+  PROD_KUBE_NAMESPACE: ${{ secrets.PROD_KUBE_NAMESPACE }}
+
+  IMAGE_TAG: ${{ github.sha }}
+  ECR_REGISTRY: ${{ secrets.ECR_REGISTRY_URL }}
+  DEV_ECR_REPOSITORY: ${{ vars.DEV_ECR_REPOSITORY }}
+  PROD_ECR_REPOSITORY: ${{ vars.PROD_ECR_REPOSITORY }}
+
+  DEV_ATHENA_DATABASE: ${{ secrets.DEV_ATHENA_DATABASE }}
+  DEV_ATHENA_TABLE_USERS: ${{ secrets.DEV_ATHENA_TABLE_USERS }}
+  DEV_ATHENA_TABLE_MODELS: ${{ secrets.DEV_ATHENA_TABLE_MODELS }}
+  DEV_ATHENA_WORKGROUP: ${{ secrets.DEV_ATHENA_WORKGROUP }}
+  PROD_ATHENA_DATABASE: ${{ secrets.PROD_ATHENA_DATABASE }}
+  PROD_ATHENA_TABLE_USERS: ${{ secrets.PROD_ATHENA_TABLE_USERS }}
+  PROD_ATHENA_TABLE_MODELS: ${{ secrets.PROD_ATHENA_TABLE_MODELS }}
+  PROD_ATHENA_WORKGROUP: ${{ secrets.PROD_ATHENA_WORKGROUP }}
+
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+
+jobs:
+  helm-template:
+    name: "Helm Template"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [development, production]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Helm template
+        id: helm-template
+        continue-on-error: true
+        run: |
+          CHART_OUTPUT=$(helm template moj-copilot-ai-credits-dashboard \
+            helm/moj-copilot-ai-credits-dashboard \
+            --namespace ${{ matrix.environment == 'production' && '${PROD_KUBE_NAMESPACE}' || '${DEV_KUBE_NAMESPACE}' }} \
+            --values=helm/moj-copilot-ai-credits-dashboard/${{ matrix.environment == 'production' && 'values-prod.yaml' || 'values-dev.yaml' }} \
+            --set app.deployment.env.AUTH0_CLIENT_ID="MOCK_AUTH0_CLIENT_ID" \
+            --set app.deployment.env.AUTH0_CLIENT_SECRET="MOCK_AUTH0_CLIENT_SECRET" \
+            --set app.deployment.image.repository=$ECR_REGISTRY/${{ matrix.environment == 'production' && '$PROD_ECR_REPOSITORY' || '$DEV_ECR_REPOSITORY' }} \
+            --set app.deployment.image.tag=$IMAGE_TAG \
+            --set app.deployment.env.APP_SECRET_KEY="MOCK_FLASK_APP_SECRET" \
+            --set app.deployment.athena.database=${{ matrix.environment == 'production' && '${PROD_ATHENA_DATABASE}' || '${DEV_ATHENA_DATABASE}' }} \
+            --set app.deployment.athena.tableUsers=${{ matrix.environment == 'production' && '${PROD_ATHENA_TABLE_USERS}' || '${DEV_ATHENA_TABLE_USERS}' }} \
+            --set app.deployment.athena.tableModels=${{ matrix.environment == 'production' && '${PROD_ATHENA_TABLE_MODELS}' || '${DEV_ATHENA_TABLE_MODELS}' }} \
+            --set app.deployment.athena.workgroup=${{ matrix.environment == 'production' && '${PROD_ATHENA_WORKGROUP}' || '${DEV_ATHENA_WORKGROUP}' }} \
+            )
+
+          echo "${CHART_OUTPUT}"
+
+          {
+            echo "chart_output<<EOF"
+            echo "${CHART_OUTPUT}"
+            echo "EOF"
+          } >>"${GITHUB_OUTPUT}"
+
+      - name: Comment on Pull Request
+        id: comment
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        env:
+          CHART_OUTPUT: ${{ steps.helm-template.outputs.chart_output }}
+        with:
+          script: |
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            })
+
+            const header = "## Helm chart template - moj-copilot-ai-credits-dashboard (${{ matrix.environment }})";
+
+            const botComment = comments.find(comment => {
+              return comment.user.type === 'Bot' && comment.body.includes(header)
+            })
+
+            const output = header + `\n\`\`\`\n${process.env.CHART_OUTPUT}\n\`\`\``;
+
+            console.log(output);
+
+            if (botComment) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botComment.id,
+                body: output
+              })
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: output
+              })
+            }
