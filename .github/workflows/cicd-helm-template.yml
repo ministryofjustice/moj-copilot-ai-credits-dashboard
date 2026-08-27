@@ -87,7 +87,7 @@ jobs:
 
             const header = "## helm-template-comment-${{ matrix.environment }}";
 
-            const output = header + ````${process.env.CHART_OUTPUT}````;
+            const output = header + `\`\`\`${process.env.CHART_OUTPUT}\`\`\``;
 
             console.log(output);
 
