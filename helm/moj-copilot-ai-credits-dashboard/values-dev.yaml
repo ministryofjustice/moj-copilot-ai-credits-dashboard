@@ -1,6 +1,6 @@
 app:
   ingress:
-    primaryHost: "moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.ukk"
+    primaryHost: "moj-copilot-ai-credits-dashboard-dev.cloud-platform.service.justice.gov.uk"
 
   deployment:
     replicaCount: 1
