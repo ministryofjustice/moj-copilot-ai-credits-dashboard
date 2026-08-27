@@ -45,7 +45,7 @@ jobs:
         id: helm-template
         continue-on-error: true
         run: |
-          CHART_OUTPUT=$({helm template moj-copilot-ai-credits-dashboard \
+          CHART_OUTPUT=$(helm template moj-copilot-ai-credits-dashboard \
             helm/moj-copilot-ai-credits-dashboard \
             --namespace ${{ matrix.environment == 'production' && '${PROD_KUBE_NAMESPACE}' || '${DEV_KUBE_NAMESPACE}' }} \
             --values=helm/moj-copilot-ai-credits-dashboard/${{ matrix.environment == 'production' && 'values-prod.yaml' || 'values-dev.yaml' }} \
@@ -58,7 +58,7 @@ jobs:
             --set app.deployment.athena.tableUsers=${{ matrix.environment == 'production' && '${PROD_ATHENA_TABLE_USERS}' || '${DEV_ATHENA_TABLE_USERS}' }} \
             --set app.deployment.athena.tableModels=${{ matrix.environment == 'production' && '${PROD_ATHENA_TABLE_MODELS}' || '${DEV_ATHENA_TABLE_MODELS}' }} \
             --set app.deployment.athena.workgroup=${{ matrix.environment == 'production' && '${PROD_ATHENA_WORKGROUP}' || '${DEV_ATHENA_WORKGROUP}' }} \
-            })
+            )
 
           echo "${CHART_OUTPUT}"
 
