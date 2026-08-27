@@ -85,7 +85,9 @@ jobs:
               return comment.user.type === 'Bot' && comment.body.includes('helm-template-comment-${{ matrix.environment }}')
             })
 
-            const output = `${process.env.CHART_OUTPUT}`;
+            const header = "## helm-template-comment-${{ matrix.environment }}";
+
+            const output = header + ````${process.env.CHART_OUTPUT}````;
 
             console.log(output);
 
