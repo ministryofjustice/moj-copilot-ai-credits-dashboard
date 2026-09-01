@@ -16,6 +16,7 @@ import random
 from collections import defaultdict
 from datetime import date, timedelta
 
+from app.main.services import telemetry as tel
 from app.main.services import weekly_per_user as wpu
 from app.main.services.reports_source import ReportsSource
 
@@ -670,6 +671,9 @@ def user_view(  # pylint: disable=too-many-locals
     the cumulative chart are scoped to calendar days; the per-week table shows
     every ISO week with usage in the month, keeping whole-week credits, so a
     straddling week appears under both months. All figures are in AI credits.
+
+    `telemetry` follows the same selected month and holds what the person did
+    rather than what it cost. It is None where the backend serves no telemetry.
     """
     plan = resolve_plan(plan)
     allowance = weekly_allowance(plan)
@@ -759,6 +763,10 @@ def user_view(  # pylint: disable=too-many-locals
                                   limits["monthly"]),
         "summary": summary,
         "calendar": _usage_calendar(urecs, limits["daily"]),
+        # What the person did, as opposed to what it cost. None when the
+        # backend serves no telemetry, which is how this stays off outside
+        # the development deployment.
+        "telemetry": tel.telemetry_view(source, login_str, selected_month),
     }
 
 
