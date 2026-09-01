@@ -144,3 +144,85 @@ def test_mode_split_skips_null_counts():
 
 def test_mode_split_of_no_rows_is_empty():
     assert tel.mode_split([]) == []
+
+
+def test_language_aliases_are_folded_together():
+    """Both spellings occur in the real August data."""
+    rows = [_act("csharp", "Inline completion", lines_added=100),
+            _act("c#", "Chat", lines_added=50),
+            _act("python", "Inline completion", lines_added=30)]
+    languages = tel.top_languages(rows)
+    assert [lang["language"] for lang in languages] == ["C#", "Python"]
+    assert languages[0]["lines_added"] == 150
+
+
+def test_shell_spellings_are_folded_together():
+    rows = [_act("shell", "CLI", lines_added=10),
+            _act("shellscript", "CLI", lines_added=10),
+            _act("bash", "CLI", lines_added=10),
+            _act("sh", "CLI", lines_added=10)]
+    languages = tel.top_languages(rows)
+    assert [lang["language"] for lang in languages] == ["Shell"]
+    assert languages[0]["lines_added"] == 40
+
+
+def test_terraform_spellings_are_folded_together():
+    rows = [_act("terraform", "Chat", lines_added=10),
+            _act("hcl", "Chat", lines_added=10),
+            _act("tf", "Chat", lines_added=10),
+            _act("terraform-vars", "Chat", lines_added=10)]
+    assert tel.top_languages(rows)[0] == {
+        "language": "Terraform", "suggested": 40, "lines_added": 40}
+
+
+def test_single_letter_language_is_given_its_real_name():
+    assert tel.top_languages([_act("r", "Chat")])[0]["language"] == "R"
+
+
+def test_unknown_languages_are_kept_under_their_own_name():
+    languages = tel.top_languages([_act("nim", "Chat", lines_added=10)])
+    assert languages[0]["language"] == "nim"
+
+
+def test_non_language_values_are_excluded_from_the_ranking():
+    """`unknown` alone is the seventh largest value in the real August data.
+    Ranking it beside Python would misdescribe what the person wrote."""
+    rows = [_act("python", "Chat", lines_added=100),
+            _act("unknown", "Chat", lines_added=500),
+            _act("plaintext", "Chat", lines_added=400),
+            _act("text", "Chat", lines_added=300),
+            _act("others", "Chat", lines_added=300),
+            _act("prompt", "Chat", lines_added=200),
+            _act("instructions", "Chat", lines_added=100),
+            _act("skill", "Chat", lines_added=100),
+            _act("chatagent", "Chat", lines_added=100)]
+    languages = tel.top_languages(rows)
+    assert [lang["language"] for lang in languages] == ["Python"]
+
+
+def test_lines_not_attributed_to_a_language_are_reported_separately():
+    rows = [_act("python", "Chat", lines_added=100),
+            _act("unknown", "Chat", lines_added=500)]
+    assert tel.unattributed_lines(rows) == 500
+
+
+def test_unattributed_lines_skips_nulls():
+    assert tel.unattributed_lines([_act("unknown", "Chat", lines_added=None)]) == 0
+
+
+def test_languages_beyond_the_limit_are_grouped_as_other():
+    rows = [_act(f"lang{i}", "Chat", lines_added=100 - i) for i in range(10)]
+    languages = tel.top_languages(rows, limit=3)
+    assert [lang["language"] for lang in languages[:3]] == ["lang0", "lang1", "lang2"]
+    assert languages[3]["language"] == "Other"
+    # The remaining seven: 97 + 96 + 95 + 94 + 93 + 92 + 91
+    assert languages[3]["lines_added"] == 658
+
+
+def test_no_other_row_when_nothing_is_left_over():
+    rows = [_act("python", "Chat", lines_added=10)]
+    assert [lang["language"] for lang in tel.top_languages(rows, limit=3)] == ["Python"]
+
+
+def test_top_languages_of_no_rows_is_empty():
+    assert tel.top_languages([]) == []
