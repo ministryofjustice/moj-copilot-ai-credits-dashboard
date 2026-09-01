@@ -78,6 +78,32 @@ class ReportsSource(ABC):
     def user_rows(self) -> list[dict]:
         """[{day, user_login, credits}, ...] across all days."""
 
+    # ---- Telemetry (optional): what the person did, not what it cost.
+    # These are ordinary methods with defaults rather than abstract ones, so
+    # every existing backend and test double keeps working untouched. A backend
+    # that has telemetry overrides all three.
+    #
+    # Unlike the two methods above, these take a person and a day range and push
+    # that filter down to storage. telemetry_by_user_activity holds one row per
+    # person per day per language per feature, so fetching it whole would get
+    # steadily more expensive every day the pipeline runs.
+
+    def telemetry_available(self) -> bool:
+        """True only where this backend is configured to serve telemetry."""
+        return False
+
+    def telemetry_user_rows(self, login: str, start_day: str,
+                            end_day: str) -> list[dict]:
+        """One row per day for `login`, between `start_day` and `end_day`
+        inclusive. Both dates are ISO `YYYY-MM-DD` strings."""
+        return []
+
+    def telemetry_activity_rows(self, login: str, start_day: str,
+                                end_day: str) -> list[dict]:
+        """One row per day, language and feature for `login`, between
+        `start_day` and `end_day` inclusive."""
+        return []
+
 
 class LocalFsReportsSource(ReportsSource):
     """Reads the on-disk `reports/credits_by_{model,user}/day=.../` parquet tree.
