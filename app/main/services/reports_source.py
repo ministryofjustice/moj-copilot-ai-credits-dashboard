@@ -14,6 +14,20 @@ not inside the file. The local source reads it back as a real date via the `DAY`
 spec below; all backends normalise it to an ISO `YYYY-MM-DD` string in the
 returned rows.
 
+Three further optional methods serve the telemetry datasets the same pipeline
+writes (`telemetry_by_user` + `telemetry_by_user_activity`), which record what a
+person did rather than what it cost:
+
+* telemetry_available()                            -> bool
+* telemetry_user_rows(login, start_day, end_day)   -> one row per day
+* telemetry_activity_rows(login, start_day, end_day) -> one row per day,
+                  language and feature
+
+They take a person and a day range because the activity dataset holds one row
+per person per day per language per feature; fetching it whole, as the two
+methods above do, would get steadily more expensive. A backend with no telemetry
+configured reports it unavailable and returns nothing.
+
 The local source reads `reports/` on disk; `DbReportsSource` reads the same data
 from Athena (see db_reports_source.py).
 """
@@ -23,8 +37,10 @@ from __future__ import annotations
 import os
 import threading
 from abc import ABC, abstractmethod
+from datetime import date
 
 import pyarrow as pa
+import pyarrow.compute as pc
 import pyarrow.dataset as ds
 
 # Partition spec so `day=YYYY-MM-DD/` parses to a real date32 (not a string).
@@ -52,6 +68,49 @@ def user_rows_from_table(table) -> list[dict]:
     return [
         {"day": _iso(d), "user_login": u, "credits": float(v)}
         for d, u, v in zip(c["day"], c["user_login"], c["ai_credits_used"])
+    ]
+
+
+TELEMETRY_USER_TABLE = "telemetry_by_user"
+TELEMETRY_ACTIVITY_TABLE = "telemetry_by_user_activity"
+
+# Parquet column -> the name used in the returned rows. Selecting an explicit
+# column list also keeps the Athena scan (and the local read) narrow.
+TELEMETRY_USER_COLUMNS = {
+    "user_initiated_interaction_count": "interactions",
+    "code_generation_activity_count": "suggested",
+    "code_acceptance_activity_count": "accepted",
+    "loc_added_sum": "lines_added",
+    "loc_deleted_sum": "lines_deleted",
+    "loc_suggested_to_add_sum": "lines_suggested_added",
+    "has_activity_telemetry": "has_telemetry",
+    "used_copilot_code_review_active": "review_requested",
+    "used_copilot_code_review_passive": "review_automatic",
+}
+
+TELEMETRY_ACTIVITY_COLUMNS = {
+    "language": "language",
+    "feature": "feature",
+    "mode": "mode",
+    "code_generation_activity_count": "suggested",
+    "code_acceptance_activity_count": "accepted",
+    "loc_added_sum": "lines_added",
+    "loc_suggested_to_add_sum": "lines_suggested_added",
+}
+
+
+def telemetry_rows_from_table(table, columns: dict) -> list[dict]:
+    """Arrow table -> row dicts, renaming columns and keeping nulls as None.
+
+    A null here means GitHub sent nothing for that person-day, which is not the
+    same as a zero, so it must not be coerced.
+    """
+    data = table.to_pydict()
+    days = [_iso(d) for d in data["day"]]
+    return [
+        {"day": days[i],
+         **{out: data[src][i] for src, out in columns.items()}}
+        for i in range(len(days))
     ]
 
 
@@ -124,6 +183,42 @@ class LocalFsReportsSource(ReportsSource):
 
     def user_rows(self) -> list[dict]:
         return read_user_rows(self._dataset("credits_by_user"))
+
+    def _has_table(self, table: str) -> bool:
+        return os.path.isdir(os.path.join(self.reports_dir, table))
+
+    def telemetry_available(self) -> bool:
+        return (self._has_table(TELEMETRY_USER_TABLE)
+                and self._has_table(TELEMETRY_ACTIVITY_TABLE))
+
+    def _telemetry_rows(self, table: str, columns: dict, login: str,
+                        start_day: str, end_day: str) -> list[dict]:
+        # Each read guards only the table it needs. `telemetry_available` is a
+        # stricter, page-level question (can the whole section render?) and
+        # requires both tables; a single read should not refuse because its
+        # sibling table happens to be missing.
+        if not self._has_table(table):
+            return []
+        # `day` parses to a date32 via the DAY partitioning spec, so the range
+        # bounds must be real dates, not strings.
+        day_filter = ((pc.field("user_login") == login)
+                      & (pc.field("day") >= date.fromisoformat(start_day))
+                      & (pc.field("day") <= date.fromisoformat(end_day)))
+        table_data = self._dataset(table).to_table(
+            columns=list(columns) + ["day"], filter=day_filter)
+        return telemetry_rows_from_table(table_data, columns)
+
+    def telemetry_user_rows(self, login: str, start_day: str,
+                            end_day: str) -> list[dict]:
+        return self._telemetry_rows(TELEMETRY_USER_TABLE,
+                                    TELEMETRY_USER_COLUMNS,
+                                    login, start_day, end_day)
+
+    def telemetry_activity_rows(self, login: str, start_day: str,
+                                end_day: str) -> list[dict]:
+        return self._telemetry_rows(TELEMETRY_ACTIVITY_TABLE,
+                                    TELEMETRY_ACTIVITY_COLUMNS,
+                                    login, start_day, end_day)
 
 
 def _build_source() -> ReportsSource:
