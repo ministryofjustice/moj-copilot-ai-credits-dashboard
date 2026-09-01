@@ -59,3 +59,41 @@ def review_activity(user_rows: list[dict]) -> dict:
         "days_without_telemetry": sum(
             1 for r in user_rows if r.get("has_telemetry") is not True),
     }
+
+
+def _grouped_totals(rows: list[dict], key_of) -> dict:
+    """Sum `suggested` and `lines_added` per group, skipping nulls and any row
+    whose key is None."""
+    totals: dict = {}
+    for row in rows:
+        key = key_of(row)
+        if key is None:
+            continue
+        entry = totals.setdefault(key, {"suggested": 0, "lines_added": 0})
+        for field in ("suggested", "lines_added"):
+            value = row.get(field)
+            if value is not None:
+                entry[field] += value
+    return totals
+
+
+def mode_split(activity_rows: list[dict]) -> list[dict]:
+    """How the person's activity divides across the Copilot surfaces.
+
+    Grouped by the `mode` column the pipeline already derives from `feature`,
+    so the dashboard does not invent a second grouping. Ranked by suggestions
+    offered, with each mode's share of the month's suggestions. No acceptance
+    figure: agent features apply code without a discrete accept step, so a
+    per-mode acceptance rate would make agent users look inactive.
+    """
+    totals = _grouped_totals(activity_rows, lambda row: row.get("mode"))
+    grand_total = sum(entry["suggested"] for entry in totals.values())
+    modes = [
+        {"mode": mode,
+         "suggested": entry["suggested"],
+         "lines_added": entry["lines_added"],
+         "share": (entry["suggested"] / grand_total) if grand_total else 0.0}
+        for mode, entry in totals.items()
+    ]
+    modes.sort(key=lambda m: (-m["suggested"], m["mode"]))
+    return modes

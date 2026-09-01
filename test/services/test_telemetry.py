@@ -86,3 +86,61 @@ def test_review_activity_of_an_empty_month():
     assert tel.review_activity([]) == {
         "requested": 0, "automatic": 0, "days_recorded": 0,
         "days_without_telemetry": 0}
+
+
+def _act(language, mode, **overrides):
+    row = {"day": "2026-08-01", "language": language, "feature": "code_completion",
+           "mode": mode, "suggested": 10, "accepted": 4,
+           "lines_added": 100, "lines_suggested_added": 80}
+    row.update(overrides)
+    return row
+
+
+def test_mode_split_groups_and_ranks_by_suggestions():
+    rows = [
+        _act("python", "Inline completion", suggested=10, lines_added=100),
+        _act("python", "Inline completion", suggested=5, lines_added=50),
+        _act("go", "Agent mode", suggested=30, lines_added=900),
+    ]
+    modes = tel.mode_split(rows)
+    assert [m["mode"] for m in modes] == ["Agent mode", "Inline completion"]
+    assert modes[0]["suggested"] == 30
+    assert modes[0]["lines_added"] == 900
+    assert modes[1]["suggested"] == 15
+    assert modes[1]["lines_added"] == 150
+
+
+def test_mode_split_share_is_a_fraction_of_all_suggestions():
+    rows = [_act("python", "Chat", suggested=30),
+            _act("go", "CLI", suggested=10)]
+    modes = tel.mode_split(rows)
+    assert modes[0]["share"] == 0.75
+    assert modes[1]["share"] == 0.25
+
+
+def test_mode_split_share_is_zero_when_nothing_was_suggested():
+    """Agent-heavy months can legitimately record no suggestions. Dividing by
+    that total must not raise."""
+    rows = [_act("python", "Agent mode", suggested=0, lines_added=500)]
+    modes = tel.mode_split(rows)
+    assert modes[0]["share"] == 0.0
+    assert modes[0]["lines_added"] == 500
+
+
+def test_mode_split_reports_no_acceptance_figure():
+    """Acceptance per mode is deliberately absent: agent features apply code
+    without a discrete accept step, so the number would mislead."""
+    modes = tel.mode_split([_act("python", "Agent mode")])
+    assert "accepted" not in modes[0]
+
+
+def test_mode_split_skips_null_counts():
+    rows = [_act("python", "Chat", suggested=None, lines_added=None),
+            _act("go", "Chat", suggested=10, lines_added=100)]
+    modes = tel.mode_split(rows)
+    assert modes[0]["suggested"] == 10
+    assert modes[0]["lines_added"] == 100
+
+
+def test_mode_split_of_no_rows_is_empty():
+    assert tel.mode_split([]) == []
