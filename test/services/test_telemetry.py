@@ -8,6 +8,7 @@ nulls are not zeros, and no rate is computed across all features.
 """
 
 from app.main.services import telemetry as tel
+from app.main.services.reports_source import ReportsSource
 
 
 def _day(day, **overrides):
@@ -226,3 +227,84 @@ def test_no_other_row_when_nothing_is_left_over():
 
 def test_top_languages_of_no_rows_is_empty():
     assert tel.top_languages([]) == []
+
+
+class StubTelemetrySource(ReportsSource):
+    """Serves fixed telemetry and records the day range it was asked for."""
+
+    def __init__(self, user_rows=None, activity_rows=None, available=True):
+        self._user_rows = list(user_rows or [])
+        self._activity_rows = list(activity_rows or [])
+        self._available = available
+        self.ranges = []
+
+    def model_rows(self):
+        return []
+
+    def user_rows(self):
+        return []
+
+    def telemetry_available(self):
+        return self._available
+
+    def telemetry_user_rows(self, login, start_day, end_day):
+        self.ranges.append((login, start_day, end_day))
+        return self._user_rows
+
+    def telemetry_activity_rows(self, login, start_day, end_day):
+        self.ranges.append((login, start_day, end_day))
+        return self._activity_rows
+
+
+def test_view_is_none_when_the_backend_has_no_telemetry():
+    """This is the whole development-only gate: no tables, no section."""
+    source = StubTelemetrySource([_day("2026-08-01")], available=False)
+    assert tel.telemetry_view(source, "alice", "2026-08") is None
+
+
+def test_view_is_none_when_the_person_has_no_rows():
+    assert tel.telemetry_view(StubTelemetrySource(), "alice", "2026-08") is None
+
+
+def test_view_asks_for_the_whole_selected_month():
+    source = StubTelemetrySource([_day("2026-08-01")])
+    tel.telemetry_view(source, "alice", "2026-08")
+    assert source.ranges[0] == ("alice", "2026-08-01", "2026-08-31")
+
+
+def test_view_handles_a_thirty_day_month():
+    source = StubTelemetrySource([_day("2026-09-01")])
+    tel.telemetry_view(source, "alice", "2026-09")
+    assert source.ranges[0] == ("alice", "2026-09-01", "2026-09-30")
+
+
+def test_view_handles_february_in_a_leap_year():
+    source = StubTelemetrySource([_day("2028-02-01")])
+    tel.telemetry_view(source, "alice", "2028-02")
+    assert source.ranges[0] == ("alice", "2028-02-01", "2028-02-29")
+
+
+def test_view_carries_every_section():
+    source = StubTelemetrySource(
+        user_rows=[_day("2026-08-01", review_requested=True)],
+        activity_rows=[_act("python", "Chat", lines_added=100),
+                       _act("unknown", "Chat", lines_added=25)],
+    )
+    view = tel.telemetry_view(source, "alice", "2026-08")
+    assert view["month"] == "2026-08"
+    assert view["volume"]["suggested"] == 40
+    assert view["review"]["requested"] == 1
+    assert view["modes"][0]["mode"] == "Chat"
+    assert view["languages"][0]["language"] == "Python"
+    assert view["unattributed_lines_added"] == 25
+
+
+def test_view_survives_a_person_with_days_but_no_language_rows():
+    """The pipeline documentation records that code review, the coding agent
+    and the cloud agent produce no language rows at all."""
+    source = StubTelemetrySource(user_rows=[_day("2026-08-01")], activity_rows=[])
+    view = tel.telemetry_view(source, "alice", "2026-08")
+    assert view is not None
+    assert view["modes"] == []
+    assert view["languages"] == []
+    assert view["unattributed_lines_added"] == 0

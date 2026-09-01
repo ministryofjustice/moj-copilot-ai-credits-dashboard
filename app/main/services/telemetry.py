@@ -21,6 +21,8 @@ because breaking any of them produces a plausible-looking wrong number:
 
 from __future__ import annotations
 
+import calendar
+
 VOLUME_FIELDS = ("interactions", "suggested", "accepted",
                  "lines_added", "lines_deleted")
 
@@ -196,3 +198,34 @@ def unattributed_lines(activity_rows: list[dict]) -> int:
         if row.get("lines_added") is not None
         and display_language(row.get("language")) is None
     )
+
+
+def month_bounds(month: str) -> tuple[str, str]:
+    """`YYYY-MM` -> the first and last calendar day of that month, inclusive."""
+    year, month_number = (int(part) for part in month.split("-"))
+    last = calendar.monthrange(year, month_number)[1]
+    return f"{month}-01", f"{month}-{last:02d}"
+
+
+def telemetry_view(source, login: str, month: str) -> dict | None:
+    """Everything the personal page shows about one person's month, or None.
+
+    None means the section does not render at all, for either of two reasons:
+    the backend serves no telemetry (which is how the feature stays switched
+    off outside development), or this person has no rows for this month.
+    """
+    if not source.telemetry_available():
+        return None
+    start_day, end_day = month_bounds(month)
+    user_rows = source.telemetry_user_rows(login, start_day, end_day)
+    activity_rows = source.telemetry_activity_rows(login, start_day, end_day)
+    if not user_rows and not activity_rows:
+        return None
+    return {
+        "month": month,
+        "volume": volume(user_rows),
+        "review": review_activity(user_rows),
+        "modes": mode_split(activity_rows),
+        "languages": top_languages(activity_rows),
+        "unattributed_lines_added": unattributed_lines(activity_rows),
+    }
