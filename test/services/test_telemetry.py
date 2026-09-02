@@ -308,3 +308,164 @@ def test_view_survives_a_person_with_days_but_no_language_rows():
     assert view["modes"] == []
     assert view["languages"] == []
     assert view["unattributed_lines_added"] == 0
+
+
+# ---------------------------------------------------------- inline completion
+def test_inline_completion_totals_only_that_mode():
+    """The acceptance figures on the page describe inline completion alone.
+    Agent and chat features apply code without a discrete accept step, so
+    folding them in would drag the rate towards zero for no real reason."""
+    rows = [
+        _act("python", "Inline completion", suggested=30, accepted=12,
+             lines_added=200, lines_suggested_added=600),
+        _act("go", "Inline completion", suggested=10, accepted=3,
+             lines_added=50, lines_suggested_added=150),
+        _act("go", "Agent mode", suggested=900, accepted=1,
+             lines_added=9000, lines_suggested_added=9000),
+    ]
+    inline = tel.inline_completion(rows)
+    assert inline["suggested"] == 40
+    assert inline["accepted"] == 15
+    assert inline["lines_added"] == 250
+    assert inline["lines_suggested_added"] == 750
+
+
+def test_inline_completion_acceptance_rate_is_a_fraction():
+    rows = [_act("python", "Inline completion", suggested=40, accepted=10)]
+    assert tel.inline_completion(rows)["acceptance_rate"] == 0.25
+
+
+def test_no_acceptance_rate_below_the_minimum_count():
+    """A rate over a handful of completions is noise, not a measurement."""
+    rows = [_act("python", "Inline completion", suggested=19, accepted=10)]
+    assert tel.inline_completion(rows)["acceptance_rate"] is None
+
+
+def test_acceptance_rate_appears_exactly_at_the_minimum_count():
+    rows = [_act("python", "Inline completion", suggested=20, accepted=5)]
+    assert tel.inline_completion(rows)["acceptance_rate"] == 0.25
+
+
+def test_no_acceptance_rate_when_more_were_accepted_than_offered():
+    """GitHub has been observed reporting this. A rate above 100 per cent is
+    not a fact about the person, so no rate is shown at all."""
+    rows = [_act("python", "Inline completion", suggested=40, accepted=41)]
+    assert tel.inline_completion(rows)["acceptance_rate"] is None
+
+
+def test_inline_completion_lines_kept_rate():
+    rows = [_act("python", "Inline completion",
+                 lines_added=250, lines_suggested_added=1000)]
+    assert tel.inline_completion(rows)["lines_kept_rate"] == 0.25
+
+
+def test_no_lines_kept_rate_below_the_minimum_count():
+    rows = [_act("python", "Inline completion",
+                 lines_added=5, lines_suggested_added=19)]
+    assert tel.inline_completion(rows)["lines_kept_rate"] is None
+
+
+def test_no_lines_kept_rate_when_more_were_kept_than_suggested():
+    """GitHub leaves agent edits out of the suggested-lines column but counts
+    them in lines added, so this pair can exceed 100 per cent."""
+    rows = [_act("python", "Inline completion",
+                 lines_added=900, lines_suggested_added=100)]
+    assert tel.inline_completion(rows)["lines_kept_rate"] is None
+
+
+def test_inline_completion_skips_null_counts():
+    rows = [_act("python", "Inline completion", suggested=None, accepted=None,
+                 lines_added=None, lines_suggested_added=None),
+            _act("go", "Inline completion", suggested=30, accepted=9,
+                 lines_added=100, lines_suggested_added=400)]
+    inline = tel.inline_completion(rows)
+    assert inline["suggested"] == 30
+    assert inline["accepted"] == 9
+    assert inline["acceptance_rate"] == 0.3
+
+
+def test_inline_completion_of_no_rows_is_zeros_and_no_rates():
+    inline = tel.inline_completion([])
+    assert inline == {"suggested": 0, "accepted": 0, "lines_added": 0,
+                      "lines_suggested_added": 0, "acceptance_rate": None,
+                      "lines_kept_rate": None}
+
+
+def test_inline_completion_when_the_person_used_only_agents():
+    inline = tel.inline_completion([_act("go", "Agent mode", suggested=500)])
+    assert inline["suggested"] == 0
+    assert inline["acceptance_rate"] is None
+
+
+# --------------------------------------------------------------- agent lines
+def test_agent_lines_added_counts_only_agent_mode():
+    """Agent edits write code into files without an accept step, so these
+    lines are reported separately from accepted suggestions."""
+    rows = [_act("go", "Agent mode", lines_added=900),
+            _act("go", "Agent mode", lines_added=100),
+            _act("python", "Inline completion", lines_added=50)]
+    assert tel.agent_lines_added(rows) == 1000
+
+
+def test_agent_lines_added_skips_nulls():
+    rows = [_act("go", "Agent mode", lines_added=None),
+            _act("go", "Agent mode", lines_added=7)]
+    assert tel.agent_lines_added(rows) == 7
+
+
+def test_agent_lines_added_of_no_rows_is_zero():
+    assert tel.agent_lines_added([]) == 0
+
+
+# ------------------------------------------------------------------ headline
+def test_headline_carries_the_parts_of_the_summary_sentence():
+    rows = [
+        _act("ruby", "Inline completion", suggested=40, accepted=10,
+             lines_added=900, lines_suggested_added=1000),
+        _act("go", "Agent mode", suggested=5, accepted=0, lines_added=13,
+             lines_suggested_added=0),
+    ]
+    head = tel.headline(tel.inline_completion(rows), tel.mode_split(rows),
+                        tel.top_languages(rows), tel.agent_lines_added(rows))
+    assert head["acceptance_rate"] == 0.25
+    assert head["inline_suggested"] == 40
+    assert head["top_language"] == "Ruby"
+    assert head["top_mode"] == "Inline completion"
+    assert head["agent_lines_added"] == 13
+
+
+def test_headline_leaves_out_what_was_never_recorded():
+    """Someone with days recorded but no language or mode rows still gets a
+    sentence; the missing parts are left out rather than guessed."""
+    head = tel.headline(tel.inline_completion([]), [], [], 0)
+    assert head["acceptance_rate"] is None
+    assert head["inline_suggested"] == 0
+    assert head["top_language"] is None
+    assert head["top_mode"] is None
+    assert head["agent_lines_added"] == 0
+
+
+# ------------------------------------------------------------- top languages
+def test_top_languages_shows_five_by_default():
+    rows = [_act(f"lang{i}", "Chat", lines_added=100 - i) for i in range(8)]
+    languages = tel.top_languages(rows)
+    assert [lang["language"] for lang in languages[:5]] == [
+        "lang0", "lang1", "lang2", "lang3", "lang4"]
+    assert languages[5]["language"] == "Other"
+    assert len(languages) == 6
+
+
+# ------------------------------------------------------------------ the view
+def test_view_carries_the_headline_and_inline_figures():
+    source = StubTelemetrySource(
+        user_rows=[_day("2026-08-01")],
+        activity_rows=[_act("ruby", "Inline completion", suggested=40,
+                            accepted=10, lines_added=200,
+                            lines_suggested_added=800),
+                       _act("go", "Agent mode", lines_added=13)],
+    )
+    view = tel.telemetry_view(source, "alice", "2026-08")
+    assert view["inline"]["acceptance_rate"] == 0.25
+    assert view["inline"]["lines_kept_rate"] == 0.25
+    assert view["agent_lines_added"] == 13
+    assert view["headline"]["top_language"] == "Ruby"

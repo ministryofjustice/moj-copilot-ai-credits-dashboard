@@ -12,11 +12,14 @@ because breaking any of them produces a plausible-looking wrong number:
   contributes nothing to a total and is never counted as a day of no activity.
 * No rate is computed across all features. GitHub excludes agent edits from
   `loc_suggested_to_add_sum` but includes them in `loc_added_sum`, so a
-  lines-kept ratio over everything exceeds 100 per cent. This module computes
-  no such rate.
+  lines-kept ratio over everything exceeds 100 per cent. Both rates this
+  module computes cover inline completion alone, and both are dropped when
+  the numerator exceeds the denominator or the sample is under MIN_FOR_RATE.
 * Acceptance is not reported per mode. Agent features apply code without a
   discrete accept step, so their acceptance counts are near zero and a rate
-  would misrepresent people who work mainly through agents.
+  would misrepresent people who work mainly through agents. Inline completion
+  is the exception, reported on its own by `inline_completion`, because there
+  the person either takes the suggestion or does not.
 """
 
 from __future__ import annotations
@@ -25,6 +28,19 @@ import calendar
 
 VOLUME_FIELDS = ("interactions", "suggested", "accepted",
                  "lines_added", "lines_deleted")
+
+# Counts summed per group (per mode, per language) and for inline completion.
+GROUPED_FIELDS = ("suggested", "accepted", "lines_added",
+                  "lines_suggested_added")
+
+# The two mode names this module singles out. The pipeline derives `mode` from
+# `feature`; these are two of the six values it produces.
+INLINE_COMPLETION_MODE = "Inline completion"
+AGENT_MODE = "Agent mode"
+
+# Below this many events, a percentage says more about the small sample than
+# about the person, so none is shown.
+MIN_FOR_RATE = 20
 
 
 def _total(rows: list[dict], field: str) -> int:
@@ -64,15 +80,15 @@ def review_activity(user_rows: list[dict]) -> dict:
 
 
 def _grouped_totals(rows: list[dict], key_of) -> dict:
-    """Sum `suggested` and `lines_added` per group, skipping nulls and any row
+    """Sum every count in GROUPED_FIELDS per group, skipping nulls and any row
     whose key is None."""
     totals: dict = {}
     for row in rows:
         key = key_of(row)
         if key is None:
             continue
-        entry = totals.setdefault(key, {"suggested": 0, "lines_added": 0})
-        for field in ("suggested", "lines_added"):
+        entry = totals.setdefault(key, {f: 0 for f in GROUPED_FIELDS})
+        for field in GROUPED_FIELDS:
             value = row.get(field)
             if value is not None:
                 entry[field] += value
@@ -99,6 +115,64 @@ def mode_split(activity_rows: list[dict]) -> list[dict]:
     ]
     modes.sort(key=lambda m: (-m["suggested"], m["mode"]))
     return modes
+
+
+def _rate(part: int, whole: int) -> float | None:
+    """`part / whole`, or None when that fraction would not be a fact.
+
+    Two things make it not a fact: too few events to measure, and a part larger
+    than its whole. The second happens in the real data - GitHub has been seen
+    reporting more acceptances than offers, and it leaves agent edits out of
+    the suggested-lines column while counting them in lines added.
+    """
+    if whole < MIN_FOR_RATE or part > whole:
+        return None
+    return part / whole
+
+
+def _rows_in_mode(activity_rows: list[dict], mode: str) -> list[dict]:
+    return [row for row in activity_rows if row.get("mode") == mode]
+
+
+def inline_completion(activity_rows: list[dict]) -> dict:
+    """Month totals and two rates for inline completion alone.
+
+    Inline completion is the only surface where offered and accepted are a
+    matched pair, because the person either takes the suggestion or does not.
+    Every other surface either applies code without an accept step or records
+    almost no acceptances, so a rate across all of them understates everyone.
+    """
+    rows = _rows_in_mode(activity_rows, INLINE_COMPLETION_MODE)
+    figures = {field: _total(rows, field) for field in GROUPED_FIELDS}
+    figures["acceptance_rate"] = _rate(figures["accepted"], figures["suggested"])
+    figures["lines_kept_rate"] = _rate(figures["lines_added"],
+                                       figures["lines_suggested_added"])
+    return figures
+
+
+def agent_lines_added(activity_rows: list[dict]) -> int:
+    """Lines agent edits wrote into files. Reported on its own because these
+    lines are never counted as accepted suggestions, so a page that showed only
+    acceptances would describe an agent user as having done nothing."""
+    return _total(_rows_in_mode(activity_rows, AGENT_MODE), "lines_added")
+
+
+def headline(inline: dict, modes: list[dict], languages: list[dict],
+             agent_lines: int) -> dict:
+    """The parts of the one-sentence summary, as values rather than text.
+
+    The sentence is written in the template. Keeping the wording out of Python
+    means the phrasing can change without touching a tested calculation, and a
+    part that was never recorded arrives as None so the template can leave that
+    clause out rather than print a placeholder.
+    """
+    return {
+        "acceptance_rate": inline["acceptance_rate"],
+        "inline_suggested": inline["suggested"],
+        "top_language": languages[0]["language"] if languages else None,
+        "top_mode": modes[0]["mode"] if modes else None,
+        "agent_lines_added": agent_lines,
+    }
 
 
 # GitHub does not standardise the language strings it reports: the August 2026
@@ -149,7 +223,7 @@ NON_LANGUAGES = frozenset({
     "plaintext", "text", "none", "skill", "chatagent", "git-commit",
 })
 
-TOP_LANGUAGE_COUNT = 8
+TOP_LANGUAGE_COUNT = 5
 
 
 def display_language(raw: str | None) -> str | None:
@@ -221,11 +295,18 @@ def telemetry_view(source, login: str, month: str) -> dict | None:
     activity_rows = source.telemetry_activity_rows(login, start_day, end_day)
     if not user_rows and not activity_rows:
         return None
+    modes = mode_split(activity_rows)
+    languages = top_languages(activity_rows)
+    inline = inline_completion(activity_rows)
+    agent_lines = agent_lines_added(activity_rows)
     return {
         "month": month,
         "volume": volume(user_rows),
         "review": review_activity(user_rows),
-        "modes": mode_split(activity_rows),
-        "languages": top_languages(activity_rows),
+        "modes": modes,
+        "languages": languages,
+        "inline": inline,
+        "agent_lines_added": agent_lines,
+        "headline": headline(inline, modes, languages, agent_lines),
         "unattributed_lines_added": unattributed_lines(activity_rows),
     }
