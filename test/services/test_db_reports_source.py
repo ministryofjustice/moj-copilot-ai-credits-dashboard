@@ -206,8 +206,8 @@ def test_telemetry_unavailable_without_table_names(monkeypatch):
     monkeypatch.delenv("ATHENA_TABLE_TELEMETRY_ACTIVITY", raising=False)
     source = DbReportsSource(client=FakeAthenaClient(), sleep=lambda _s: None)
     assert source.telemetry_available() is False
-    assert source.telemetry_user_rows("alice", "2026-08-01", "2026-08-31") == []
-    assert source.telemetry_activity_rows("alice", "2026-08-01", "2026-08-31") == []
+    assert not source.telemetry_user_rows("alice", "2026-08-01", "2026-08-31")
+    assert not source.telemetry_activity_rows("alice", "2026-08-01", "2026-08-31")
 
 
 def test_telemetry_unavailable_with_only_one_table_name(monkeypatch):
@@ -317,7 +317,7 @@ def test_an_invalid_username_is_rejected_before_any_query(monkeypatch, login):
     source = _telemetry_source(monkeypatch, client)
     with pytest.raises(ValueError):
         source.telemetry_user_rows(login, "2026-08-01", "2026-08-31")
-    assert client.queries == []
+    assert not client.queries
 
 
 @pytest.mark.parametrize("start,end", [
@@ -330,7 +330,7 @@ def test_an_invalid_date_is_rejected_before_any_query(monkeypatch, start, end):
     source = _telemetry_source(monkeypatch, client)
     with pytest.raises(ValueError):
         source.telemetry_user_rows("alice", start, end)
-    assert client.queries == []
+    assert not client.queries
 
 
 def test_a_hyphenated_username_is_accepted(monkeypatch):

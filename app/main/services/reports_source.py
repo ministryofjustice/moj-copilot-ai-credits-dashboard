@@ -155,12 +155,14 @@ class ReportsSource(ABC):
                             end_day: str) -> list[dict]:
         """One row per day for `login`, between `start_day` and `end_day`
         inclusive. Both dates are ISO `YYYY-MM-DD` strings."""
+        # pylint: disable=unused-argument
         return []
 
     def telemetry_activity_rows(self, login: str, start_day: str,
                                 end_day: str) -> list[dict]:
         """One row per day, language and feature for `login`, between
         `start_day` and `end_day` inclusive."""
+        # pylint: disable=unused-argument
         return []
 
 
@@ -191,7 +193,7 @@ class LocalFsReportsSource(ReportsSource):
         return (self._has_table(TELEMETRY_USER_TABLE)
                 and self._has_table(TELEMETRY_ACTIVITY_TABLE))
 
-    def _telemetry_rows(self, table: str, columns: dict, login: str,
+    def _telemetry_rows(self, table: str, columns: dict, login: str,  # pylint: disable=too-many-arguments
                         start_day: str, end_day: str) -> list[dict]:
         # Each read guards only the table it needs. `telemetry_available` is a
         # stricter, page-level question (can the whole section render?) and
