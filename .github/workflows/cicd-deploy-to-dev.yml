@@ -24,6 +24,10 @@ env:
   ATHENA_TABLE_USERS: ${{ secrets.DEV_ATHENA_TABLE_USERS }}
   ATHENA_TABLE_MODELS: ${{ secrets.DEV_ATHENA_TABLE_MODELS }}
   ATHENA_WORKGROUP: ${{ secrets.DEV_ATHENA_WORKGROUP }}
+  # Development only. Both must be set for the personal page's telemetry
+  # section to appear; the production workflow deliberately has neither.
+  ATHENA_TABLE_TELEMETRY_USERS: ${{ secrets.DEV_ATHENA_TABLE_TELEMETRY_USERS }}
+  ATHENA_TABLE_TELEMETRY_ACTIVITY: ${{ secrets.DEV_ATHENA_TABLE_TELEMETRY_ACTIVITY }}
 
 jobs:
   build-push:
@@ -79,4 +83,6 @@ jobs:
             --set app.deployment.athena.database=${ATHENA_DATABASE} \
             --set app.deployment.athena.tableUsers=${ATHENA_TABLE_USERS} \
             --set app.deployment.athena.tableModels=${ATHENA_TABLE_MODELS} \
-            --set app.deployment.athena.workgroup=${ATHENA_WORKGROUP}
+            --set app.deployment.athena.workgroup=${ATHENA_WORKGROUP} \
+            --set app.deployment.athena.tableTelemetryUsers="${ATHENA_TABLE_TELEMETRY_USERS}" \
+            --set app.deployment.athena.tableTelemetryActivity="${ATHENA_TABLE_TELEMETRY_ACTIVITY}"
