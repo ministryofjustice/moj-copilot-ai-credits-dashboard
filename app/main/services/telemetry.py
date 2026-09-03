@@ -12,9 +12,9 @@ because breaking any of them produces a plausible-looking wrong number:
   contributes nothing to a total and is never counted as a day of no activity.
 * No rate is computed across all features. GitHub excludes agent edits from
   `loc_suggested_to_add_sum` but includes them in `loc_added_sum`, so a
-  lines-kept ratio over everything exceeds 100 per cent. Both rates this
-  module computes cover inline completion alone, and both are dropped when
-  the numerator exceeds the denominator or the sample is under MIN_FOR_RATE.
+  lines-kept ratio over everything exceeds 100 per cent. The one rate this
+  module computes covers inline completion alone, and it is dropped when the
+  numerator exceeds the denominator or the sample is under MIN_FOR_RATE.
 * Acceptance is not reported per mode. Agent features apply code without a
   discrete accept step, so their acceptance counts are near zero and a rate
   would misrepresent people who work mainly through agents. Inline completion
@@ -135,7 +135,7 @@ def _rows_in_mode(activity_rows: list[dict], mode: str) -> list[dict]:
 
 
 def inline_completion(activity_rows: list[dict]) -> dict:
-    """Month totals and two rates for inline completion alone.
+    """Month totals and the acceptance rate for inline completion alone.
 
     Inline completion is the only surface where offered and accepted are a
     matched pair, because the person either takes the suggestion or does not.
@@ -145,8 +145,6 @@ def inline_completion(activity_rows: list[dict]) -> dict:
     rows = _rows_in_mode(activity_rows, INLINE_COMPLETION_MODE)
     figures = {field: _total(rows, field) for field in GROUPED_FIELDS}
     figures["acceptance_rate"] = _rate(figures["accepted"], figures["suggested"])
-    figures["lines_kept_rate"] = _rate(figures["lines_added"],
-                                       figures["lines_suggested_added"])
     return figures
 
 

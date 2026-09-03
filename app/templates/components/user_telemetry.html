@@ -30,24 +30,23 @@
 </style>
 
 {# ---- One sentence saying what the month looked like ----
-   The wording lives here rather than in Python so it can change without
-   touching a tested calculation. Any part GitHub did not record arrives as
-   None and its clause is left out entirely. #}
+   Where no honest acceptance rate exists - too few inline completions, or a
+   person who works through the CLI or agents and gets almost none - the
+   sentence reports the code that was applied instead. #}
 {% set h = t.headline %}
-{% set inline = t.inline %}
 <p class="govuk-body-l">
   {%- if h.acceptance_rate is not none -%}
     Accepted <strong>{{ "%.1f%%"|format(h.acceptance_rate * 100) }}</strong> of
     {{ "{:,}".format(h.inline_suggested) }} inline completions this month
-  {%- elif h.inline_suggested -%}
-    Was offered only {{ "{:,}".format(h.inline_suggested) }} inline completions
-    this month, too few for an acceptance rate
+  {%- elif t.volume.lines_added -%}
+    Applied <strong>{{ "{:,}".format(t.volume.lines_added) }}</strong> lines of
+    code this month
   {%- else -%}
-    Was offered no inline completions this month
+    No code activity was recorded for you this month
   {%- endif -%}
   {%- if h.top_language %}, mostly in <strong>{{ h.top_language }}</strong>{% endif -%}
   {%- if h.top_mode %}, working mostly in <strong>{{ h.top_mode }}</strong>{% endif -%}.
-  {%- if h.agent_lines_added %}
+  {%- if h.acceptance_rate is not none and h.agent_lines_added %}
   Agent edits wrote <strong>{{ "{:,}".format(h.agent_lines_added) }}</strong>
   lines into files, which are not counted as accepted suggestions.
   {%- endif %}
@@ -55,38 +54,6 @@
 
 {# ---- The month in numbers ---- #}
 <div class="telemetry-stat-row">
-  <div class="telemetry-stat">
-    <span class="govuk-caption-m">Inline completion acceptance rate</span>
-    <span class="govuk-heading-m govuk-!-margin-bottom-0">
-      {{ "%.1f%%"|format(inline.acceptance_rate * 100)
-         if inline.acceptance_rate is not none else "not shown" }}</span>
-    <span class="govuk-body-s govuk-!-margin-bottom-0">
-      {%- if not inline.suggested -%}
-        no inline completions offered
-      {%- else -%}
-        {{ "{:,}".format(inline.accepted) }} accepted of
-        {{ "{:,}".format(inline.suggested) }} offered
-        {%- if inline.acceptance_rate is none -%}
-          {{- " - more accepted than offered, so no percentage"
-              if inline.accepted > inline.suggested
-              else " - too few to be a rate" -}}
-        {%- endif -%}
-      {%- endif -%}</span>
-  </div>
-  <div class="telemetry-stat">
-    <span class="govuk-caption-m">Inline completion lines kept</span>
-    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(inline.lines_added) }}</span>
-    <span class="govuk-body-s govuk-!-margin-bottom-0">
-      {%- if inline.lines_kept_rate is not none -%}
-        {{ "%.1f%%"|format(inline.lines_kept_rate * 100) }} of
-        {{ "{:,}".format(inline.lines_suggested_added) }} suggested
-      {%- elif inline.lines_added > inline.lines_suggested_added -%}
-        more lines than the {{ "{:,}".format(inline.lines_suggested_added) }}
-        suggested, so no percentage
-      {%- else -%}
-        {{ "{:,}".format(inline.lines_suggested_added) }} suggested - too few to be a rate
-      {%- endif -%}</span>
-  </div>
   <div class="telemetry-stat">
     <span class="govuk-caption-m">Lines of code applied</span>
     <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.volume.lines_added) }}</span>

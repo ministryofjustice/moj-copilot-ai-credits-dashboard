@@ -141,14 +141,18 @@ def test_summary_sentence_reports_the_acceptance_rate(monkeypatch, make_record):
     assert "working mostly in <strong>Inline completion</strong>" in page
 
 
-def test_summary_sentence_says_when_there_are_too_few_to_rate(
+def test_summary_sentence_reports_lines_when_no_rate_is_possible(
         monkeypatch, make_record):
+    """5 inline completions is under the 20-event minimum. The sentence then
+    says what was applied and never mentions a percentage or its absence."""
     activity = _activity("2026-08-04")
     activity.update(suggested=5, accepted=2)
     source = SourceWithTelemetry(
         _credits(make_record), [_telemetry_day("2026-08-04")], [activity])
     page = _page_text(monkeypatch, source)
-    assert "too few for an acceptance rate" in page
+    assert "Applied <strong>320</strong> lines of code this month" in page
+    assert "acceptance rate" not in page
+    assert "too few" not in page
 
 
 def test_summary_sentence_reports_agent_lines_separately(
@@ -169,22 +173,9 @@ def test_every_tile_is_rendered(monkeypatch, make_record):
         _credits(make_record), [_telemetry_day("2026-08-04")],
         [_activity("2026-08-04")])
     page = _page_text(monkeypatch, source)
-    for label in ("Inline completion acceptance rate",
-                  "Inline completion lines kept",
-                  "Lines of code applied",
+    for label in ("Lines of code applied",
                   "Activity across all modes",
                   "Active days",
                   "Top mode",
                   "Chats and prompts started"):
         assert label in page
-
-
-def test_no_lines_kept_rate_when_more_lines_were_kept_than_suggested(
-        monkeypatch, make_record):
-    """The fixture day added 320 lines against 200 suggested, which cannot be
-    a percentage. The tile must say why rather than print a rate over 100%."""
-    source = SourceWithTelemetry(
-        _credits(make_record), [_telemetry_day("2026-08-04")],
-        [_activity("2026-08-04")])
-    page = _page_text(monkeypatch, source)
-    assert "more lines than the 200 suggested" in page
