@@ -353,26 +353,6 @@ def test_no_acceptance_rate_when_more_were_accepted_than_offered():
     assert tel.inline_completion(rows)["acceptance_rate"] is None
 
 
-def test_inline_completion_lines_kept_rate():
-    rows = [_act("python", "Inline completion",
-                 lines_added=250, lines_suggested_added=1000)]
-    assert tel.inline_completion(rows)["lines_kept_rate"] == 0.25
-
-
-def test_no_lines_kept_rate_below_the_minimum_count():
-    rows = [_act("python", "Inline completion",
-                 lines_added=5, lines_suggested_added=19)]
-    assert tel.inline_completion(rows)["lines_kept_rate"] is None
-
-
-def test_no_lines_kept_rate_when_more_were_kept_than_suggested():
-    """GitHub leaves agent edits out of the suggested-lines column but counts
-    them in lines added, so this pair can exceed 100 per cent."""
-    rows = [_act("python", "Inline completion",
-                 lines_added=900, lines_suggested_added=100)]
-    assert tel.inline_completion(rows)["lines_kept_rate"] is None
-
-
 def test_inline_completion_skips_null_counts():
     rows = [_act("python", "Inline completion", suggested=None, accepted=None,
                  lines_added=None, lines_suggested_added=None),
@@ -387,8 +367,7 @@ def test_inline_completion_skips_null_counts():
 def test_inline_completion_of_no_rows_is_zeros_and_no_rates():
     inline = tel.inline_completion([])
     assert inline == {"suggested": 0, "accepted": 0, "lines_added": 0,
-                      "lines_suggested_added": 0, "acceptance_rate": None,
-                      "lines_kept_rate": None}
+                      "lines_suggested_added": 0, "acceptance_rate": None}
 
 
 def test_inline_completion_when_the_person_used_only_agents():
@@ -466,6 +445,5 @@ def test_view_carries_the_headline_and_inline_figures():
     )
     view = tel.telemetry_view(source, "alice", "2026-08")
     assert view["inline"]["acceptance_rate"] == 0.25
-    assert view["inline"]["lines_kept_rate"] == 0.25
     assert view["agent_lines_added"] == 13
     assert view["headline"]["top_language"] == "Ruby"
