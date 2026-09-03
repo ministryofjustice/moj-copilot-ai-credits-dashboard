@@ -138,7 +138,7 @@ def test_summary_sentence_reports_the_acceptance_rate(monkeypatch, make_record):
     assert "45.0%" in page
     assert "of 40 inline completions this month" in page
     assert "mostly in <strong>Python</strong>" in page
-    assert "working mostly in <strong>Inline completion</strong>" in page
+    assert "working mostly in <strong>inline completion</strong>" in page
 
 
 def test_summary_sentence_reports_lines_when_no_rate_is_possible(
