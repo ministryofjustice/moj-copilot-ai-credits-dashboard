@@ -45,7 +45,7 @@
     No code activity was recorded for you this month
   {%- endif -%}
   {%- if h.top_language %}, mostly in <strong>{{ h.top_language }}</strong>{% endif -%}
-  {%- if h.top_mode %}, working mostly in <strong>{{ h.top_mode }}</strong>{% endif -%}.
+  {%- if h.top_mode %}, working mostly in <strong>{{ h.top_mode | lower }}</strong>{% endif -%}.
   {%- if h.acceptance_rate is not none and h.agent_lines_added %}
   Agent edits wrote <strong>{{ "{:,}".format(h.agent_lines_added) }}</strong>
   lines into files, which are not counted as accepted suggestions.
@@ -75,7 +75,7 @@
   </div>
   <div class="telemetry-stat">
     <span class="govuk-caption-m">Top mode</span>
-    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ h.top_mode or "none recorded" }}</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ (h.top_mode or "none recorded") | lower }}</span>
   </div>
   <div class="telemetry-stat">
     <span class="govuk-caption-m">Chats and prompts started</span>
@@ -110,7 +110,7 @@
   <tbody class="govuk-table__body">
     {% for m in t.modes %}
     <tr class="govuk-table__row">
-      <td class="govuk-table__cell">{{ m.mode }}</td>
+      <td class="govuk-table__cell">{{ m.mode | lower }}</td>
       <td class="govuk-table__cell">
         {# A non-zero share never renders as nothing: floor the drawn width. #}
         <div class="telemetry-bar" aria-hidden="true"><span
