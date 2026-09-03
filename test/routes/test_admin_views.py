@@ -75,6 +75,23 @@ def test_admin_weekly_measures_users_against_200(monkeypatch, fake_source):
     assert "weekly allowance 4619 credits/seat" in body
 
 
+def test_admin_monthly_renders_table_against_full_monthly_budget(monkeypatch,
+                                                                 fake_source):
+    """The monthly view mirrors weekly but measures against the full $200/mo
+    budget (200 * 100 = 20000 credits), not the ÷4.33 weekly figure."""
+    client = _admin_client(monkeypatch, fake_source(_user_rows()))
+    resp = client.get("/admin/monthly")
+    assert resp.status_code == 200
+    body = resp.get_data(as_text=True)
+    assert "Monthly per-user" in body
+    assert 'data-chart="topUsers"' in body
+    assert "Top model" not in body
+    assert '$200 / month" selected' in body
+    assert "$39 / month" in body
+    assert "$70 / month" not in body
+    assert "monthly allowance 20000 credits/seat" in body
+
+
 def test_admin_pooled_offers_only_the_39_we_are_billed(monkeypatch, fake_source,
                                                        model_records):
     """The pool is sized on GitHub's actual per-seat charge, which is fixed."""
