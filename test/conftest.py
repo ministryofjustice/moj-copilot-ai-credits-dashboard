@@ -92,3 +92,16 @@ def week_records():
         _build_record("2026-06-03", "c", 30.0),
         _build_record("2026-06-04", "d", 20.0),
     ]
+
+
+@pytest.fixture
+def month_records():
+    """User rows spanning two calendar months: heavy 'a' in 2026-06, others
+    small; one row in 2026-07 so a second month bucket exists."""
+    return [
+        _build_record("2026-06-01", "a", 25000.0),
+        _build_record("2026-06-20", "a", 1000.0),
+        _build_record("2026-06-02", "b", 50.0),
+        _build_record("2026-06-03", "c", 30.0),
+        _build_record("2026-07-01", "d", 20.0),
+    ]
