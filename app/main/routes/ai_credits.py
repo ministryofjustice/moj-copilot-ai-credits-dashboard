@@ -7,6 +7,7 @@ replacement for Streamlit's reactive widgets):
     /admin         Redirects to the default admin view (/admin/pooled)
     /admin/pooled  Org pooled — ?period=weekly|monthly&key=<key>&plan=<plan>&seats=<n>
     /admin/weekly  Org weekly — ?plan=<plan>&week=YYYY-Www
+    /admin/monthly Org monthly — ?plan=<plan>&month=YYYY-MM
     /admin/daily   Org daily  — ?day=YYYY-MM-DD
 
 `plan` takes different values per page. "/" and /admin/weekly measure a person
@@ -78,6 +79,16 @@ def admin_weekly():
         get_reports_source(), request.args.get("plan"), request.args.get("week")
     )
     return render_template("pages/admin_weekly.html", v=view)
+
+
+@ai_credits.route("/admin/monthly")
+@requires_auth
+@requires_admin
+def admin_monthly():
+    view = ac.monthly_view(
+        get_reports_source(), request.args.get("plan"), request.args.get("month")
+    )
+    return render_template("pages/admin_monthly.html", v=view)
 
 
 @ai_credits.route("/admin/pooled")
