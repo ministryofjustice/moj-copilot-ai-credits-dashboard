@@ -120,8 +120,8 @@ def test_default_source_reports_no_telemetry():
     """A backend that knows nothing about telemetry must not claim to have it."""
     inner = CountingSource()
     assert inner.telemetry_available() is False
-    assert inner.telemetry_user_rows("alice", "2026-08-01", "2026-08-31") == []
-    assert inner.telemetry_activity_rows("alice", "2026-08-01", "2026-08-31") == []
+    assert not inner.telemetry_user_rows("alice", "2026-08-01", "2026-08-31")
+    assert not inner.telemetry_activity_rows("alice", "2026-08-01", "2026-08-31")
 
 
 def test_telemetry_availability_passes_through():

@@ -74,7 +74,7 @@ _POLL_SECONDS = 1.0
 _MAX_POLLS = 300  # ~5 min ceiling at 1s between polls
 
 
-class DbReportsSource(ReportsSource):
+class DbReportsSource(ReportsSource):  # pylint: disable=too-many-instance-attributes
     def __init__(self, database=None, model_table=None, user_table=None,  # pylint: disable=too-many-arguments
                  output_location=None, *, workgroup=None, client=None,
                  sleep=None) -> None:
@@ -161,7 +161,7 @@ class DbReportsSource(ReportsSource):
     def telemetry_available(self) -> bool:
         return bool(self.telemetry_user_table and self.telemetry_activity_table)
 
-    def _telemetry_query(self, table: str, columns: dict, login: str,
+    def _telemetry_query(self, table: str, columns: dict, login: str,  # pylint: disable=too-many-arguments
                          start_day: str, end_day: str) -> list[dict]:
         """Run one narrow, filtered telemetry query and rename its columns.
 
