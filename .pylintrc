@@ -422,6 +422,7 @@ disable=raw-checker-failed,
         missing-module-docstring,
         missing-function-docstring,
         line-too-long,
+        duplicate-code,
         cyclic-import
 
 # Enable the message, report, category or checker with the given id(s). You can

@@ -17,6 +17,12 @@ app:
       database: "" # Glue database holding the ai-credits tables
       tableModels: "" # per-model table (partitioned Parquet from build_credit_rows)
       tableUsers: "" # per-user table (partitioned Parquet from build_credit_rows)
+      # Telemetry tables — development only. Set at deploy time from the
+      # DEV_ATHENA_TABLE_TELEMETRY_USERS and DEV_ATHENA_TABLE_TELEMETRY_ACTIVITY
+      # secrets by .github/workflows/cicd-deploy-to-dev.yml. Both must be set
+      # for the personal page's telemetry section to appear.
+      tableTelemetryUsers: "" # per-person-day telemetry table
+      tableTelemetryActivity: "" # per-language/feature telemetry table
       # No outputLocation: Athena uses the workgroup's default output location.
       workgroup: "primary"
       region: "eu-west-2"

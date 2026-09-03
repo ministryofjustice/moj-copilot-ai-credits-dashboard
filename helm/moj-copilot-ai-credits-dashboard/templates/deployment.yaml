@@ -61,6 +61,13 @@ spec:
               value: {{ .Values.app.deployment.athena.tableModels | quote }}
             - name: ATHENA_TABLE_USERS
               value: {{ .Values.app.deployment.athena.tableUsers | quote }}
+            # Telemetry tables. Empty everywhere they are not configured, which
+            # switches the personal page's telemetry section off. Development
+            # sets them; production does not.
+            - name: ATHENA_TABLE_TELEMETRY_USERS
+              value: {{ .Values.app.deployment.athena.tableTelemetryUsers | default "" | quote }}
+            - name: ATHENA_TABLE_TELEMETRY_ACTIVITY
+              value: {{ .Values.app.deployment.athena.tableTelemetryActivity | default "" | quote }}
             - name: ATHENA_WORKGROUP
               value: {{ .Values.app.deployment.athena.workgroup | default "primary" | quote }}
             - name: AWS_DEFAULT_REGION
