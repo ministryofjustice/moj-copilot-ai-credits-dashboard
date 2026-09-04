@@ -65,17 +65,41 @@ def test_model_and_user_cached_independently():
     assert inner.user_calls == 1
 
 
-def test_cache_expires_after_ttl():
+def test_cache_expires_at_the_end_of_the_window():
     inner = CountingSource()
-    clock = FakeClock(now=1000.0)
+    clock = FakeClock(now=1000.0)  # window 3 of 300s runs [900, 1200)
     src = _caching(inner, ttl=300.0, clock=clock)
     src.model_rows()
-    clock.now = 1000.0 + 299.0  # still inside the window
+    clock.now = 1199.0  # still inside the same window
     src.model_rows()
     assert inner.model_calls == 1
-    clock.now = 1000.0 + 301.0  # past the TTL
+    clock.now = 1201.0  # the window has rolled over
     assert src.model_rows()[0]["credits"] == 2.0
     assert inner.model_calls == 2
+
+
+def test_window_boundaries_do_not_depend_on_when_the_cache_warmed():
+    """Each running copy of the app caches separately, and they warm at whatever
+    moment each first got a request. Their windows must still start and end at
+    the same instants; otherwise one copy holds new data while another still
+    holds the previous day's, and refreshing bounces between the two figures.
+    """
+    def refetch_instants(warmed_at: float) -> list[int]:
+        inner = CountingSource()
+        clock = FakeClock(now=warmed_at)
+        src = _caching(inner, ttl=300.0, clock=clock)
+        src.model_rows()  # this copy warms its cache here
+        instants = []
+        for tick in range(1500, 3000):
+            clock.now = float(tick)
+            before = inner.model_calls
+            src.model_rows()
+            if inner.model_calls != before:
+                instants.append(tick)
+        return instants
+
+    assert refetch_instants(1000.0) == refetch_instants(1250.0)
+    assert refetch_instants(1000.0) == [1500, 1800, 2100, 2400, 2700]
 
 
 def test_ttl_zero_disables_caching():
