@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import threading
 import time
+import os
 
 from app.main.services.reports_source import ReportsSource
 
@@ -33,18 +34,34 @@ class CachingReportsSource(ReportsSource):
         self._now = time_fn
         self._lock = threading.Lock()
         self._cache: dict[object, tuple[int, object]] = {}
+        self._pod_name = os.getenv("HOSTNAME", "unknown")
 
     def _cached(self, key, produce):
         if self._ttl <= 0:
             return produce()
-        window = int(self._now() // self._ttl)
+        now = self._now()
+        window = int(now // self._ttl)
+        expires_at = (window + 1) * self._ttl
+        seconds_remaining = expires_at - now
         with self._lock:
             entry = self._cache.get(key)
             if entry is not None and entry[0] == window:
+                print(
+                    "reports cache hit "
+                    f"key={key} window={window} expires_at={expires_at} "
+                    f"seconds_remaining={seconds_remaining:.3f} "
+                    f"pod={self._pod_name}"
+                )
                 return entry[1]
         value = produce()
         with self._lock:
             self._cache[key] = (window, value)
+        print(
+            "reports cache refresh "
+            f"key={key} window={window} expires_at={expires_at} "
+            f"seconds_remaining={seconds_remaining:.3f} "
+            f"pod={self._pod_name}"
+        )
         return value
 
     def model_rows(self) -> list[dict]:
