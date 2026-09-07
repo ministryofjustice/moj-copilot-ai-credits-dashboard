@@ -102,3 +102,33 @@ def rollup_weekly(records: list[dict]) -> list[dict]:
     } for b in agg.values()]
     rows.sort(key=lambda x: (x["week_label"], -x["credits"]))
     return rows
+
+
+def rollup_monthly(records: list[dict]) -> list[dict]:
+    """Sum per-(month, user) credits from per-day {day, user, credits} records.
+
+    Returns one dict per (month_label, user) with summed credits and the count
+    of distinct days the user appears in, sorted by month (ascending) then
+    credits (descending). Month labels are 'YYYY-MM', so lexical sort is
+    chronological. Empty input -> empty list.
+    """
+    agg: dict[tuple[str, str], dict] = {}
+    for r in records:
+        label = month_label(r["day"])
+        key = (label, r["user"])
+        bucket = agg.get(key)
+        if bucket is None:
+            bucket = {
+                "month_label": label, "user": r["user"],
+                "credits": 0.0, "days": set(),
+            }
+            agg[key] = bucket
+        bucket["credits"] += r["credits"]
+        bucket["days"].add(r["day"])
+
+    rows = [{
+        "month_label": b["month_label"], "user": b["user"],
+        "credits": b["credits"], "day_count": len(b["days"]),
+    } for b in agg.values()]
+    rows.sort(key=lambda x: (x["month_label"], -x["credits"]))
+    return rows

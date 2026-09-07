@@ -334,6 +334,21 @@ def _week_ranges(rows: list[dict]) -> dict[str, str]:
     }
 
 
+def _monthly_rows(source: ReportsSource) -> list[dict]:
+    return wpu.rollup_monthly(_user_records(source))
+
+
+def _month_labels(rows: list[dict]) -> list[str]:
+    # rows already sorted by month_label asc; keep first-seen order, de-duped.
+    return list(dict.fromkeys(r["month_label"] for r in rows))
+
+
+def _month_ranges(rows: list[dict]) -> dict[str, str]:
+    """Map each 'YYYY-MM' label to its 'Jun 2026' display form."""
+    return {r["month_label"]: wpu.format_month_label(r["month_label"])
+            for r in rows}
+
+
 # ----------------------------------------------------------------- pooled helpers
 TIER_COLOURS = {
     "Power": "#d4351c",
@@ -651,6 +666,47 @@ def weekly_view(source: ReportsSource, plan: str | None, week: str | None) -> di
         "weeks": weeks, "week": week,
         "week_ranges": week_ranges,
         "span": f"{mon:%a %d %b} – {sun:%a %d %b}",
+        "active_users": len(rows),
+        "rows": rows, "over": over,
+    }
+
+
+def monthly_view(source: ReportsSource, plan: str | None, month: str | None) -> dict:  # pylint: disable=too-many-locals
+    """Org monthly per-user allowance table for one calendar month.
+
+    Twin of weekly_view, bucketed by calendar month and measured against the
+    full monthly budget (plan_limits(plan)["monthly"]), not the weekly figure.
+    """
+    all_rows = _monthly_rows(source)
+    plan = resolve_plan(plan)
+    if not all_rows:
+        return {"has_data": False, "plans": plan_labels(), "plan": plan,
+                "months": []}
+
+    months = _month_labels(all_rows)
+    month = _resolve_label(month, months)
+    allowance = plan_limits(plan)["monthly"]
+    month_ranges = _month_ranges(all_rows)
+
+    mth = [r for r in all_rows if r["month_label"] == month]
+    rows = []
+    for r in mth:
+        credits_val = float(r["credits"])
+        rows.append({
+            "user": r["user"], "credits": credits_val,
+            "pct": (credits_val / allowance) if allowance else 0.0,
+            "remaining": allowance - credits_val,
+            "day_count": int(r["day_count"]),
+        })
+    rows.sort(key=lambda x: x["credits"], reverse=True)
+    over = sum(1 for x in rows if x["pct"] >= 1.0)
+
+    return {
+        "has_data": True,
+        "plans": plan_labels(), "plan": plan, "allowance": allowance,
+        "months": months, "month": month,
+        "month_ranges": month_ranges,
+        "span": wpu.format_month_label(month),
         "active_users": len(rows),
         "rows": rows, "over": over,
     }
