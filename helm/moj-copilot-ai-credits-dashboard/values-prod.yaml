@@ -13,9 +13,9 @@ app:
       APP_ENV: "production"
       FLASK_DEBUG: false
       REPORTS_SOURCE: "db"
-      REPORTS_CACHE_TTL: 3600 # seconds; memoise the reads. The Glue crawler refreshes
-        # the data once a day (10:00 UTC), so anything shorter just re-queries Athena
-        # for data that cannot have changed. 0 disables.
+      REPORTS_CACHE_TTL: 600 # seconds; memoise the reads. The Glue crawler refreshes
+        # the data once a day (10:00 UTC); this caps how long a replica can still be
+        # serving the previous day's numbers after it. 0 disables.
     # Athena backend config (live: REPORTS_SOURCE is "db" above).
     # These are placeholders — the real values are injected at deploy time by
     # .github/workflows/cicd-deploy-to-prod.yml, which --sets them from the
