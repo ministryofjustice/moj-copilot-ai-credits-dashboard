@@ -1,6 +1,6 @@
 name: Auth0 Actions - Js Unit Tests
 
-on:
+"on":
   pull_request:
     paths:
       - 'terraform/auth0/actions_code/**'
@@ -26,4 +26,3 @@ jobs:
       - run: npm ci
 
       - run: npm test
-      
