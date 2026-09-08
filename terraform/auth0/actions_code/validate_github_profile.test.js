@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { checkGitHubOrganisationMembership } = require('./validate_github_profile');
+const { checkGitHubOrganisationMembership, checkOrgsMembershipAtLeastOne } = require('./validate_github_profile');
 
 jest.mock('axios');
 
@@ -26,3 +26,37 @@ test('checkGitHubOrganisationMembership rethrows errore when github responds wit
     await expect(checkGitHubOrganisationMembership('fake-token', 'ministryofjustice')).rejects.toEqual({ response: { status: 500 } });
 });
 
+// Returns true if the user is a member of the org checked
+test('checkOrgsMembershipAtLeastOne returns true if the user is a member of the org', async () => {
+    axios.get.mockResolvedValueOnce({ status: 200, data: {} });
+    const result = await checkOrgsMembershipAtLeastOne('fake-token', ["ministryofjustice"]);
+
+    expect(result).toBe(true)
+});
+
+// Returns true if the user matches a later org after an earlier one fails
+test('checkOrgsMembershipAtLeastOne returns true if the user matches a later org after an earlier one fails', async () => {
+    axios.get
+        .mockRejectedValueOnce({ response: { status: 404 } })
+        .mockResolvedValueOnce({ status: 200, data: {} });
+    const result = await checkOrgsMembershipAtLeastOne('fake-token', ["fake-org", "jac-uk"]);
+
+    expect(result).toBe(true)
+});
+
+// returns false if the user is not a member of any org in the list
+test('checkOrgsMembershipAtLeastOne returns false if the user is not a member of any org in the list', async () => {
+    axios.get
+        .mockRejectedValue({ response: { status: 404 } });
+    const result = await checkOrgsMembershipAtLeastOne('fake-token', ["fake-org-1", "fake-org-2-uk"]);
+
+    expect(result).toBe(false)
+});
+
+// Returns false when given an empty list/array of orgs
+// Note: no axios mock needed here. the loop never runs when orgs is empty
+test('checkOrgsMembershipAtLeastOne returns false when given an empty list/array of orgs', async () => {
+    const result = await checkOrgsMembershipAtLeastOne('fake-token', []);
+
+    expect(result).toBe(false)
+});
