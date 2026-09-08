@@ -1,5 +1,10 @@
 const axios = require('axios');
-const { checkGitHubOrganisationMembership, checkOrgsMembershipAtLeastOne, checkGitHubTeamMembership, checkTeamMembershipAtLeastOne } = require('./validate_github_profile');
+const { 
+    checkGitHubOrganisationMembership, 
+    checkOrgsMembershipAtLeastOne, 
+    checkGitHubTeamMembership, 
+    checkTeamMembershipAtLeastOne, 
+    assignUserRole } = require('./validate_github_profile');
 
 jest.mock('axios');
 
@@ -129,4 +134,24 @@ test('checkTeamMembershipAtLeastOne returns false when given an empty list/array
     expect(result).toBe(false)
 });
 
+// Returns "admin" when the user is a member of the admin team
+test('assignUserRole returns "admin" when the user is a member of the admin team' , async () => {
+    axios.get.mockResolvedValueOnce({ status: 200, data: {} });
 
+    const result = await assignUserRole(
+        'fake-token', 'ministryofjustice',
+        'moj-copilot-credits-dashboard-admin', 'dummy-user');
+
+    expect(result).toBe("admin")
+});
+
+// Returns "member" when the user is not a member of the admin team
+test('assignUserRole returns "member" when the user is not a member of the admin team' , async () => {
+    axios.get.mockRejectedValueOnce({ response: { status: 404 } });
+
+    const result = await assignUserRole(
+        'fake-token', 'ministryofjustice',
+        'not-in-admin-team', 'dummy-user');
+
+    expect(result).toBe("member")
+});
