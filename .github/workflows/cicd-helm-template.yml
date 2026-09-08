@@ -60,8 +60,8 @@ jobs:
             --set app.deployment.athena.tableUsers=${{ matrix.environment == 'production' && '${PROD_ATHENA_TABLE_USERS}' || '${DEV_ATHENA_TABLE_USERS}' }} \
             --set app.deployment.athena.tableModels=${{ matrix.environment == 'production' && '${PROD_ATHENA_TABLE_MODELS}' || '${DEV_ATHENA_TABLE_MODELS}' }} \
             --set app.deployment.athena.workgroup=${{ matrix.environment == 'production' && '${PROD_ATHENA_WORKGROUP}' || '${DEV_ATHENA_WORKGROUP}' }} \
-            --set app.deployment.athena.tableTelemetryUsers=${{ matrix.environment == 'production' && '' || '${DEV_ATHENA_TABLE_TELEMETRY_USERS}' }} \
-            --set app.deployment.athena.tableTelemetryActivity=${{ matrix.environment == 'production' && '' || '${DEV_ATHENA_TABLE_TELEMETRY_ACTIVITY}' }}
+            --set app.deployment.athena.tableTelemetryUsers=${{ matrix.environment == 'production' && '""' || '${DEV_ATHENA_TABLE_TELEMETRY_USERS}' }} \
+            --set app.deployment.athena.tableTelemetryActivity=${{ matrix.environment == 'production' && '""' || '${DEV_ATHENA_TABLE_TELEMETRY_ACTIVITY}' }}
             )
 
           echo "${CHART_OUTPUT}"
