@@ -26,5 +26,7 @@ app:
       tableModels: "" # <- set from secret PROD_ATHENA_TABLE_MODELS
       tableUsers: "" # <- set from secret PROD_ATHENA_TABLE_USERS
       # No outputLocation: the workgroup pins its own and enforces it.
+      tableTelemetryUsers: "" # per-person-day telemetry table
+      tableTelemetryActivity: "" # per-language/feature telemetry table
       workgroup: "primary" # <- overridden by secret PROD_ATHENA_WORKGROUP
       region: "eu-west-2"

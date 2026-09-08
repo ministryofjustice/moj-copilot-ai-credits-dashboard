@@ -24,6 +24,8 @@ env:
   ATHENA_DATABASE: ${{ secrets.PROD_ATHENA_DATABASE }}
   ATHENA_TABLE_MODELS: ${{ secrets.PROD_ATHENA_TABLE_MODELS }}
   ATHENA_TABLE_USERS: ${{ secrets.PROD_ATHENA_TABLE_USERS }}
+  ATHENA_TABLE_TELEMETRY_USERS: ${{ secrets.PROD_ATHENA_TABLE_TELEMETRY_USERS }}
+  ATHENA_TABLE_TELEMETRY_ACTIVITY: ${{ secrets.PROD_ATHENA_TABLE_TELEMETRY_ACTIVITY }}
   ATHENA_WORKGROUP: ${{ secrets.PROD_ATHENA_WORKGROUP }}
 
 jobs:
@@ -80,4 +82,6 @@ jobs:
             --set app.deployment.athena.database=${ATHENA_DATABASE} \
             --set app.deployment.athena.tableModels=${ATHENA_TABLE_MODELS} \
             --set app.deployment.athena.tableUsers=${ATHENA_TABLE_USERS} \
-            --set app.deployment.athena.workgroup=${ATHENA_WORKGROUP}
+            --set app.deployment.athena.workgroup=${ATHENA_WORKGROUP} \
+            --set app.deployment.athena.tableTelemetryUsers="${ATHENA_TABLE_TELEMETRY_USERS}" \
+            --set app.deployment.athena.tableTelemetryActivity="${ATHENA_TABLE_TELEMETRY_ACTIVITY}"
