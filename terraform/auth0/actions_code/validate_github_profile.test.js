@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { checkGitHubOrganisationMembership, checkOrgsMembershipAtLeastOne, checkGitHubTeamMembership } = require('./validate_github_profile');
+const { checkGitHubOrganisationMembership, checkOrgsMembershipAtLeastOne, checkGitHubTeamMembership, checkTeamMembershipAtLeastOne } = require('./validate_github_profile');
 
 jest.mock('axios');
 
@@ -20,7 +20,7 @@ test('checkGitHubOrganisationMembership returns false when github responds with 
 });
 
 // Rethrows the error when github responds with a non 404 error (e.g. 500)
-test('checkGitHubOrganisationMembership rethrows errore when github responds with a non 404 status', async () => {
+test('checkGitHubOrganisationMembership rethrows error when github responds with a non 404 status', async () => {
     axios.get.mockRejectedValueOnce({ response: { status: 500 } });
     
     await expect(checkGitHubOrganisationMembership('fake-token', 'ministryofjustice')).rejects.toEqual({ response: { status: 500 } });
@@ -81,7 +81,7 @@ test('checkGitHubTeamMembership returns false when GitHub responds user is not a
 });
 
 // Rethrows the error when github responds with a non 404 error
-test('checkGitHubTeamMembership rethrows errore when github responds with a non 404 status', async () => {
+test('checkGitHubTeamMembership rethrows error when github responds with a non 404 status', async () => {
     axios.get.mockRejectedValueOnce({ response: { status: 500 } });
     
     await expect(checkGitHubTeamMembership(
@@ -89,3 +89,44 @@ test('checkGitHubTeamMembership rethrows errore when github responds with a non 
         .rejects.toEqual({ response: { status: 500 } 
     });
 });
+
+// Returns true if user is a member of the first team checked
+test('checkTeamMembershipAtLeastOne returns true if the user is a member of the first team checked', async () => {
+    axios.get.mockResolvedValueOnce({ status: 200, data: {} });
+    const result = await checkTeamMembershipAtLeastOne('fake-token', 'dummy-user', 
+        'ministryofjustice', ["cloud-optimisation-and-accountability", "octo-developer-experience"]);
+
+    expect(result).toBe(true)
+});
+
+// Returns true if user is a member of a later team, after an earlier on fails
+test('checkTeamMembershipAtLeastOne returns true if the user matches a later team after an earlier one fails', async () => {
+    axios.get
+        .mockRejectedValueOnce({ response: { status: 404 } })
+        .mockResolvedValueOnce({ status: 200, data: {} });
+    const result = await checkTeamMembershipAtLeastOne('fake-token', 'dummy-user', 
+        'ministryofjustice', ["fake-cloud-optimisation-and-accountability", "octo-developer-experience"]);
+    expect(result).toBe(true)
+});
+
+// returns false if the user is not a member of any team in the list
+test('checkTeamMembershipAtLeastOne returns false if the user is not a member of any team in the list', async () => {
+    axios.get
+        .mockRejectedValue({ response: { status: 404 } });
+    const result = await checkTeamMembershipAtLeastOne(
+        'fake-token', 'dummy-user', 'ministryofjustice',
+        ["fake-cloud-optimisation-and-accountability", "fake-octo-developer-experience"]);
+
+    expect(result).toBe(false)
+});
+
+// Returns false when given an empty list/array of teams 
+// Note: no axios mock needed here. the loop never runs when team is empty
+test('checkTeamMembershipAtLeastOne returns false when given an empty list/array of teams', async () => {
+    const result = await checkTeamMembershipAtLeastOne(
+        'fake-token', 'dummy-user', 'ministryofjustice', []);
+
+    expect(result).toBe(false)
+});
+
+
