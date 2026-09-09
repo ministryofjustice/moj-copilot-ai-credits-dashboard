@@ -213,6 +213,8 @@
       </div>
       {% endif %}
 
+      {% if v.telemetry %}{% include "components/user_telemetry.html" %}{% endif %}
+
       <hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
 
       {# ---- Full weekly history vs the weekly limit — kept at the bottom ---- #}

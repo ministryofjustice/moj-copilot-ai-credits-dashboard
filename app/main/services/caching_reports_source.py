@@ -6,6 +6,11 @@ on every request. This wraps any source and memoises its two methods for
 `ReportsSource`, so the factory can compose it transparently and routes/views
 are untouched.
 
+The two whole-table methods are keyed by name alone. The telemetry methods take
+arguments, so they are keyed by name plus the username and both dates: without
+that, the first person to load the page would have their telemetry served to
+everyone else until the entry expired.
+
 The cache is per-process and production runs several replicas, so the caches must
 expire together or a refresh gets an old figure from one replica and a new one
 from the next. Time is therefore cut into fixed `ttl_seconds` windows counted
@@ -69,3 +74,21 @@ class CachingReportsSource(ReportsSource):
 
     def user_rows(self) -> list[dict]:
         return self._cached("user_rows", self._inner.user_rows)
+
+    def telemetry_available(self) -> bool:
+        # Cheap and constant for the life of the process; not worth caching.
+        return self._inner.telemetry_available()
+
+    def telemetry_user_rows(self, login: str, start_day: str,
+                            end_day: str) -> list[dict]:
+        return self._cached(
+            ("telemetry_user_rows", login, start_day, end_day),
+            lambda: self._inner.telemetry_user_rows(login, start_day, end_day),
+        )
+
+    def telemetry_activity_rows(self, login: str, start_day: str,
+                                end_day: str) -> list[dict]:
+        return self._cached(
+            ("telemetry_activity_rows", login, start_day, end_day),
+            lambda: self._inner.telemetry_activity_rows(login, start_day, end_day),
+        )

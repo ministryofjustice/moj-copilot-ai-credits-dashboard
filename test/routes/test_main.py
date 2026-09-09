@@ -4,9 +4,13 @@ from flask import session
 
 from app.app import create_app
 from app.main.routes import ai_credits as routes
+from app.main.services.reports_source import ReportsSource
 
 
-class _FakeSource:
+class _FakeSource(ReportsSource):
+    """Subclasses ReportsSource so it inherits the optional telemetry methods;
+    a duck-typed stub silently stops matching the interface when it grows."""
+
     def __init__(self, user_rows):
         self._user_rows = user_rows
 

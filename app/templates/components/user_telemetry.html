@@ -1,0 +1,188 @@
+{# What the person did with Copilot in the selected month, as opposed to what
+   it cost. Rendered only when `v.telemetry` is set, which happens only where
+   the backend is configured with the two telemetry tables.
+
+   No charts here: the four volume figures and the two review counts are single
+   numbers, and the two breakdowns print their exact values in the table, so a
+   bar carries the shape and the cell carries the number. The bars are marked
+   aria-hidden because the number beside them is the accessible value. #}
+{% from "govuk_frontend_jinja/components/inset-text/macro.html" import govukInsetText %}
+{% set t = v.telemetry %}
+
+<hr class="govuk-section-break govuk-section-break--l govuk-section-break--visible">
+
+<h2 class="govuk-heading-m">What you did in {{ v.month_label }}</h2>
+
+<style>
+  .telemetry-bar { background: #f3f2f1; height: 12px; border-radius: 2px;
+    width: 100%; max-width: 160px; overflow: hidden; }
+  .telemetry-bar span { display: block; height: 12px; border-radius: 2px;
+    background: #1d70b8; }
+  /* Seven tiles do not divide into the GOV.UK column classes, so they are laid
+     out as a wrapping row. The colours and the three-line shape match the
+     credit tiles at the top of this same page. */
+  .telemetry-stat-row { display: flex; flex-wrap: wrap; gap: 15px;
+    margin: 15px 0 25px; }
+  .telemetry-stat { flex: 1 1 160px; border: 1px solid #b1b4b6;
+    border-left: 6px solid #1d70b8; padding: 12px 15px; }
+  .telemetry-stat .govuk-caption-m, .telemetry-stat .govuk-body-s {
+    display: block; }
+</style>
+
+{# ---- One sentence saying what the month looked like ----
+   Where no honest acceptance rate exists - too few inline completions, or a
+   person who works through the CLI or agents and gets almost none - the
+   sentence reports the code that was applied instead. #}
+{% set h = t.headline %}
+<p class="govuk-body-l">
+  {%- if h.acceptance_rate is not none -%}
+    Accepted <strong>{{ "%.1f%%"|format(h.acceptance_rate * 100) }}</strong> of
+    {{ "{:,}".format(h.inline_suggested) }} inline completions this month
+  {%- elif t.volume.lines_added -%}
+    Applied <strong>{{ "{:,}".format(t.volume.lines_added) }}</strong> lines of
+    code this month
+  {%- else -%}
+    No code activity was recorded for you this month
+  {%- endif -%}
+  {%- if h.top_language %}, mostly in <strong>{{ h.top_language }}</strong>{% endif -%}
+  {%- if h.top_mode %}, working mostly in <strong>{{ h.top_mode | lower }}</strong>{% endif -%}.
+  {%- if h.acceptance_rate is not none and h.agent_lines_added %}
+  Agent edits wrote <strong>{{ "{:,}".format(h.agent_lines_added) }}</strong>
+  lines into files, which are not counted as accepted suggestions.
+  {%- endif %}
+</p>
+
+{# ---- The month in numbers ---- #}
+<div class="telemetry-stat-row">
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Lines of code applied</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.volume.lines_added) }}</span>
+    <span class="govuk-body-s govuk-!-margin-bottom-0">
+      {%- if t.agent_lines_added -%}
+        {{ "{:,}".format(t.agent_lines_added) }} of them by agent edits
+      {%- else -%}
+        across all modes
+      {%- endif -%}</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Activity across all modes</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.volume.suggested) }}</span>
+    <span class="govuk-body-s govuk-!-margin-bottom-0">{{ "{:,}".format(t.volume.accepted) }} counted as accepted</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Active days</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ t.volume.days_with_telemetry }} of {{ t.volume.days_recorded }}</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Top mode</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ (h.top_mode or "none recorded") | lower }}</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Chats and prompts started</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.volume.interactions) }}</span>
+  </div>
+</div>
+
+<p class="govuk-body-s">
+  GitHub reported activity for {{ t.volume.days_with_telemetry }}
+  of the {{ t.volume.days_recorded }} day{{ "" if t.volume.days_recorded == 1 else "s" }}
+  it holds a record for this month. It sends no activity detail on some days, so
+  a lower first number does not mean you did nothing on those days.
+</p>
+
+{# ---- How you use Copilot ---- #}
+<h3 class="govuk-heading-s govuk-!-margin-top-4">How you use Copilot</h3>
+{% if t.modes %}
+<p class="govuk-body-s">
+  Share of the suggestions Copilot offered you, by what it was working as.
+  Acceptance is not shown per surface: agent mode applies code without a
+  separate accept step, so its acceptance count is near zero by design.
+</p>
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Surface</th>
+      <th scope="col" class="govuk-table__header">Share of suggestions</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Suggestions offered</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Lines added</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for m in t.modes %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ m.mode | lower }}</td>
+      <td class="govuk-table__cell">
+        {# A non-zero share never renders as nothing: floor the drawn width. #}
+        <div class="telemetry-bar" aria-hidden="true"><span
+          style="width: {{ [(m.share * 100), 1.5] | max if m.share > 0 else 0 }}%;"></span></div>
+        <span class="govuk-body-s">{{ "%.0f%%"|format(m.share * 100) }}</span>
+      </td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ "{:,}".format(m.suggested) }}</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ "{:,}".format(m.lines_added) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="govuk-body-s">GitHub reported no per-surface activity for you this month.</p>
+{% endif %}
+
+{# ---- Top languages ---- #}
+<h3 class="govuk-heading-s govuk-!-margin-top-6">Top languages</h3>
+{% if t.languages %}
+<p class="govuk-body-s">
+  Ranked by the lines Copilot added. GitHub does not standardise these names, so
+  near-duplicates such as <code>csharp</code> and <code>c#</code> are combined
+  here for display.
+</p>
+{% set most_lines = t.languages | map(attribute="lines_added") | max %}
+<table class="govuk-table">
+  <thead class="govuk-table__head">
+    <tr class="govuk-table__row">
+      <th scope="col" class="govuk-table__header">Language</th>
+      <th scope="col" class="govuk-table__header">
+        <span class="govuk-visually-hidden">Size relative to the largest</span></th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Lines added</th>
+      <th scope="col" class="govuk-table__header govuk-table__header--numeric">Suggestions offered</th>
+    </tr>
+  </thead>
+  <tbody class="govuk-table__body">
+    {% for lang in t.languages %}
+    <tr class="govuk-table__row">
+      <td class="govuk-table__cell">{{ lang.language }}</td>
+      <td class="govuk-table__cell">
+        <div class="telemetry-bar" aria-hidden="true"><span
+          style="width: {{ (lang.lines_added / most_lines * 100) | round(1) if most_lines else 0 }}%;"></span></div>
+      </td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ "{:,}".format(lang.lines_added) }}</td>
+      <td class="govuk-table__cell govuk-table__cell--numeric">{{ "{:,}".format(lang.suggested) }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% if t.unattributed_lines_added %}
+<p class="govuk-body-s">
+  A further {{ "{:,}".format(t.unattributed_lines_added) }} lines were reported
+  against values that are not languages, such as prompt and instruction files.
+  They are left out of the table above.
+</p>
+{% endif %}
+{% else %}
+<p class="govuk-body-s">GitHub reported no language activity for you this month.</p>
+{% endif %}
+
+{# ---- Copilot code review ---- #}
+<h3 class="govuk-heading-s govuk-!-margin-top-6">Copilot code review</h3>
+<div class="telemetry-stat-row">
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Days you requested a review</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ t.review.requested }}</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Days a review ran automatically</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ t.review.automatic }}</span>
+  </div>
+</div>
+{{ govukInsetText({"text":
+  "GitHub reports the credit cost of code review for the whole organisation, not
+   per person, so your own review cost cannot be shown here."}) }}
