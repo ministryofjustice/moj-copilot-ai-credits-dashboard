@@ -20,6 +20,7 @@ __pycache__
 htmlcov
 .idea/
 megalinter-reports/
+node_modules/
 
 # Local AI-credit usage data — never commit (may contain user/billing data)
 reports/
