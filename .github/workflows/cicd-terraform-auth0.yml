@@ -32,7 +32,7 @@ jobs:
       group: deploy-auth0-terraform-${{ matrix.environment }}
       cancel-in-progress: false
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
@@ -51,7 +51,7 @@ jobs:
           echo "TF_VAR_environment=${{ matrix.environment == 'production' && 'production' || 'development' }}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials for Terraform
-        uses: aws-actions/configure-aws-credentials@486457dc46e82b9a740ca0ef1dac6a38a3fc272d # v4.0.2
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ matrix.environment == 'production' && secrets.PROD_S3_ROLE_TO_ASSUME || secrets.DEV_S3_ROLE_TO_ASSUME }}
           aws-region: eu-west-2
@@ -67,7 +67,45 @@ jobs:
 
       - name: Terraform Plan
         id: plan
-        run: terraform plan -input=false -no-color
+        # Exit codes with -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes
+        run: terraform plan -detailed-exitcode -input=false -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: Check for Plan Failure
+        if: steps.plan.outputs.exitcode == '1'
+        run: |
+          echo "Terraform plan failed with an error"
+          exit 1
+
+      - name: Save plan fingerprint
+        if: steps.plan.outputs.exitcode == '2'
+        run: |
+          terraform show -json tfplan > /tmp/tfplan.json
+          jq -cS '{resource_changes, output_changes}' /tmp/tfplan.json \
+            | sha256sum \
+            | awk '{print $1}' > "${{ github.workspace }}/plan.fingerprint"
+          echo "Plan fingerprint: $(cat "${{ github.workspace }}/plan.fingerprint")"
+
+      - name: Upload plan fingerprint
+        if: steps.plan.outputs.exitcode == '2'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tf-plan-fingerprint-${{ matrix.environment }}
+          path: plan.fingerprint
+          retention-days: 1
+
+      - name: Save plan exit code
+        if: always() && steps.plan.outputs.exitcode != ''
+        working-directory: .
+        run: echo -n "${{ steps.plan.outputs.exitcode }}" > "${{ matrix.environment }}.exitcode"
+
+      - name: Upload plan exit code
+        if: always() && steps.plan.outputs.exitcode != ''
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tf-plan-exitcode-${{ matrix.environment }}
+          path: ${{ matrix.environment }}.exitcode
+          retention-days: 1
 
       - name: Post Plan to GitHub PR
         if: always() && github.event_name == 'pull_request'
@@ -79,8 +117,56 @@ jobs:
             ```
             ${{ steps.plan.outputs.stdout || steps.plan.outputs.stderr }}
             ```
+
+  # Build a matrix of environments that need apply so those jobs (and environment
+  # review) are skipped entirely when the plan has no changes.
+  plan-gate:
+    name: "Auth0 Terraform - Plan Gate"
+    needs: terraform-plan
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    outputs:
+      environments: ${{ steps.read.outputs.environments }}
+    steps:
+      - name: Download plan exit codes
+        continue-on-error: true
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: tf-plan-exitcode-*
+          merge-multiple: true
+
+      - name: Build apply matrix
+        id: read
+        run: |
+          envs=()
+          for env in development production; do
+            if [ ! -f "${env}.exitcode" ]; then
+              continue
+            fi
+            if [ "$(cat "${env}.exitcode")" != "2" ]; then
+              continue
+            fi
+            # Match previous behaviour: production apply only on main
+            if [ "$env" = "production" ] && [ "${{ github.ref }}" != "refs/heads/main" ]; then
+              continue
+            fi
+            envs+=("\"${env}\"")
+          done
+
+          if [ ${#envs[@]} -eq 0 ]; then
+            echo "environments=[]" >> "$GITHUB_OUTPUT"
+            echo "No environments require apply"
+          else
+            IFS=,
+            echo "environments=[${envs[*]}]" >> "$GITHUB_OUTPUT"
+            echo "Environments requiring apply: [${envs[*]}]"
+          fi
+
   terraform-apply:
     name: "Auth0 Terraform - Apply"
+    needs: plan-gate
+    # Skip the whole job (including environment review) when no environments need apply.
+    if: needs.plan-gate.result == 'success' && needs.plan-gate.outputs.environments != '[]'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -88,16 +174,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        environment: [development, production]
-        exclude:
-          - environment: ${{ github.ref != 'refs/heads/main' && 'production' || '' }}
+        environment: ${{ fromJSON(needs.plan-gate.outputs.environments) }}
     concurrency:
       group: deploy-auth0-terraform-${{ matrix.environment }}
       cancel-in-progress: false
     environment:
       name: ${{ matrix.environment }}
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
         with:
@@ -116,7 +200,7 @@ jobs:
           echo "TF_VAR_environment=${{ matrix.environment == 'production' && 'production' || 'development' }}" >> $GITHUB_ENV
 
       - name: Configure AWS credentials for Terraform
-        uses: aws-actions/configure-aws-credentials@486457dc46e82b9a740ca0ef1dac6a38a3fc272d # v4.0.2
+        uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
         with:
           role-to-assume: ${{ matrix.environment == 'production' && secrets.PROD_S3_ROLE_TO_ASSUME || secrets.DEV_S3_ROLE_TO_ASSUME }}
           aws-region: eu-west-2
@@ -130,10 +214,44 @@ jobs:
         id: validate
         run: terraform validate -no-color
 
+      - name: Download approved plan fingerprint
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: tf-plan-fingerprint-${{ matrix.environment }}
+          path: ${{ github.workspace }}
+
       - name: Terraform Plan
         id: plan
-        run: terraform plan -input=false -no-color
+        # Re-check before apply in case state changed while waiting for review.
+        # Exit codes with -detailed-exitcode: 0 = no changes, 1 = error, 2 = changes
+        run: terraform plan -detailed-exitcode -input=false -no-color -out=tfplan
+        continue-on-error: true
+
+      - name: Check for Plan Failure
+        if: steps.plan.outputs.exitcode == '1'
+        run: |
+          echo "Terraform plan failed with an error"
+          exit 1
+
+      - name: Skip Apply (No Changes)
+        if: steps.plan.outputs.exitcode == '0'
+        run: echo "No Terraform changes detected; skipping apply."
+
+      - name: Verify plan has not changed
+        if: steps.plan.outputs.exitcode == '2'
+        run: |
+          terraform show -json tfplan > /tmp/tfplan.json
+          jq -cS '{resource_changes, output_changes}' /tmp/tfplan.json \
+            | sha256sum \
+            | awk '{print $1}' > /tmp/current.fingerprint
+          echo "Approved fingerprint: $(cat "${{ github.workspace }}/plan.fingerprint")"
+          echo "Current fingerprint:  $(cat /tmp/current.fingerprint)"
+          if ! cmp -s "${{ github.workspace }}/plan.fingerprint" /tmp/current.fingerprint; then
+            echo "Plan has changed since approval; refusing to apply. Re-run the workflow."
+            exit 1
+          fi
 
       - name: Terraform Apply
         id: apply
-        run: terraform apply -input=false -no-color -auto-approve
+        if: steps.plan.outputs.exitcode == '2'
+        run: terraform apply -input=false -no-color -auto-approve tfplan
