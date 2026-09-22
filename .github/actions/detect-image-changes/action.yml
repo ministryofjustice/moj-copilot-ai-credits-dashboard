@@ -1,0 +1,35 @@
+name: Detect image-related file changes
+description: >
+  Compare the files that make up the application container image against a
+  previous git ref. Helm, Terraform, tests, docs, and workflow files are
+  ignored so chart-only deploys can skip docker build and push.
+
+inputs:
+  base-strategy:
+    description: >
+      previous-commit compares HEAD to github.event.before (or HEAD^).
+      previous-tag compares HEAD to the most recent tag other than the
+      current ref. Use previous-commit for the dev pipeline (every main
+      push deploys) and previous-tag for the prod pipeline (releases are
+      tags).
+    required: true
+  before:
+    description: The push event's before SHA, when available.
+    required: false
+    default: ""
+
+outputs:
+  changed:
+    description: '"true" if image-related files changed, otherwise "false".'
+    value: ${{ steps.detect.outputs.changed }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect image-related file changes
+      id: detect
+      shell: bash
+      env:
+        BASE_STRATEGY: ${{ inputs.base-strategy }}
+        GITHUB_EVENT_BEFORE: ${{ inputs.before }}
+      run: bash "${{ github.action_path }}/detect.sh"
