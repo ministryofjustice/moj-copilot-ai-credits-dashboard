@@ -1,4 +1,5 @@
 # pylint: disable=C0411
+# TEST: image-change detect path — revert after workflow_dispatch re-test
 import logging
 
 from flask import Flask
