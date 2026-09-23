@@ -29,7 +29,35 @@ env:
   ATHENA_WORKGROUP: ${{ secrets.PROD_ATHENA_WORKGROUP }}
 
 jobs:
+  # Image paths are defined in .github/actions/detect-image-changes.
+  # Compare against the previous release tag so app changes since the last
+  # production tag still rebuild, even if the tagged commit is Helm-only.
+  detect-image-changes:
+    name: Detect image changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.detect.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Detect image-related file changes
+        id: detect
+        uses: ./.github/actions/detect-image-changes
+        with:
+          base-strategy: previous-tag
+          before: ${{ github.event.before }}
+
   build-push:
+    name: Build and push image
+    needs: detect-image-changes
+    # Build unless detection explicitly reported no image changes. Any other
+    # result (true, empty, unexpected) rebuilds so we never deploy a missing tag.
+    if: needs.detect-image-changes.outputs.changed != 'false'
     runs-on: ubuntu-latest
     permissions:
       id-token: write
@@ -49,7 +77,9 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
   deploy-to-prod:
-    needs: build-push
+    name: Deploy to production namespace
+    needs: [detect-image-changes, build-push]
+    if: always() && !cancelled() && needs.detect-image-changes.result == 'success' && (needs.build-push.result == 'success' || needs.build-push.result == 'skipped')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -63,6 +93,29 @@ jobs:
           kubectl config set-context ${KUBE_CLUSTER} --cluster=${KUBE_CLUSTER} --user=deploy-user --namespace=${KUBE_NAMESPACE}
           kubectl config get-contexts
           kubectl config use-context ${KUBE_CLUSTER}
+
+      - name: Resolve image tag
+        env:
+          IMAGE_CHANGED: ${{ needs.detect-image-changes.outputs.changed }}
+        run: |
+          if [ "${IMAGE_CHANGED}" = "false" ]; then
+            echo "Image build was skipped; reusing the currently deployed image."
+            if ! current_image="$(kubectl get deployment moj-copilot-ai-credits-dashboard \
+              --namespace "${KUBE_NAMESPACE}" \
+              --output jsonpath='{.spec.template.spec.containers[0].image}')"; then
+              echo "::error::Image build was skipped but no existing deployment was found. Trigger a run that includes application image changes."
+              exit 1
+            fi
+            tag="${current_image##*:}"
+            if [ -z "${tag}" ] || [ "${tag}" = "${current_image}" ]; then
+              echo "::error::Could not determine the currently deployed image tag from '${current_image}'."
+              exit 1
+            fi
+            echo "Reusing image tag ${tag} from ${current_image}"
+            echo "IMAGE_TAG=${tag}" >> "${GITHUB_ENV}"
+          else
+            echo "Using newly built image tag ${IMAGE_TAG}"
+          fi
 
       - name: Deploy helm chart to moj-copilot-ai-credits-dashboard-prod
         run: |
