@@ -190,3 +190,66 @@ def test_telemetry_activity_rows_not_shared_between_people():
     assert src.telemetry_activity_rows(
         "bob", "2026-08-01", "2026-08-31")[0]["login"] == "bob"
     assert len(inner.activity_calls) == 2
+
+
+class CountingOrgSource(ReportsSource):
+    """Records every org telemetry call and echoes its dates back."""
+
+    def __init__(self):
+        self.month_calls = 0
+        self.user_calls = []
+        self.activity_calls = []
+
+    def model_rows(self) -> list[dict]:
+        return []
+
+    def user_rows(self) -> list[dict]:
+        return []
+
+    def org_telemetry_months(self):
+        self.month_calls += 1
+        return ["2026-08"]
+
+    def org_telemetry_user_rows(self, start_day, end_day):
+        self.user_calls.append((start_day, end_day))
+        return [{"day": start_day}]
+
+    def org_telemetry_activity_rows(self, start_day, end_day):
+        self.activity_calls.append((start_day, end_day))
+        return [{"day": start_day}]
+
+
+def test_default_source_reports_no_org_telemetry():
+    inner = CountingSource()
+    assert inner.org_telemetry_months() == []
+    assert inner.org_telemetry_user_rows("2026-08-01", "2026-08-31") == []
+    assert inner.org_telemetry_activity_rows("2026-08-01", "2026-08-31") == []
+
+
+def test_org_months_cached_within_ttl():
+    inner = CountingOrgSource()
+    src = _caching(inner)
+    src.org_telemetry_months()
+    src.org_telemetry_months()
+    assert inner.month_calls == 1
+
+
+def test_org_user_rows_cached_within_ttl():
+    inner = CountingOrgSource()
+    src = _caching(inner)
+    src.org_telemetry_user_rows("2026-08-01", "2026-08-31")
+    src.org_telemetry_user_rows("2026-08-01", "2026-08-31")
+    assert len(inner.user_calls) == 1
+
+
+def test_org_rows_not_shared_between_months():
+    inner = CountingOrgSource()
+    src = _caching(inner)
+    august = src.org_telemetry_user_rows("2026-08-01", "2026-08-31")
+    july = src.org_telemetry_user_rows("2026-07-01", "2026-07-31")
+    assert august[0]["day"] == "2026-08-01"
+    assert july[0]["day"] == "2026-07-01"
+    assert len(inner.user_calls) == 2
+    src.org_telemetry_activity_rows("2026-08-01", "2026-08-31")
+    src.org_telemetry_activity_rows("2026-07-01", "2026-07-31")
+    assert len(inner.activity_calls) == 2
