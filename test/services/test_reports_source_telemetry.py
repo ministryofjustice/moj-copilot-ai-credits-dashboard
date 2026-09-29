@@ -7,7 +7,10 @@ pipeline writes a genuinely absent value as null, and turning it into zero
 would report a person as inactive when the truth is that no data arrived.
 """
 
-from app.main.services.reports_source import LocalFsReportsSource
+from app.main.services.reports_source import (
+    LocalFsReportsSource,
+    ORG_TELEMETRY_USER_COLUMNS,
+)
 from services.parquet_fixtures import (
     write_telemetry_activity_partition,
     write_telemetry_user_partition,
@@ -146,3 +149,65 @@ def test_rows_are_empty_for_a_person_with_no_data(tmp_path):
     source = LocalFsReportsSource(str(tmp_path))
     assert source.telemetry_user_rows("nobody", "2026-08-01", "2026-08-31") == []
     assert source.telemetry_activity_rows("nobody", "2026-08-01", "2026-08-31") == []
+
+
+# ------------------------------------------------------------ org-wide reads
+
+def test_org_user_rows_include_everyone_in_the_range(tmp_path):
+    write_telemetry_user_partition(str(tmp_path), "2026-07-31", [_user_row("alice")])
+    write_telemetry_user_partition(
+        str(tmp_path), "2026-08-01", [_user_row("alice"), _user_row("bob")])
+    rows = LocalFsReportsSource(str(tmp_path)).org_telemetry_user_rows(
+        "2026-08-01", "2026-08-31")
+    assert sorted(r["user_login"] for r in rows) == ["alice", "bob"]
+    assert {r["day"] for r in rows} == {"2026-08-01"}
+
+
+def test_org_user_rows_carry_the_org_columns(tmp_path):
+    write_telemetry_user_partition(str(tmp_path), "2026-08-01", [_user_row(
+        "alice", used_chat=True, used_copilot_app=False,
+        cli_request_count=7, app_request_count=None, cli_prompt_count=3)])
+    row = LocalFsReportsSource(str(tmp_path)).org_telemetry_user_rows(
+        "2026-08-01", "2026-08-31")[0]
+    assert row["user_login"] == "alice"
+    assert row["credits"] == 1.5
+    assert row["suggested"] == 40
+    assert row["used_chat"] is True
+    assert row["used_app"] is False
+    assert row["used_agent"] is None
+    assert row["cli_requests"] == 7
+    assert row["app_requests"] is None
+    assert row["cli_prompts"] == 3
+
+
+def test_org_columns_never_include_tokens():
+    assert not [name for name in ORG_TELEMETRY_USER_COLUMNS if "token" in name]
+
+
+def test_org_activity_rows_include_everyone_with_their_login(tmp_path):
+    write_telemetry_activity_partition(str(tmp_path), "2026-08-01", [
+        _activity_row("alice", "python", "code_completion", "Inline completion"),
+        _activity_row("bob", "go", "chat_panel_agent_mode", "Agent mode"),
+    ])
+    write_telemetry_activity_partition(
+        str(tmp_path), "2026-09-01",
+        [_activity_row("alice", "go", "chat_panel_agent_mode", "Agent mode")])
+    rows = LocalFsReportsSource(str(tmp_path)).org_telemetry_activity_rows(
+        "2026-08-01", "2026-08-31")
+    assert sorted((r["user_login"], r["language"]) for r in rows) == [
+        ("alice", "python"), ("bob", "go")]
+
+
+def test_org_months_lists_each_month_once_in_order(tmp_path):
+    for day in ("2026-08-02", "2026-07-30", "2026-08-01"):
+        write_telemetry_user_partition(str(tmp_path), day, [_user_row("alice")])
+    assert LocalFsReportsSource(str(tmp_path)).org_telemetry_months() == [
+        "2026-07", "2026-08"]
+
+
+def test_org_reads_are_empty_without_the_telemetry_tables(tmp_path):
+    write_user_partition(str(tmp_path), "2026-08-01", [("alice", 1.0)])
+    source = LocalFsReportsSource(str(tmp_path))
+    assert source.org_telemetry_months() == []
+    assert source.org_telemetry_user_rows("2026-08-01", "2026-08-31") == []
+    assert source.org_telemetry_activity_rows("2026-08-01", "2026-08-31") == []

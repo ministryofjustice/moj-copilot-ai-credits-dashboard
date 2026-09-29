@@ -22,6 +22,9 @@ person did rather than what it cost:
 * telemetry_user_rows(login, start_day, end_day)   -> one row per day
 * telemetry_activity_rows(login, start_day, end_day) -> one row per day,
                   language and feature
+* org_telemetry_months() / org_telemetry_user_rows(start_day, end_day) /
+  org_telemetry_activity_rows(start_day, end_day) -> the same rows for
+                  everyone, filtered by day range only (org admin page)
 
 They take a person and a day range because the activity dataset holds one row
 per person per day per language per feature; fetching it whole, as the two
@@ -98,6 +101,32 @@ TELEMETRY_ACTIVITY_COLUMNS = {
     "loc_suggested_to_add_sum": "lines_suggested_added",
 }
 
+# The org telemetry page reads everyone at once. It needs the login to count
+# distinct people, plus the capability flags and request counts the personal
+# page does not show. These are separate maps so the personal page's queries
+# keep reading exactly the columns they read today. No token column is listed:
+# tokens are never read.
+ORG_TELEMETRY_USER_COLUMNS = {
+    **TELEMETRY_USER_COLUMNS,
+    "user_login": "user_login",
+    "ai_credits_used": "credits",
+    "used_chat": "used_chat",
+    "used_agent": "used_agent",
+    "used_cli": "used_cli",
+    "used_copilot_app": "used_app",
+    "used_copilot_coding_agent": "used_coding_agent",
+    "used_copilot_cloud_agent": "used_cloud_agent",
+    "cli_request_count": "cli_requests",
+    "app_request_count": "app_requests",
+    "cli_prompt_count": "cli_prompts",
+    "app_prompt_count": "app_prompts",
+}
+
+ORG_TELEMETRY_ACTIVITY_COLUMNS = {
+    **TELEMETRY_ACTIVITY_COLUMNS,
+    "user_login": "user_login",
+}
+
 
 def telemetry_rows_from_table(table, columns: dict) -> list[dict]:
     """Arrow table -> row dicts, renaming columns and keeping nulls as None.
@@ -165,6 +194,28 @@ class ReportsSource(ABC):
         # pylint: disable=unused-argument
         return []
 
+    # ---- Org telemetry (optional): the same two tables, everyone at once,
+    # filtered by day range only. One month is a few thousand rows per table
+    # (6,451 and 16,752 for August 2026), so one query each is enough.
+
+    def org_telemetry_months(self) -> list[str]:
+        """Sorted `YYYY-MM` months that have rows in the telemetry user table."""
+        return []
+
+    def org_telemetry_user_rows(self, start_day: str,
+                                end_day: str) -> list[dict]:
+        """One row per person per day, everyone, between `start_day` and
+        `end_day` inclusive."""
+        # pylint: disable=unused-argument
+        return []
+
+    def org_telemetry_activity_rows(self, start_day: str,
+                                    end_day: str) -> list[dict]:
+        """One row per person, day, language and feature, everyone, between
+        `start_day` and `end_day` inclusive."""
+        # pylint: disable=unused-argument
+        return []
+
 
 class LocalFsReportsSource(ReportsSource):
     """Reads the on-disk `reports/credits_by_{model,user}/day=.../` parquet tree.
@@ -193,7 +244,7 @@ class LocalFsReportsSource(ReportsSource):
         return (self._has_table(TELEMETRY_USER_TABLE)
                 and self._has_table(TELEMETRY_ACTIVITY_TABLE))
 
-    def _telemetry_rows(self, table: str, columns: dict, login: str,  # pylint: disable=too-many-arguments
+    def _telemetry_rows(self, table: str, columns: dict, login: str | None,  # pylint: disable=too-many-arguments
                         start_day: str, end_day: str) -> list[dict]:
         # Each read guards only the table it needs. `telemetry_available` is a
         # stricter, page-level question (can the whole section render?) and
@@ -202,12 +253,14 @@ class LocalFsReportsSource(ReportsSource):
         if not self._has_table(table):
             return []
         # `day` parses to a date32 via the DAY partitioning spec, so the range
-        # bounds must be real dates, not strings.
-        day_filter = ((pc.field("user_login") == login)
-                      & (pc.field("day") >= date.fromisoformat(start_day))
+        # bounds must be real dates, not strings. A login of None means
+        # everyone: the org page reads the whole month.
+        row_filter = ((pc.field("day") >= date.fromisoformat(start_day))
                       & (pc.field("day") <= date.fromisoformat(end_day)))
+        if login is not None:
+            row_filter = (pc.field("user_login") == login) & row_filter
         table_data = self._dataset(table).to_table(
-            columns=list(columns) + ["day"], filter=day_filter)
+            columns=list(columns) + ["day"], filter=row_filter)
         return telemetry_rows_from_table(table_data, columns)
 
     def telemetry_user_rows(self, login: str, start_day: str,
@@ -221,6 +274,24 @@ class LocalFsReportsSource(ReportsSource):
         return self._telemetry_rows(TELEMETRY_ACTIVITY_TABLE,
                                     TELEMETRY_ACTIVITY_COLUMNS,
                                     login, start_day, end_day)
+
+    def org_telemetry_months(self) -> list[str]:
+        if not self._has_table(TELEMETRY_USER_TABLE):
+            return []
+        days = self._dataset(TELEMETRY_USER_TABLE).to_table(columns=["day"])["day"]
+        return sorted({_iso(day)[:7] for day in pc.unique(days).to_pylist()})
+
+    def org_telemetry_user_rows(self, start_day: str,
+                                end_day: str) -> list[dict]:
+        return self._telemetry_rows(TELEMETRY_USER_TABLE,
+                                    ORG_TELEMETRY_USER_COLUMNS,
+                                    None, start_day, end_day)
+
+    def org_telemetry_activity_rows(self, start_day: str,
+                                    end_day: str) -> list[dict]:
+        return self._telemetry_rows(TELEMETRY_ACTIVITY_TABLE,
+                                    ORG_TELEMETRY_ACTIVITY_COLUMNS,
+                                    None, start_day, end_day)
 
 
 def _build_source() -> ReportsSource:
