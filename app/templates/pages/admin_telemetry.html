@@ -122,9 +122,10 @@
 
 <h3 class="govuk-heading-s">Lines suggested and lines applied per day</h3>
 <p class="govuk-body-s">
-  Two separate counts, not a part and a whole. Agent edits add lines without
-  reporting them as suggested, so lines applied can be higher than lines
-  suggested.
+  Lines suggested is how many lines Copilot offered. Lines applied is how
+  many lines were written into files. Agent mode writes lines straight into
+  files without offering them first, so they count as applied but never as
+  suggested. This is why lines applied can be higher than lines suggested.
 </p>
 <div style="height:320px;"><canvas data-chart="daily_lines"></canvas></div>
 
