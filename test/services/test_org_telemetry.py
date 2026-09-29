@@ -212,3 +212,63 @@ def test_view_contains_no_login(org_source):
                    suggested=30, accepted=10)])
     v = org.org_telemetry_view(source, None)
     assert "zz-secret-login" not in json.dumps(v)
+
+
+# --------------------------------------------------------- activity per day
+DAYS = ["2026-08-01", "2026-08-03"]  # a Saturday and a Monday
+
+
+def test_daily_activity_sums_each_day_skipping_nulls():
+    rows = [_person_day("a", day="2026-08-01", suggested=4, accepted=2,
+                        interactions=1),
+            _person_day("b", day="2026-08-01", suggested=None, accepted=None,
+                        interactions=None),
+            _person_day("a", day="2026-08-03", suggested=10, accepted=3,
+                        interactions=5)]
+    d = org.daily_activity(rows, DAYS)
+    assert d["suggested"] == [4, 10]
+    assert d["accepted"] == [2, 3]
+    assert d["interactions"] == [1, 5]
+    assert d["labels"] == ["1", "3"]
+
+
+def test_daily_inline_rate_uses_inline_completion_only():
+    activity = [
+        _activity("a", "python", "Inline completion", day="2026-08-03",
+                  suggested=40, accepted=10),
+        _activity("a", "python", "Agent mode", day="2026-08-03",
+                  suggested=400, accepted=0),
+    ]
+    assert org.daily_inline_rate(activity, DAYS)["rates"] == [None, 25.0]
+
+
+def test_daily_inline_rate_is_none_below_the_minimum():
+    activity = [_activity("a", "python", "Inline completion",
+                          day="2026-08-03", suggested=19, accepted=19)]
+    assert org.daily_inline_rate(activity, DAYS)["rates"] == [None, None]
+
+
+def test_daily_people_counts_active_people_and_marks_weekends():
+    rows = [_person_day("a", day="2026-08-01", suggested=1),
+            _person_day("a", day="2026-08-03", suggested=1),
+            _person_day("b", day="2026-08-03", used_chat=True),
+            _person_day("c", day="2026-08-03")]  # not active
+    d = org.daily_people(rows, DAYS)
+    assert d["people"] == [1, 2]
+    assert d["weekend"] == [True, False]
+
+
+def test_daily_lines_keeps_suggested_and_applied_separate():
+    rows = [_person_day("a", day="2026-08-03", lines_suggested_added=10,
+                        lines_added=30)]
+    d = org.daily_lines(rows, DAYS)
+    assert d["lines_suggested"] == [0, 10]
+    assert d["lines_added"] == [0, 30]
+
+
+def test_view_includes_the_daily_series(org_source):
+    v = org.org_telemetry_view(
+        org_source([_person_day("a", suggested=1)]), None)
+    for key in ("daily_activity", "daily_inline_rate", "daily_people",
+                "daily_lines"):
+        assert v[key]["labels"] == ["3"]

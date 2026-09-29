@@ -16,12 +16,15 @@ returns contains a login.
 from __future__ import annotations
 
 from collections import defaultdict
+from datetime import date
 
 from app.main.services import weekly_per_user as wpu
 from app.main.services.ai_credits import _full_day_label, _resolve_label
 from app.main.services.telemetry import (
+    INLINE_COMPLETION_MODE,
     _grouped_totals,
     _rate,
+    _rows_in_mode,
     _total,
     agent_lines_added,
     display_language,
@@ -142,6 +145,58 @@ def capability_share(user_rows: list[dict], days: list[str]) -> dict:
     return {**_day_axis(days), "series": series}
 
 
+def daily_activity(user_rows: list[dict], days: list[str]) -> dict:
+    """Suggestions, acceptances and interactions per day, across all modes."""
+    by_day = _rows_by_day(user_rows)
+    return {
+        **_day_axis(days),
+        "suggested": [_total(by_day.get(d, []), "suggested") for d in days],
+        "accepted": [_total(by_day.get(d, []), "accepted") for d in days],
+        "interactions": [_total(by_day.get(d, []), "interactions")
+                         for d in days],
+    }
+
+
+def daily_inline_rate(activity_rows: list[dict], days: list[str]) -> dict:
+    """Inline completion acceptance rate per day, as a percentage.
+
+    Inline completion only, for the reason given in telemetry.py. A day below
+    the minimum sample has no value."""
+    by_day = _rows_by_day(_rows_in_mode(activity_rows, INLINE_COMPLETION_MODE))
+    rates = []
+    for day in days:
+        rows = by_day.get(day, [])
+        rate = _rate(_total(rows, "accepted"), _total(rows, "suggested"))
+        rates.append(None if rate is None else round(rate * 100, 1))
+    return {**_day_axis(days), "rates": rates}
+
+
+def daily_people(user_rows: list[dict], days: list[str]) -> dict:
+    """Distinct active people per day, and which days are Saturday or Sunday."""
+    active = _rows_by_day([row for row in user_rows if is_active(row)])
+    return {
+        **_day_axis(days),
+        "people": [len({row["user_login"] for row in active.get(d, [])})
+                   for d in days],
+        "weekend": [date.fromisoformat(d).weekday() >= 5 for d in days],
+    }
+
+
+def daily_lines(user_rows: list[dict], days: list[str]) -> dict:
+    """Lines suggested and lines applied per day.
+
+    Two separate counts, not a part and a whole: agent edits add lines
+    without reporting them as suggested (see telemetry.py)."""
+    by_day = _rows_by_day(user_rows)
+    return {
+        **_day_axis(days),
+        "lines_suggested": [_total(by_day.get(d, []), "lines_suggested_added")
+                            for d in days],
+        "lines_added": [_total(by_day.get(d, []), "lines_added")
+                        for d in days],
+    }
+
+
 def org_telemetry_view(source, month: str | None) -> dict:
     """Everything the org telemetry admin page shows for one month.
 
@@ -170,4 +225,8 @@ def org_telemetry_view(source, month: str | None) -> dict:
         "month_label": wpu.format_month_label(selected),
         "tiles": tiles(user_rows, activity_rows),
         "capability_share": capability_share(user_rows, days),
+        "daily_activity": daily_activity(user_rows, days),
+        "daily_inline_rate": daily_inline_rate(activity_rows, days),
+        "daily_people": daily_people(user_rows, days),
+        "daily_lines": daily_lines(user_rows, days),
     }
