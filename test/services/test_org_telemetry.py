@@ -322,3 +322,34 @@ def test_language_chart_uses_the_personal_page_names():
                 for raw in ("cs", "csharp", "C#", "ts", "tsx", "typescript")]
     g = org.language_chart(activity)
     assert dict(zip(g["labels"], g["accepted"])) == {"C#": 3, "TypeScript": 3}
+
+
+# ---------------------------------------------------------------------- modes
+def test_mode_chart_orders_modes_by_suggestions():
+    activity = [_activity("a", "python", "Chat", suggested=5, accepted=1),
+                _activity("a", "python", "Inline completion", suggested=50,
+                          accepted=20),
+                _activity("b", "go", "Inline completion", suggested=10,
+                          accepted=2)]
+    m = org.mode_chart(activity)
+    assert m["labels"] == ["Inline completion", "Chat"]
+    assert m["suggested"] == [60, 5]
+    assert m["accepted"] == [22, 1]
+
+
+def test_mode_chart_counts_a_person_once_per_mode_they_used():
+    activity = [_activity("a", "python", "Agent mode", lines_added=10),
+                _activity("a", "go", "Agent mode", lines_added=5),
+                _activity("a", "python", "Chat", suggested=1),
+                _activity("b", "python", "Agent mode", suggested=3),
+                _activity("c", "python", "Chat")]  # all zero: not counted
+    m = org.mode_chart(activity)
+    people = dict(zip(m["labels"], m["people"]))
+    assert people == {"Agent mode": 2, "Chat": 1}
+
+
+def test_view_includes_the_mode_series(org_source):
+    v = org.org_telemetry_view(org_source(
+        [_person_day("a", suggested=1)],
+        [_activity("a", "python", "Chat", suggested=1)]), None)
+    assert v["modes"]["labels"] == ["Chat"]

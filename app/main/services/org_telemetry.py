@@ -226,6 +226,33 @@ def language_chart(activity_rows: list[dict],
     }
 
 
+# Activity-row counts that show a person worked in a mode when above zero.
+MODE_ACTIVITY_COUNTS = ("suggested", "accepted", "lines_added")
+
+
+def mode_chart(activity_rows: list[dict]) -> dict:
+    """Suggestions, acceptances and distinct people per mode, most
+    suggestions first.
+
+    Uses the `mode` column the pipeline derives from `feature`, as the
+    personal page does. A person who worked in several modes is counted in
+    each."""
+    totals = _grouped_totals(activity_rows, lambda row: row.get("mode"))
+    people: dict[str, set] = defaultdict(set)
+    for row in activity_rows:
+        if row.get("mode") is None:
+            continue
+        if any((row.get(field) or 0) > 0 for field in MODE_ACTIVITY_COUNTS):
+            people[row["mode"]].add(row["user_login"])
+    modes = sorted(totals, key=lambda mode: (-totals[mode]["suggested"], mode))
+    return {
+        "labels": modes,
+        "suggested": [totals[mode]["suggested"] for mode in modes],
+        "accepted": [totals[mode]["accepted"] for mode in modes],
+        "people": [len(people[mode]) for mode in modes],
+    }
+
+
 def org_telemetry_view(source, month: str | None) -> dict:
     """Everything the org telemetry admin page shows for one month.
 
@@ -259,4 +286,5 @@ def org_telemetry_view(source, month: str | None) -> dict:
         "daily_people": daily_people(user_rows, days),
         "daily_lines": daily_lines(user_rows, days),
         "languages": language_chart(activity_rows),
+        "modes": mode_chart(activity_rows),
     }

@@ -153,6 +153,23 @@
 <h3 class="govuk-heading-s">Lines of code applied by language</h3>
 <div style="height:480px;"><canvas data-chart="language_lines"></canvas></div>
 
+<h2 class="govuk-heading-m govuk-!-margin-top-8">Modes</h2>
+
+<h3 class="govuk-heading-s">Suggestions and acceptances by mode</h3>
+<p class="govuk-body-s">
+  Agent mode writes code into files without asking the person to accept it
+  first, so it records very few acceptances. A low acceptance count for agent
+  mode does not mean its suggestions were rejected.
+</p>
+<div style="height:320px;"><canvas data-chart="mode_volume"></canvas></div>
+
+<h3 class="govuk-heading-s">How many people work in each mode</h3>
+<p class="govuk-body-s">
+  A person who used more than one mode in the month is counted once in each of
+  those modes, so the bars add up to more than the number of people.
+</p>
+<div style="height:320px;"><canvas data-chart="mode_people"></canvas></div>
+
 {# ---- Chart specifications. Each later section adds its own update line. #}
 {% set charts = {} %}
 {% set c = v.capability_share %}
@@ -171,6 +188,13 @@
 {{- charts.update({"language_volume": {"type": "bar", "horizontal": true, "labels": g.labels, "datasets": [{"label": "Suggestions", "data": g.suggested}, {"label": "Acceptances", "data": g.accepted}]}}) or "" -}}
 {{- charts.update({"language_inline_rate": {"type": "bar", "horizontal": true, "suffix": "%", "labels": g.labels, "datasets": [{"label": "Inline completion acceptance rate", "data": g.inline_rates}]}}) or "" -}}
 {{- charts.update({"language_lines": {"type": "bar", "horizontal": true, "labels": g.labels, "datasets": [{"label": "Lines of code applied", "data": g.lines_added}]}}) or "" -}}
+{% set md = v.modes %}
+{# The same six colours, in the same order, as colour() in charts.js. #}
+{% set palette = ["#1d70b8", "#00703c", "#4c2c92", "#d4351c", "#f47738", "#85994b"] %}
+{% set mode_colours = [] %}
+{% for label in md.labels %}{{- mode_colours.append(palette[loop.index0 % 6]) or "" -}}{% endfor %}
+{{- charts.update({"mode_volume": {"type": "bar", "horizontal": true, "labels": md.labels, "datasets": [{"label": "Suggestions", "data": md.suggested}, {"label": "Acceptances", "data": md.accepted}]}}) or "" -}}
+{{- charts.update({"mode_people": {"type": "bar", "horizontal": true, "labels": md.labels, "datasets": [{"label": "People", "data": md.people, "colors": mode_colours}]}}) or "" -}}
 <script type="application/json" id="chart-data">{{ charts | tojson }}</script>
 {% endif %}
 {% endblock %}

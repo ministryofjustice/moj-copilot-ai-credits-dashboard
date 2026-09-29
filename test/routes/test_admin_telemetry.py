@@ -95,3 +95,13 @@ def test_page_draws_the_language_charts(monkeypatch, org_source):
         assert charts[name]["horizontal"] is True
         assert charts[name]["labels"] == ["Python"]
     assert charts["language_inline_rate"]["suffix"] == "%"
+
+
+def test_page_draws_the_mode_charts(monkeypatch, org_source):
+    client = _admin_client(monkeypatch, org_source(*_rows()))
+    charts = _charts(client.get("/admin/telemetry").get_data(as_text=True))
+    assert charts["mode_volume"]["horizontal"] is True
+    assert charts["mode_volume"]["labels"] == ["Inline completion"]
+    people = charts["mode_people"]["datasets"][0]
+    assert people["data"] == [1]
+    assert people["colors"] == ["#1d70b8"]
