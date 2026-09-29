@@ -31,6 +31,8 @@ import re
 import time
 
 from app.main.services.reports_source import (
+    ORG_TELEMETRY_ACTIVITY_COLUMNS,
+    ORG_TELEMETRY_USER_COLUMNS,
     ReportsSource,
     TELEMETRY_ACTIVITY_COLUMNS,
     TELEMETRY_USER_COLUMNS,
@@ -43,7 +45,10 @@ _LOGIN = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$")
 _DAY = re.compile(r"\d{4}-\d{2}-\d{2}$")
 
 # Columns holding text rather than a count, passed through unconverted.
-_TEXT_COLUMNS = ("language", "feature", "mode")
+_TEXT_COLUMNS = ("language", "feature", "mode", "user_login")
+
+# Columns holding a decimal amount rather than a count.
+_FLOAT_COLUMNS = ("ai_credits_used",)
 
 
 def _checked_login(login: str) -> str:
@@ -62,6 +67,10 @@ def _int_or_none(value):
     """Athena omits VarCharValue for a null, which arrives here as None. A null
     is not a zero: it means GitHub sent nothing for that person-day."""
     return None if value is None or value == "" else int(value)
+
+
+def _float_or_none(value):
+    return None if value is None or value == "" else float(value)
 
 
 def _bool_or_none(value):
@@ -161,23 +170,24 @@ class DbReportsSource(ReportsSource):  # pylint: disable=too-many-instance-attri
     def telemetry_available(self) -> bool:
         return bool(self.telemetry_user_table and self.telemetry_activity_table)
 
-    def _telemetry_query(self, table: str, columns: dict, login: str,  # pylint: disable=too-many-arguments
+    def _telemetry_query(self, table: str, columns: dict, login: str | None,  # pylint: disable=too-many-arguments
                          start_day: str, end_day: str) -> list[dict]:
         """Run one narrow, filtered telemetry query and rename its columns.
 
-        Only the listed columns are selected and only one person-month is
-        scanned, because the activity table holds one row per person per day
-        per language per feature.
+        Only the listed columns are selected and only the day range is
+        scanned. With a login, only that person's rows are read (the personal
+        page); with None, everyone's (the org admin page).
 
-        The three values are validated against an allow-list before any SQL is
+        Every value is validated against an allow-list before any SQL is
         built, per OWASP input-validation first principles.
         """
-        login = _checked_login(login)
         start_day, end_day = _checked_day(start_day), _checked_day(end_day)
+        conditions = [f"day >= '{start_day}'", f"day <= '{end_day}'"]
+        if login is not None:
+            conditions.insert(0, f"user_login = '{_checked_login(login)}'")
         selected = ", ".join(list(columns) + ["day"])
         sql = (f"SELECT {selected} FROM {table} "
-               f"WHERE user_login = '{login}' "
-               f"AND day >= '{start_day}' AND day <= '{end_day}'")
+               f"WHERE {' AND '.join(conditions)}")
         rows = []
         for record in self._run_query(sql):
             row = {"day": record["day"]}
@@ -185,6 +195,8 @@ class DbReportsSource(ReportsSource):  # pylint: disable=too-many-instance-attri
                 raw = record.get(source_name)
                 if source_name in _TEXT_COLUMNS:
                     row[output_name] = raw
+                elif source_name in _FLOAT_COLUMNS:
+                    row[output_name] = _float_or_none(raw)
                 elif source_name.startswith(("has_", "used_")):
                     row[output_name] = _bool_or_none(raw)
                 else:
@@ -207,3 +219,27 @@ class DbReportsSource(ReportsSource):  # pylint: disable=too-many-instance-attri
         return self._telemetry_query(self.telemetry_activity_table,
                                      TELEMETRY_ACTIVITY_COLUMNS,
                                      login, start_day, end_day)
+
+    def org_telemetry_months(self) -> list[str]:
+        if not self.telemetry_available():
+            return []
+        # Distinct days rather than a substring in SQL, so this does not
+        # depend on whether the table types `day` as a string or a date.
+        sql = f"SELECT DISTINCT day FROM {self.telemetry_user_table}"
+        return sorted({r["day"][:7] for r in self._run_query(sql) if r.get("day")})
+
+    def org_telemetry_user_rows(self, start_day: str,
+                                end_day: str) -> list[dict]:
+        if not self.telemetry_available():
+            return []
+        return self._telemetry_query(self.telemetry_user_table,
+                                     ORG_TELEMETRY_USER_COLUMNS,
+                                     None, start_day, end_day)
+
+    def org_telemetry_activity_rows(self, start_day: str,
+                                    end_day: str) -> list[dict]:
+        if not self.telemetry_available():
+            return []
+        return self._telemetry_query(self.telemetry_activity_table,
+                                     ORG_TELEMETRY_ACTIVITY_COLUMNS,
+                                     None, start_day, end_day)

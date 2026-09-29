@@ -339,3 +339,74 @@ def test_a_hyphenated_username_is_accepted(monkeypatch):
     source = _telemetry_source(monkeypatch, client)
     source.telemetry_user_rows("some-real-login", "2026-08-01", "2026-08-31")
     assert "user_login = 'some-real-login'" in client.queries[0]
+
+
+# --------------------------------------------------------- org-wide telemetry
+def test_org_user_query_has_no_person_filter(monkeypatch):
+    client = FakeAthenaClient(_result_set([], []))
+    _telemetry_source(monkeypatch, client).org_telemetry_user_rows(
+        "2026-08-01", "2026-08-31")
+    sql = client.queries[0]
+    assert "FROM telemetry_by_user WHERE" in sql
+    assert "user_login =" not in sql
+    assert "day >= '2026-08-01'" in sql
+    assert "day <= '2026-08-31'" in sql
+    assert "SELECT *" not in sql
+    assert "used_chat" in sql
+    assert "token" not in sql
+
+
+def test_org_activity_query_has_no_person_filter(monkeypatch):
+    client = FakeAthenaClient(_result_set([], []))
+    _telemetry_source(monkeypatch, client).org_telemetry_activity_rows(
+        "2026-08-01", "2026-08-31")
+    sql = client.queries[0]
+    assert "FROM telemetry_by_user_activity WHERE" in sql
+    assert "user_login =" not in sql
+    assert "user_login" in sql
+
+
+def test_org_user_rows_convert_login_credits_and_flags(monkeypatch):
+    header = ["day", "user_login", "ai_credits_used", "used_chat",
+              "cli_request_count"]
+    client = FakeAthenaClient(_result_set(
+        header, [["2026-08-01", "alice", "1.5", "true", "7"]]))
+    row = _telemetry_source(monkeypatch, client).org_telemetry_user_rows(
+        "2026-08-01", "2026-08-31")[0]
+    assert row["user_login"] == "alice"
+    assert row["credits"] == 1.5
+    assert row["used_chat"] is True
+    assert row["cli_requests"] == 7
+    assert row["suggested"] is None
+
+
+@pytest.mark.parametrize("start,end", [
+    ("2026-08-01", "2026-08-31 OR 1=1"),
+    ("not-a-date", "2026-08-31"),
+])
+def test_an_invalid_date_is_rejected_before_any_org_query(monkeypatch, start, end):
+    client = FakeAthenaClient(_result_set([], []))
+    source = _telemetry_source(monkeypatch, client)
+    with pytest.raises(ValueError):
+        source.org_telemetry_user_rows(start, end)
+    assert not client.queries
+
+
+def test_org_months_come_from_distinct_days(monkeypatch):
+    client = FakeAthenaClient(_result_set(
+        ["day"], [["2026-08-02"], ["2026-07-31"], ["2026-08-01"]]))
+    source = _telemetry_source(monkeypatch, client)
+    assert source.org_telemetry_months() == ["2026-07", "2026-08"]
+    assert client.queries[0] == "SELECT DISTINCT day FROM telemetry_by_user"
+
+
+def test_org_reads_are_empty_when_telemetry_is_not_configured(monkeypatch):
+    monkeypatch.setenv("ATHENA_DATABASE", "db")
+    monkeypatch.delenv("ATHENA_TABLE_TELEMETRY_USERS", raising=False)
+    monkeypatch.delenv("ATHENA_TABLE_TELEMETRY_ACTIVITY", raising=False)
+    client = FakeAthenaClient()
+    source = DbReportsSource(client=client, sleep=lambda _s: None)
+    assert source.org_telemetry_months() == []
+    assert source.org_telemetry_user_rows("2026-08-01", "2026-08-31") == []
+    assert source.org_telemetry_activity_rows("2026-08-01", "2026-08-31") == []
+    assert not client.queries
