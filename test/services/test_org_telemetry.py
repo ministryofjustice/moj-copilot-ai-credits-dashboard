@@ -272,3 +272,45 @@ def test_view_includes_the_daily_series(org_source):
     for key in ("daily_activity", "daily_inline_rate", "daily_people",
                 "daily_lines"):
         assert v[key]["labels"] == ["3"]
+
+
+# ------------------------------------------------------------------ languages
+def test_language_chart_ranks_by_accepted_and_keeps_fifteen():
+    activity = [_activity("a", f"lang{i:02d}", "Inline completion",
+                          suggested=100, accepted=i) for i in range(20)]
+    g = org.language_chart(activity)
+    assert len(g["labels"]) == 15
+    assert g["labels"][0] == "lang19"
+    assert g["accepted"][0] == 19
+
+
+def test_language_chart_folds_aliases():
+    activity = [_activity("a", "ts", "Inline completion", accepted=2,
+                          suggested=5, lines_added=7),
+                _activity("b", "typescript", "Agent mode", accepted=1,
+                          suggested=5, lines_added=3)]
+    g = org.language_chart(activity)
+    assert g["labels"] == ["TypeScript"]
+    assert (g["suggested"], g["accepted"], g["lines_added"]) == ([10], [3], [10])
+
+
+def test_language_inline_rate_uses_inline_completion_only():
+    activity = [_activity("a", "python", "Inline completion",
+                          suggested=40, accepted=10),
+                _activity("a", "python", "Agent mode",
+                          suggested=400, accepted=390)]
+    assert org.language_chart(activity)["inline_rates"] == [25.0]
+
+
+def test_language_inline_rate_is_none_without_enough_inline_use():
+    activity = [_activity("a", "go", "Agent mode", suggested=400, accepted=9),
+                _activity("a", "rust", "Inline completion", suggested=5,
+                          accepted=1)]
+    assert org.language_chart(activity)["inline_rates"] == [None, None]
+
+
+def test_view_includes_the_language_series(org_source):
+    v = org.org_telemetry_view(org_source(
+        [_person_day("a", suggested=1)],
+        [_activity("a", "python", "Inline completion", accepted=1)]), None)
+    assert v["languages"]["labels"] == ["Python"]

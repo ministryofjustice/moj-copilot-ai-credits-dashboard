@@ -197,6 +197,35 @@ def daily_lines(user_rows: list[dict], days: list[str]) -> dict:
     }
 
 
+# How many languages the language charts show.
+TOP_LANGUAGES_CHARTED = 15
+
+
+def language_chart(activity_rows: list[dict],
+                   limit: int = TOP_LANGUAGES_CHARTED) -> dict:
+    """The languages with the most accepted suggestions, with their counts and
+    their inline completion acceptance rate as a percentage.
+
+    The rate uses inline completion rows only, for the reason given in
+    telemetry.py; a language below the minimum sample has no value."""
+    ranked = language_totals(activity_rows)[:limit]
+    inline = _grouped_totals(
+        _rows_in_mode(activity_rows, INLINE_COMPLETION_MODE),
+        lambda row: display_language(row.get("language")))
+    rates = []
+    for lang in ranked:
+        entry = inline.get(lang["language"])
+        rate = _rate(entry["accepted"], entry["suggested"]) if entry else None
+        rates.append(None if rate is None else round(rate * 100, 1))
+    return {
+        "labels": [lang["language"] for lang in ranked],
+        "suggested": [lang["suggested"] for lang in ranked],
+        "accepted": [lang["accepted"] for lang in ranked],
+        "inline_rates": rates,
+        "lines_added": [lang["lines_added"] for lang in ranked],
+    }
+
+
 def org_telemetry_view(source, month: str | None) -> dict:
     """Everything the org telemetry admin page shows for one month.
 
@@ -229,4 +258,5 @@ def org_telemetry_view(source, month: str | None) -> dict:
         "daily_inline_rate": daily_inline_rate(activity_rows, days),
         "daily_people": daily_people(user_rows, days),
         "daily_lines": daily_lines(user_rows, days),
+        "languages": language_chart(activity_rows),
     }
