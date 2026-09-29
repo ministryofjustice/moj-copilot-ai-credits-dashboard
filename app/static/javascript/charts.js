@@ -5,7 +5,7 @@
 //   <canvas data-chart="<name>"></canvas>
 // where each <spec> is a normalised Chart.js shape:
 //   { "type": "bar"|"line", "labels": [...], "datasets": [{ "label": "...", "data": [...] }],
-//     "suffix": "%" (optional) }
+//     "suffix": "%" (optional), "horizontal": true (optional) }
 //
 // No app data lives in JS — the server owns the numbers; this just draws them.
 (function () {
@@ -121,18 +121,22 @@
         return (ctx.dataset.label || "") + ": " + ctx.formattedValue + suffix;
       };
     }
+    // Optional: bars drawn left to right, for categories with long names.
+    // The value axis is then x, so the suffix and zero baseline move there.
+    var horizontal = spec.horizontal === true;
 
     new Chart(canvas.getContext("2d"), {
       type: type,
       data: { labels: spec.labels || [], datasets: datasets },
       options: {
+        indexAxis: horizontal ? "y" : "x",
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: { display: datasets.length > 1 },
           tooltip: tooltip,
         },
-        scales: { y: valueScale },
+        scales: horizontal ? { x: valueScale } : { y: valueScale },
       },
     });
   }

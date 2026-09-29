@@ -129,6 +129,30 @@
 </p>
 <div style="height:320px;"><canvas data-chart="daily_lines"></canvas></div>
 
+<h2 class="govuk-heading-m govuk-!-margin-top-8">Languages</h2>
+<p class="govuk-body-s">
+  These charts show the 15 languages with the most accepted suggestions.
+  GitHub reports some languages under more than one name, for example
+  <code>ts</code>, <code>tsx</code> and <code>typescript</code>, or
+  <code>cs</code> and <code>csharp</code>. Each group is counted as one
+  language, using the same names as the My Usage page. Values that are not
+  languages, such as <code>unknown</code> and <code>prompt</code>, are not
+  shown.
+</p>
+
+<h3 class="govuk-heading-s">Suggestions and acceptances by language</h3>
+<div style="height:480px;"><canvas data-chart="language_volume"></canvas></div>
+
+<h3 class="govuk-heading-s">Inline completion acceptance rate by language</h3>
+<p class="govuk-body-s">
+  This rate uses inline completions only. A language with fewer than 20
+  inline completion suggestions in the month has no bar.
+</p>
+<div style="height:480px;"><canvas data-chart="language_inline_rate"></canvas></div>
+
+<h3 class="govuk-heading-s">Lines of code applied by language</h3>
+<div style="height:480px;"><canvas data-chart="language_lines"></canvas></div>
+
 {# ---- Chart specifications. Each later section adds its own update line. #}
 {% set charts = {} %}
 {% set c = v.capability_share %}
@@ -143,6 +167,10 @@
 {{- charts.update({"daily_people": {"type": "bar", "labels": p.labels, "tooltip_labels": p.tooltip_labels, "datasets": [{"label": "People with any activity", "data": p.people, "colors": people_colours}]}}) or "" -}}
 {% set l = v.daily_lines %}
 {{- charts.update({"daily_lines": {"type": "line", "labels": l.labels, "tooltip_labels": l.tooltip_labels, "datasets": [{"label": "Lines suggested", "data": l.lines_suggested}, {"label": "Lines applied", "data": l.lines_added}]}}) or "" -}}
+{% set g = v.languages %}
+{{- charts.update({"language_volume": {"type": "bar", "horizontal": true, "labels": g.labels, "datasets": [{"label": "Suggestions", "data": g.suggested}, {"label": "Acceptances", "data": g.accepted}]}}) or "" -}}
+{{- charts.update({"language_inline_rate": {"type": "bar", "horizontal": true, "suffix": "%", "labels": g.labels, "datasets": [{"label": "Inline completion acceptance rate", "data": g.inline_rates}]}}) or "" -}}
+{{- charts.update({"language_lines": {"type": "bar", "horizontal": true, "labels": g.labels, "datasets": [{"label": "Lines of code applied", "data": g.lines_added}]}}) or "" -}}
 <script type="application/json" id="chart-data">{{ charts | tojson }}</script>
 {% endif %}
 {% endblock %}

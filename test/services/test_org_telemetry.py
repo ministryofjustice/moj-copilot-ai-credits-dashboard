@@ -314,3 +314,11 @@ def test_view_includes_the_language_series(org_source):
         [_person_day("a", suggested=1)],
         [_activity("a", "python", "Inline completion", accepted=1)]), None)
     assert v["languages"]["labels"] == ["Python"]
+
+
+def test_language_chart_uses_the_personal_page_names():
+    """The org page folds language names with the same mapping as My Usage."""
+    activity = [_activity("a", raw, "Inline completion", accepted=1)
+                for raw in ("cs", "csharp", "C#", "ts", "tsx", "typescript")]
+    g = org.language_chart(activity)
+    assert dict(zip(g["labels"], g["accepted"])) == {"C#": 3, "TypeScript": 3}

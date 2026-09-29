@@ -86,3 +86,12 @@ def test_page_draws_the_daily_charts(monkeypatch, org_source):
     assert people["datasets"][0]["colors"] == ["#1d70b8"]  # 2026-08-03 is a Monday
     assert [d["label"] for d in charts["daily_lines"]["datasets"]] == [
         "Lines suggested", "Lines applied"]
+
+
+def test_page_draws_the_language_charts(monkeypatch, org_source):
+    client = _admin_client(monkeypatch, org_source(*_rows()))
+    charts = _charts(client.get("/admin/telemetry").get_data(as_text=True))
+    for name in ("language_volume", "language_inline_rate", "language_lines"):
+        assert charts[name]["horizontal"] is True
+        assert charts[name]["labels"] == ["Python"]
+    assert charts["language_inline_rate"]["suffix"] == "%"
