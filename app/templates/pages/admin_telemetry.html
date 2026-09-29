@@ -103,10 +103,45 @@
 </p>
 <div style="height:320px;"><canvas data-chart="capability_share"></canvas></div>
 
+<h2 class="govuk-heading-m govuk-!-margin-top-8">Activity through the month</h2>
+
+<h3 class="govuk-heading-s">Suggestions, acceptances and interactions per day</h3>
+<div style="height:320px;"><canvas data-chart="daily_activity"></canvas></div>
+
+<h3 class="govuk-heading-s">Inline completion acceptance rate per day</h3>
+<p class="govuk-body-s">
+  Inline completion only. Agent mode applies code without a separate accept
+  step, so a rate across every mode would understate everyone. Days with
+  fewer than 20 inline suggestions have no point.
+</p>
+<div style="height:280px;"><canvas data-chart="daily_inline_rate"></canvas></div>
+
+<h3 class="govuk-heading-s">People active per day</h3>
+<p class="govuk-body-s">Orange bars are Saturdays and Sundays.</p>
+<div style="height:280px;"><canvas data-chart="daily_people"></canvas></div>
+
+<h3 class="govuk-heading-s">Lines suggested and lines applied per day</h3>
+<p class="govuk-body-s">
+  Two separate counts, not a part and a whole. Agent edits add lines without
+  reporting them as suggested, so lines applied can be higher than lines
+  suggested.
+</p>
+<div style="height:320px;"><canvas data-chart="daily_lines"></canvas></div>
+
 {# ---- Chart specifications. Each later section adds its own update line. #}
 {% set charts = {} %}
 {% set c = v.capability_share %}
 {{- charts.update({"capability_share": {"type": "line", "labels": c.labels, "tooltip_labels": c.tooltip_labels, "suffix": "%", "datasets": c.series}}) or "" -}}
+{% set a = v.daily_activity %}
+{{- charts.update({"daily_activity": {"type": "line", "labels": a.labels, "tooltip_labels": a.tooltip_labels, "datasets": [{"label": "Suggestions", "data": a.suggested}, {"label": "Acceptances", "data": a.accepted}, {"label": "User-initiated interactions", "data": a.interactions}]}}) or "" -}}
+{% set r = v.daily_inline_rate %}
+{{- charts.update({"daily_inline_rate": {"type": "line", "labels": r.labels, "tooltip_labels": r.tooltip_labels, "suffix": "%", "datasets": [{"label": "Inline completion acceptance rate", "data": r.rates}]}}) or "" -}}
+{% set p = v.daily_people %}
+{% set people_colours = [] %}
+{% for weekend in p.weekend %}{{- people_colours.append("#f47738" if weekend else "#1d70b8") or "" -}}{% endfor %}
+{{- charts.update({"daily_people": {"type": "bar", "labels": p.labels, "tooltip_labels": p.tooltip_labels, "datasets": [{"label": "People with any activity", "data": p.people, "colors": people_colours}]}}) or "" -}}
+{% set l = v.daily_lines %}
+{{- charts.update({"daily_lines": {"type": "line", "labels": l.labels, "tooltip_labels": l.tooltip_labels, "datasets": [{"label": "Lines suggested", "data": l.lines_suggested}, {"label": "Lines applied", "data": l.lines_added}]}}) or "" -}}
 <script type="application/json" id="chart-data">{{ charts | tojson }}</script>
 {% endif %}
 {% endblock %}

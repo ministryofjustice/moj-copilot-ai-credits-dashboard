@@ -44,12 +44,15 @@
       // A dataset may override its series colour (e.g. a muted grey for a
       // prior-period comparison line); otherwise fall back to the palette.
       var col = ds.color || colour(i);
+      // A bar dataset may instead give one colour per bar (e.g. weekend days
+      // in orange); Chart.js reads an array per index.
+      var perBar = Array.isArray(ds.colors) ? ds.colors : null;
       var ds_out = {
         type: type,
         label: ds.label || "",
         data: data,
-        backgroundColor: type === "line" ? "transparent" : col,
-        borderColor: col,
+        backgroundColor: type === "line" ? "transparent" : perBar || col,
+        borderColor: perBar || col,
         borderWidth: 2,
         tension: 0.2,
         pointRadius: type === "line" ? 2 : 0,

@@ -73,3 +73,16 @@ def test_page_shows_no_login(monkeypatch, org_source):
     body = client.get("/admin/telemetry").get_data(as_text=True)
     assert "zz-secret-login" not in body
     assert "zz-other-login" not in body
+
+
+def test_page_draws_the_daily_charts(monkeypatch, org_source):
+    client = _admin_client(monkeypatch, org_source(*_rows()))
+    charts = _charts(client.get("/admin/telemetry").get_data(as_text=True))
+    assert [d["label"] for d in charts["daily_activity"]["datasets"]] == [
+        "Suggestions", "Acceptances", "User-initiated interactions"]
+    assert charts["daily_inline_rate"]["suffix"] == "%"
+    people = charts["daily_people"]
+    assert people["type"] == "bar"
+    assert people["datasets"][0]["colors"] == ["#1d70b8"]  # 2026-08-03 is a Monday
+    assert [d["label"] for d in charts["daily_lines"]["datasets"]] == [
+        "Lines suggested", "Lines applied"]
