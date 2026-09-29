@@ -232,22 +232,6 @@ def test_daily_activity_sums_each_day_skipping_nulls():
     assert d["labels"] == ["1", "3"]
 
 
-def test_daily_inline_rate_uses_inline_completion_only():
-    activity = [
-        _activity("a", "python", "Inline completion", day="2026-08-03",
-                  suggested=40, accepted=10),
-        _activity("a", "python", "Agent mode", day="2026-08-03",
-                  suggested=400, accepted=0),
-    ]
-    assert org.daily_inline_rate(activity, DAYS)["rates"] == [None, 25.0]
-
-
-def test_daily_inline_rate_is_none_below_the_minimum():
-    activity = [_activity("a", "python", "Inline completion",
-                          day="2026-08-03", suggested=19, accepted=19)]
-    assert org.daily_inline_rate(activity, DAYS)["rates"] == [None, None]
-
-
 def test_daily_people_counts_active_people_and_marks_weekends():
     rows = [_person_day("a", day="2026-08-01", suggested=1),
             _person_day("a", day="2026-08-03", suggested=1),
@@ -269,7 +253,7 @@ def test_daily_lines_keeps_suggested_and_applied_separate():
 def test_view_includes_the_daily_series(org_source):
     v = org.org_telemetry_view(
         org_source([_person_day("a", suggested=1)]), None)
-    for key in ("daily_activity", "daily_inline_rate", "daily_people",
+    for key in ("daily_activity", "daily_people",
                 "daily_lines"):
         assert v[key]["labels"] == ["3"]
 

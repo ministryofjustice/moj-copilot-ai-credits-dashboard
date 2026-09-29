@@ -157,20 +157,6 @@ def daily_activity(user_rows: list[dict], days: list[str]) -> dict:
     }
 
 
-def daily_inline_rate(activity_rows: list[dict], days: list[str]) -> dict:
-    """Inline completion acceptance rate per day, as a percentage.
-
-    Inline completion only, for the reason given in telemetry.py. A day below
-    the minimum sample has no value."""
-    by_day = _rows_by_day(_rows_in_mode(activity_rows, INLINE_COMPLETION_MODE))
-    rates = []
-    for day in days:
-        rows = by_day.get(day, [])
-        rate = _rate(_total(rows, "accepted"), _total(rows, "suggested"))
-        rates.append(None if rate is None else round(rate * 100, 1))
-    return {**_day_axis(days), "rates": rates}
-
-
 def daily_people(user_rows: list[dict], days: list[str]) -> dict:
     """Distinct active people per day, and which days are Saturday or Sunday."""
     active = _rows_by_day([row for row in user_rows if is_active(row)])
@@ -282,7 +268,6 @@ def org_telemetry_view(source, month: str | None) -> dict:
         "tiles": tiles(user_rows, activity_rows),
         "capability_share": capability_share(user_rows, days),
         "daily_activity": daily_activity(user_rows, days),
-        "daily_inline_rate": daily_inline_rate(activity_rows, days),
         "daily_people": daily_people(user_rows, days),
         "daily_lines": daily_lines(user_rows, days),
         "languages": language_chart(activity_rows),

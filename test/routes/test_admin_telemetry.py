@@ -80,7 +80,7 @@ def test_page_draws_the_daily_charts(monkeypatch, org_source):
     charts = _charts(client.get("/admin/telemetry").get_data(as_text=True))
     assert [d["label"] for d in charts["daily_activity"]["datasets"]] == [
         "Suggestions", "Acceptances", "User-initiated interactions"]
-    assert charts["daily_inline_rate"]["suffix"] == "%"
+    assert "daily_inline_rate" not in charts
     people = charts["daily_people"]
     assert people["type"] == "bar"
     assert people["datasets"][0]["colors"] == ["#1d70b8"]  # 2026-08-03 is a Monday
