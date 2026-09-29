@@ -406,7 +406,7 @@ def test_org_reads_are_empty_when_telemetry_is_not_configured(monkeypatch):
     monkeypatch.delenv("ATHENA_TABLE_TELEMETRY_ACTIVITY", raising=False)
     client = FakeAthenaClient()
     source = DbReportsSource(client=client, sleep=lambda _s: None)
-    assert source.org_telemetry_months() == []
-    assert source.org_telemetry_user_rows("2026-08-01", "2026-08-31") == []
-    assert source.org_telemetry_activity_rows("2026-08-01", "2026-08-31") == []
+    assert not source.org_telemetry_months()
+    assert not source.org_telemetry_user_rows("2026-08-01", "2026-08-31")
+    assert not source.org_telemetry_activity_rows("2026-08-01", "2026-08-31")
     assert not client.queries

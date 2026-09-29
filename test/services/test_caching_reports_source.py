@@ -221,9 +221,9 @@ class CountingOrgSource(ReportsSource):
 
 def test_default_source_reports_no_org_telemetry():
     inner = CountingSource()
-    assert inner.org_telemetry_months() == []
-    assert inner.org_telemetry_user_rows("2026-08-01", "2026-08-31") == []
-    assert inner.org_telemetry_activity_rows("2026-08-01", "2026-08-31") == []
+    assert not inner.org_telemetry_months()
+    assert not inner.org_telemetry_user_rows("2026-08-01", "2026-08-31")
+    assert not inner.org_telemetry_activity_rows("2026-08-01", "2026-08-31")
 
 
 def test_org_months_cached_within_ttl():
