@@ -4,7 +4,8 @@
 //   <script type="application/json" id="chart-data">{ "<name>": <spec>, ... }</script>
 //   <canvas data-chart="<name>"></canvas>
 // where each <spec> is a normalised Chart.js shape:
-//   { "type": "bar"|"line", "labels": [...], "datasets": [{ "label": "...", "data": [...] }] }
+//   { "type": "bar"|"line", "labels": [...], "datasets": [{ "label": "...", "data": [...] }],
+//     "suffix": "%" (optional) }
 //
 // No app data lives in JS — the server owns the numbers; this just draws them.
 (function () {
@@ -102,6 +103,22 @@
         }
       : {};
 
+    // Optional unit appended to the value axis and tooltip values, e.g. "%"
+    // for a chart whose values are percentages.
+    var suffix = typeof spec.suffix === "string" ? spec.suffix : "";
+    var valueScale = { beginAtZero: true };
+    if (suffix) {
+      valueScale.ticks = {
+        callback: function (value) {
+          return value + suffix;
+        },
+      };
+      tooltip.callbacks = tooltip.callbacks || {};
+      tooltip.callbacks.label = function (ctx) {
+        return (ctx.dataset.label || "") + ": " + ctx.formattedValue + suffix;
+      };
+    }
+
     new Chart(canvas.getContext("2d"), {
       type: type,
       data: { labels: spec.labels || [], datasets: datasets },
@@ -112,7 +129,7 @@
           legend: { display: datasets.length > 1 },
           tooltip: tooltip,
         },
-        scales: { y: { beginAtZero: true } },
+        scales: { y: valueScale },
       },
     });
   }
