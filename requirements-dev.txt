@@ -26,3 +26,5 @@ jaraco-context==6.1.2
 # ---- tests / dev tooling ----
 pytest==9.1.0
 coverage==7.4.4
+urllib3>=2.8.0 # not directly required, pinned by Snyk to avoid a vulnerability
+werkzeug>=3.1.9 # not directly required, pinned by Snyk to avoid a vulnerability
