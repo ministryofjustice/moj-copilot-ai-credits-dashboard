@@ -6,14 +6,16 @@
 # GitHub workflows — those must not trigger an image rebuild.
 #
 # Base selection depends on BASE_STRATEGY:
-#   previous-commit  Push to main. Compare HEAD to github.event.before, or to
-#                    HEAD^ when that value is empty or all zeros.
-#   deployed-image   Manual workflow_dispatch only. Compare HEAD to the tag of
-#                    the image currently running in the dev cluster
-#                    (deployment moj-copilot-ai-credits-dashboard, container 0).
-#                    HEAD^ is wrong here: github.event.before is empty, so a
-#                    branch can contain earlier image changes that are not in
-#                    the running deployment.
+#   deployed-image   Dev, for both push to main and workflow_dispatch.
+#                    Compare HEAD to the tag of the image currently running
+#                    in the dev cluster (deployment
+#                    moj-copilot-ai-credits-dashboard, container 0). A
+#                    tip-commit diff (HEAD^ or github.event.before) misses
+#                    earlier image changes when the latest commit does not
+#                    touch image paths.
+#   previous-commit  Compare HEAD to github.event.before, or to HEAD^ when
+#                    that value is empty or all zeros. The dev pipeline does
+#                    not use this strategy.
 #   previous-tag     Production. Compare HEAD to the most recent tag other
 #                    than the current ref. This path does not read the cluster.
 #
@@ -133,7 +135,7 @@ read_deployed_image_tag() {
 }
 
 case "${BASE_STRATEGY:?BASE_STRATEGY is required}" in
-  # Push to main. github.event.before is the prior commit on the branch.
+  # Tip-commit comparison. Not used by the dev pipeline.
   previous-commit)
     before="${GITHUB_EVENT_BEFORE:-}"
     if [[ -z "${before}" || "${before}" =~ ^0+$ ]]; then
@@ -147,8 +149,8 @@ case "${BASE_STRATEGY:?BASE_STRATEGY is required}" in
       base="${before}"
     fi
     ;;
-  # Manual workflow_dispatch. Compare against the SHA running in the cluster,
-  # not HEAD^ and not main. Any lookup failure fails open to changed=true.
+  # Dev push and workflow_dispatch. Compare against the SHA running in the
+  # cluster. Any lookup failure fails open to changed=true.
   deployed-image)
     DEPLOYED_IMAGE_TAG=""
     if read_deployed_image_tag; then

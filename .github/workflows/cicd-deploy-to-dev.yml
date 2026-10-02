@@ -34,10 +34,10 @@ jobs:
   # Helm-only (and other non-image) changes skip build-push and reuse the
   # image already running in the cluster.
   #
-  # Push to main compares against github.event.before (or HEAD^). Manual
-  # workflow_dispatch compares against the image SHA running in the dev
-  # cluster. github.event.before is empty on manual runs, so HEAD^ would
-  # miss earlier commits on the branch that are not in the running image.
+  # Both push to main and workflow_dispatch compare against the image SHA
+  # running in the dev cluster. A tip-commit diff (HEAD^ or
+  # github.event.before) misses earlier image changes when the latest
+  # commit does not touch image paths.
   detect-image-changes:
     name: Detect image changes
     runs-on: ubuntu-latest
@@ -55,15 +55,12 @@ jobs:
         id: detect
         uses: ./.github/actions/detect-image-changes
         env:
-          # Used only by the deployed-image strategy (workflow_dispatch).
-          # Push runs ignore these and keep the previous-commit comparison.
           KUBE_CERT: ${{ env.KUBE_CERT }}
           KUBE_CLUSTER: ${{ env.KUBE_CLUSTER }}
           KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
           KUBE_NAMESPACE: ${{ env.KUBE_NAMESPACE }}
         with:
-          base-strategy: ${{ github.event_name == 'workflow_dispatch' && 'deployed-image' || 'previous-commit' }}
-          before: ${{ github.event.before }}
+          base-strategy: deployed-image
 
   build-push:
     name: Build and push image
