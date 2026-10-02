@@ -33,6 +33,9 @@ jobs:
   # Image paths are defined in .github/actions/detect-image-changes.
   # Helm-only (and other non-image) changes skip build-push and reuse the
   # image already running in the cluster.
+  #
+  # Both push to main and workflow_dispatch compare against the image SHA
+  # running in the dev cluster.
   detect-image-changes:
     name: Detect image changes
     runs-on: ubuntu-latest
@@ -49,9 +52,13 @@ jobs:
       - name: Detect image-related file changes
         id: detect
         uses: ./.github/actions/detect-image-changes
+        env:
+          KUBE_CERT: ${{ env.KUBE_CERT }}
+          KUBE_CLUSTER: ${{ env.KUBE_CLUSTER }}
+          KUBE_TOKEN: ${{ env.KUBE_TOKEN }}
+          KUBE_NAMESPACE: ${{ env.KUBE_NAMESPACE }}
         with:
-          base-strategy: previous-commit
-          before: ${{ github.event.before }}
+          base-strategy: deployed-image
 
   build-push:
     name: Build and push image

@@ -1,0 +1,196 @@
+{% extends "components/base.html" %}
+{% from "govuk_frontend_jinja/components/select/macro.html" import govukSelect %}
+{% from "govuk_frontend_jinja/components/button/macro.html" import govukButton %}
+{% from "govuk_frontend_jinja/components/inset-text/macro.html" import govukInsetText %}
+
+{% block pageTitle %}Copilot AI Credits — Telemetry{% endblock %}
+
+{% block content %}
+{% set active = 'telemetry' %}
+<h1 class="govuk-heading-l">GitHub Copilot — AI Credit Usage</h1>
+{% include "components/admin_nav.html" with context %}
+
+{% if not v.available %}
+  {{ govukInsetText({"text": "Telemetry is not configured for this environment."}) }}
+{% elif not v.has_data %}
+  {{ govukInsetText({"text": "No telemetry has been recorded for this month."}) }}
+{% else %}
+
+{% set month_items = [] %}
+{% for m in v.months %}{{- month_items.append({"value": m.value, "text": m.text, "selected": m.value == v.month}) or "" -}}{% endfor %}
+
+<form method="get" action="/admin/telemetry" class="govuk-!-margin-bottom-4" data-auto-submit>
+  <div class="govuk-grid-row">
+    <div class="govuk-grid-column-one-third">
+      {{ govukSelect({"id": "month", "name": "month", "label": {"text": "Calendar month"}, "items": month_items}) }}
+    </div>
+    <div class="govuk-grid-column-one-third">
+      <div class="govuk-!-padding-top-6" data-auto-submit-hide>{{ govukButton({"text": "Apply", "classes": "govuk-button--secondary"}) }}</div>
+    </div>
+  </div>
+</form>
+
+<h2 class="govuk-heading-m">What the organisation did in {{ v.month_label }}</h2>
+
+<style>
+  /* Same tile layout as app/templates/components/user_telemetry.html. */
+  .telemetry-stat-row { display: flex; flex-wrap: wrap; gap: 15px;
+    margin: 15px 0 25px; }
+  .telemetry-stat { flex: 1 1 160px; border: 1px solid #b1b4b6;
+    border-left: 6px solid #1d70b8; padding: 12px 15px; }
+  .telemetry-stat .govuk-caption-m, .telemetry-stat .govuk-body-s {
+    display: block; }
+</style>
+
+{% set t = v.tiles %}
+<div class="telemetry-stat-row">
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Days covered</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ t.days }}</span>
+    <span class="govuk-body-s govuk-!-margin-bottom-0">{{ t.first_day }} to {{ t.last_day }}</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">People with any activity</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.people_active) }}</span>
+    <span class="govuk-body-s govuk-!-margin-bottom-0">of {{ "{:,}".format(t.seats_seen) }} seats seen</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Suggestions</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.suggested) }}</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Inline completions accepted</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.inline_accepted) }}</span>
+    <span class="govuk-body-s govuk-!-margin-bottom-0">
+      {%- if t.inline_acceptance_rate is not none -%}{{ "%.1f%%"|format(t.inline_acceptance_rate * 100) }} {% endif -%}
+      of {{ "{:,}".format(t.inline_suggested) }} offered</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Lines of code applied</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.lines_added) }}</span>
+    <span class="govuk-body-s govuk-!-margin-bottom-0">{{ "{:,}".format(t.agent_lines_added) }} of them by agent edits</span>
+  </div>
+</div>
+<div class="telemetry-stat-row">
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Inline completion lines kept</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.inline_lines_kept) }}</span>
+    <span class="govuk-body-s govuk-!-margin-bottom-0">
+      {%- if t.inline_keep_rate is not none -%}{{ "%.1f%%"|format(t.inline_keep_rate * 100) }} {% endif -%}
+      of {{ "{:,}".format(t.inline_lines_suggested) }} suggested</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">User-initiated interactions</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.interactions) }}</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">CLI and app requests</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ "{:,}".format(t.requests) }}</span>
+    <span class="govuk-body-s govuk-!-margin-bottom-0">from {{ "{:,}".format(t.prompts) }} user prompts</span>
+  </div>
+  <div class="telemetry-stat">
+    <span class="govuk-caption-m">Languages seen</span>
+    <span class="govuk-heading-m govuk-!-margin-bottom-0">{{ t.languages_seen }}</span>
+    {% if t.top_language %}<span class="govuk-body-s govuk-!-margin-bottom-0">top: {{ t.top_language }}</span>{% endif %}
+  </div>
+</div>
+
+<h3 class="govuk-heading-s">Share of active people using each capability, per day</h3>
+<p class="govuk-body-s">
+  Of the people active each day, the percentage whose record shows each
+  capability used. A person counts as active on a day with any interaction,
+  suggestion, AI credit charge or capability recorded.
+</p>
+<div style="height:320px;"><canvas data-chart="capability_share"></canvas></div>
+
+<h2 class="govuk-heading-m govuk-!-margin-top-8">Activity through the month</h2>
+
+<h3 class="govuk-heading-s">Suggestions, acceptances and interactions per day</h3>
+<div style="height:320px;"><canvas data-chart="daily_activity"></canvas></div>
+
+<h3 class="govuk-heading-s">People active per day</h3>
+<p class="govuk-body-s">Orange bars are Saturdays and Sundays.</p>
+<div style="height:280px;"><canvas data-chart="daily_people"></canvas></div>
+
+<h3 class="govuk-heading-s">Lines suggested and lines applied per day</h3>
+<p class="govuk-body-s">
+  Lines suggested is how many lines Copilot offered. Lines applied is how
+  many lines were written into files. Agent mode writes lines straight into
+  files without offering them first, so they count as applied but never as
+  suggested. This is why lines applied can be higher than lines suggested.
+</p>
+<div style="height:320px;"><canvas data-chart="daily_lines"></canvas></div>
+
+<h2 class="govuk-heading-m govuk-!-margin-top-8">Languages</h2>
+<p class="govuk-body-s">
+  These charts show the 15 languages with the most accepted suggestions.
+  GitHub reports some languages under more than one name, for example
+  <code>ts</code>, <code>tsx</code> and <code>typescript</code>, or
+  <code>cs</code> and <code>csharp</code>. Each group is counted as one
+  language, using the same names as the My Usage page. Values that are not
+  languages, such as <code>unknown</code> and <code>prompt</code>, are not
+  shown.
+</p>
+
+<h3 class="govuk-heading-s">Language-specific suggestions and acceptances</h3>
+<div style="height:480px;"><canvas data-chart="language_volume"></canvas></div>
+
+<h3 class="govuk-heading-s">Inline completion acceptance rate by language</h3>
+<p class="govuk-body-s">
+  This rate uses inline completions only. A language with fewer than 20
+  inline completion suggestions in the month has no bar.
+</p>
+<div style="height:480px;"><canvas data-chart="language_inline_rate"></canvas></div>
+
+<h3 class="govuk-heading-s">Lines of code applied by language</h3>
+<div style="height:480px;"><canvas data-chart="language_lines"></canvas></div>
+
+<h2 class="govuk-heading-m govuk-!-margin-top-8">Modes</h2>
+
+<h3 class="govuk-heading-s">Mode-specific suggestions and acceptances</h3>
+<p class="govuk-body-s">
+  Agent mode writes code into files without asking the person to accept it
+  first, so it records very few acceptances. A low acceptance count for agent
+  mode does not mean its suggestions were rejected.
+</p>
+<div style="height:320px;"><canvas data-chart="mode_volume"></canvas></div>
+
+<h3 class="govuk-heading-s">How many people work in each mode</h3>
+<p class="govuk-body-s">
+  A person who used more than one mode in the month is counted once in each of
+  those modes, so the bars add up to more than the number of people.
+</p>
+<div style="height:320px;"><canvas data-chart="mode_people"></canvas></div>
+
+{# ---- Chart specifications. Each later section adds its own update line. #}
+{% set charts = {} %}
+{% set c = v.capability_share %}
+{{- charts.update({"capability_share": {"type": "line", "labels": c.labels, "tooltip_labels": c.tooltip_labels, "suffix": "%", "datasets": c.series}}) or "" -}}
+{% set a = v.daily_activity %}
+{{- charts.update({"daily_activity": {"type": "line", "labels": a.labels, "tooltip_labels": a.tooltip_labels, "datasets": [{"label": "Suggestions", "data": a.suggested}, {"label": "Acceptances", "data": a.accepted}, {"label": "User-initiated interactions", "data": a.interactions}]}}) or "" -}}
+{% set p = v.daily_people %}
+{% set people_colours = [] %}
+{% for weekend in p.weekend %}{{- people_colours.append("#f47738" if weekend else "#1d70b8") or "" -}}{% endfor %}
+{{- charts.update({"daily_people": {"type": "bar", "labels": p.labels, "tooltip_labels": p.tooltip_labels, "datasets": [{"label": "People with any activity", "data": p.people, "colors": people_colours}]}}) or "" -}}
+{% set l = v.daily_lines %}
+{{- charts.update({"daily_lines": {"type": "line", "labels": l.labels, "tooltip_labels": l.tooltip_labels, "datasets": [{"label": "Lines suggested", "data": l.lines_suggested}, {"label": "Lines applied", "data": l.lines_added}]}}) or "" -}}
+{% set g = v.languages %}
+{{- charts.update({"language_volume": {"type": "bar", "horizontal": true, "labels": g.labels, "datasets": [{"label": "Suggestions", "data": g.suggested}, {"label": "Acceptances", "data": g.accepted}]}}) or "" -}}
+{{- charts.update({"language_inline_rate": {"type": "bar", "horizontal": true, "suffix": "%", "labels": g.labels, "datasets": [{"label": "Inline completion acceptance rate", "data": g.inline_rates}]}}) or "" -}}
+{{- charts.update({"language_lines": {"type": "bar", "horizontal": true, "labels": g.labels, "datasets": [{"label": "Lines of code applied", "data": g.lines_added}]}}) or "" -}}
+{% set md = v.modes %}
+{# The same six colours, in the same order, as colour() in charts.js. #}
+{% set palette = ["#1d70b8", "#00703c", "#4c2c92", "#d4351c", "#f47738", "#85994b"] %}
+{% set mode_colours = [] %}
+{% for label in md.labels %}{{- mode_colours.append(palette[loop.index0 % 6]) or "" -}}{% endfor %}
+{{- charts.update({"mode_volume": {"type": "bar", "horizontal": true, "labels": md.labels, "datasets": [{"label": "Suggestions", "data": md.suggested}, {"label": "Acceptances", "data": md.accepted}]}}) or "" -}}
+{{- charts.update({"mode_people": {"type": "bar", "horizontal": true, "labels": md.labels, "datasets": [{"label": "People", "data": md.people, "colors": mode_colours}]}}) or "" -}}
+<script type="application/json" id="chart-data">{{ charts | tojson }}</script>
+{% endif %}
+{% endblock %}
+
+{% block bodyEnd %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='javascript/chart.umd.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='javascript/charts.js') }}"></script>
+{% endblock %}

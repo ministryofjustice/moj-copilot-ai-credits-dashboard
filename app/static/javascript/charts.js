@@ -4,7 +4,8 @@
 //   <script type="application/json" id="chart-data">{ "<name>": <spec>, ... }</script>
 //   <canvas data-chart="<name>"></canvas>
 // where each <spec> is a normalised Chart.js shape:
-//   { "type": "bar"|"line", "labels": [...], "datasets": [{ "label": "...", "data": [...] }] }
+//   { "type": "bar"|"line", "labels": [...], "datasets": [{ "label": "...", "data": [...] }],
+//     "suffix": "%" (optional), "horizontal": true (optional) }
 //
 // No app data lives in JS — the server owns the numbers; this just draws them.
 (function () {
@@ -43,12 +44,15 @@
       // A dataset may override its series colour (e.g. a muted grey for a
       // prior-period comparison line); otherwise fall back to the palette.
       var col = ds.color || colour(i);
+      // A bar dataset may instead give one colour per bar (e.g. weekend days
+      // in orange); Chart.js reads an array per index.
+      var perBar = Array.isArray(ds.colors) ? ds.colors : null;
       var ds_out = {
         type: type,
         label: ds.label || "",
         data: data,
-        backgroundColor: type === "line" ? "transparent" : col,
-        borderColor: col,
+        backgroundColor: type === "line" ? "transparent" : perBar || col,
+        borderColor: perBar || col,
         borderWidth: 2,
         tension: 0.2,
         pointRadius: type === "line" ? 2 : 0,
@@ -102,17 +106,37 @@
         }
       : {};
 
+    // Optional unit appended to the value axis and tooltip values, e.g. "%"
+    // for a chart whose values are percentages.
+    var suffix = typeof spec.suffix === "string" ? spec.suffix : "";
+    var valueScale = { beginAtZero: true };
+    if (suffix) {
+      valueScale.ticks = {
+        callback: function (value) {
+          return value + suffix;
+        },
+      };
+      tooltip.callbacks = tooltip.callbacks || {};
+      tooltip.callbacks.label = function (ctx) {
+        return (ctx.dataset.label || "") + ": " + ctx.formattedValue + suffix;
+      };
+    }
+    // Optional: bars drawn left to right, for categories with long names.
+    // The value axis is then x, so the suffix and zero baseline move there.
+    var horizontal = spec.horizontal === true;
+
     new Chart(canvas.getContext("2d"), {
       type: type,
       data: { labels: spec.labels || [], datasets: datasets },
       options: {
+        indexAxis: horizontal ? "y" : "x",
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
           legend: { display: datasets.length > 1 },
           tooltip: tooltip,
         },
-        scales: { y: { beginAtZero: true } },
+        scales: horizontal ? { x: valueScale } : { y: valueScale },
       },
     });
   }

@@ -10,6 +10,8 @@ The two whole-table methods are keyed by name alone. The telemetry methods take
 arguments, so they are keyed by name plus the username and both dates: without
 that, the first person to load the page would have their telemetry served to
 everyone else until the entry expired.
+The org telemetry methods read everyone, so they are keyed by name plus both
+dates; the month list is keyed by name alone.
 
 The cache is per-process and production runs several replicas, so the caches must
 expire together or a refresh gets an old figure from one replica and a new one
@@ -91,4 +93,22 @@ class CachingReportsSource(ReportsSource):
         return self._cached(
             ("telemetry_activity_rows", login, start_day, end_day),
             lambda: self._inner.telemetry_activity_rows(login, start_day, end_day),
+        )
+
+    def org_telemetry_months(self) -> list[str]:
+        return self._cached("org_telemetry_months",
+                            self._inner.org_telemetry_months)
+
+    def org_telemetry_user_rows(self, start_day: str,
+                                end_day: str) -> list[dict]:
+        return self._cached(
+            ("org_telemetry_user_rows", start_day, end_day),
+            lambda: self._inner.org_telemetry_user_rows(start_day, end_day),
+        )
+
+    def org_telemetry_activity_rows(self, start_day: str,
+                                    end_day: str) -> list[dict]:
+        return self._cached(
+            ("org_telemetry_activity_rows", start_day, end_day),
+            lambda: self._inner.org_telemetry_activity_rows(start_day, end_day),
         )
