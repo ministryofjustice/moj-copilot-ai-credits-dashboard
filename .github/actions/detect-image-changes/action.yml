@@ -7,11 +7,15 @@ description: >
 inputs:
   base-strategy:
     description: >
-      previous-commit compares HEAD to github.event.before (or HEAD^).
+      previous-commit compares HEAD to github.event.before, or HEAD^ when
+      that SHA is empty. Use it for pushes to main.
+      deployed-image compares HEAD to the image tag currently running in
+      the cluster (manual workflow_dispatch). It reads KUBE_CERT,
+      KUBE_CLUSTER, KUBE_TOKEN, and KUBE_NAMESPACE from the environment and
+      treats the image as changed if the deployment, tag, or kubectl call
+      cannot be resolved.
       previous-tag compares HEAD to the most recent tag other than the
-      current ref. Use previous-commit for the dev pipeline (every main
-      push deploys) and previous-tag for the prod pipeline (releases are
-      tags).
+      current ref. Use it for the prod pipeline (releases are tags).
     required: true
   before:
     description: The push event's before SHA, when available.
