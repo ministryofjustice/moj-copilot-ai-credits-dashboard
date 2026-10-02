@@ -50,7 +50,6 @@ jobs:
         uses: ./.github/actions/detect-image-changes
         with:
           base-strategy: previous-tag
-          before: ${{ github.event.before }}
 
   build-push:
     name: Build and push image

@@ -35,9 +35,7 @@ jobs:
   # image already running in the cluster.
   #
   # Both push to main and workflow_dispatch compare against the image SHA
-  # running in the dev cluster. A tip-commit diff (HEAD^ or
-  # github.event.before) misses earlier image changes when the latest
-  # commit does not touch image paths.
+  # running in the dev cluster.
   detect-image-changes:
     name: Detect image changes
     runs-on: ubuntu-latest

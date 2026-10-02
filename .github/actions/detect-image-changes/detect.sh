@@ -9,13 +9,7 @@
 #   deployed-image   Dev, for both push to main and workflow_dispatch.
 #                    Compare HEAD to the tag of the image currently running
 #                    in the dev cluster (deployment
-#                    moj-copilot-ai-credits-dashboard, container 0). A
-#                    tip-commit diff (HEAD^ or github.event.before) misses
-#                    earlier image changes when the latest commit does not
-#                    touch image paths.
-#   previous-commit  Compare HEAD to github.event.before, or to HEAD^ when
-#                    that value is empty or all zeros. The dev pipeline does
-#                    not use this strategy.
+#                    moj-copilot-ai-credits-dashboard, container 0).
 #   previous-tag     Production. Compare HEAD to the most recent tag other
 #                    than the current ref. This path does not read the cluster.
 #
@@ -135,20 +129,6 @@ read_deployed_image_tag() {
 }
 
 case "${BASE_STRATEGY:?BASE_STRATEGY is required}" in
-  # Tip-commit comparison. Not used by the dev pipeline.
-  previous-commit)
-    before="${GITHUB_EVENT_BEFORE:-}"
-    if [[ -z "${before}" || "${before}" =~ ^0+$ ]]; then
-      if git rev-parse --verify --quiet HEAD^ >/dev/null; then
-        base="HEAD^"
-      else
-        log "No previous commit found; treating image as changed."
-        changed=true
-      fi
-    else
-      base="${before}"
-    fi
-    ;;
   # Dev push and workflow_dispatch. Compare against the SHA running in the
   # cluster. Any lookup failure fails open to changed=true.
   deployed-image)
