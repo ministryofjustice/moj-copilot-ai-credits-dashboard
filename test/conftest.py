@@ -50,6 +50,41 @@ def fake_source():
     return _FakeSource
 
 
+class _OrgTelemetrySource(ReportsSource):
+    """Serves org telemetry rows from lists, filtered by day range the way the
+    real backends filter them."""
+
+    def __init__(self, user_rows=None, activity_rows=None, available=True):
+        self._user_rows = list(user_rows or [])
+        self._activity_rows = list(activity_rows or [])
+        self._available = available
+
+    def model_rows(self):
+        return []
+
+    def user_rows(self):
+        return []
+
+    def telemetry_available(self):
+        return self._available
+
+    def org_telemetry_months(self):
+        return sorted({r["day"][:7] for r in self._user_rows})
+
+    def org_telemetry_user_rows(self, start_day, end_day):
+        return [r for r in self._user_rows if start_day <= r["day"] <= end_day]
+
+    def org_telemetry_activity_rows(self, start_day, end_day):
+        return [r for r in self._activity_rows
+                if start_day <= r["day"] <= end_day]
+
+
+@pytest.fixture
+def org_source():
+    """Return a factory: (user_rows, activity_rows, available=True) -> ReportsSource."""
+    return _OrgTelemetrySource
+
+
 def _build_record(day, user, amount):
     """One per-user daily row: {day, user_login, credits}."""
     return {"day": day, "user_login": user, "credits": amount}

@@ -23,6 +23,7 @@ freezegun = "==1.5.1"
 setuptools = "==83.0.0"
 wheel = "==0.46.2"
 jaraco-context = "==6.1.2"
+urllib3 = "==2.8.0"
 
 [dev-packages]
 coverage = "==7.4.4"

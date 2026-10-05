@@ -9,6 +9,7 @@ replacement for Streamlit's reactive widgets):
     /admin/weekly  Org weekly — ?plan=<plan>&week=YYYY-Www
     /admin/monthly Org monthly — ?plan=<plan>&month=YYYY-MM
     /admin/daily   Org daily  — ?day=YYYY-MM-DD
+    /admin/telemetry Org telemetry — ?month=YYYY-MM
 
 `plan` takes different values per page. "/" and /admin/weekly measure a person
 against what we allocate them out of the pool, so they accept $200 / month (the
@@ -24,6 +25,7 @@ today, DB later) so these handlers never touch storage directly.
 from flask import Blueprint, redirect, render_template, request, session
 
 from app.main.services import ai_credits as ac
+from app.main.services import org_telemetry as org
 from app.main.services.reports_source import get_reports_source
 from app.main.middleware.auth import requires_auth, requires_admin
 from app.main.config.app_config import app_config
@@ -103,3 +105,11 @@ def admin_pooled():
         request.args.get("seats"),
     )
     return render_template("pages/admin_pooled.html", v=view)
+
+
+@ai_credits.route("/admin/telemetry")
+@requires_auth
+@requires_admin
+def admin_telemetry():
+    view = org.org_telemetry_view(get_reports_source(), request.args.get("month"))
+    return render_template("pages/admin_telemetry.html", v=view)

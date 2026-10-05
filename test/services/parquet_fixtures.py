@@ -47,6 +47,16 @@ def write_telemetry_user_partition(root, day, rows):
         "used_copilot_code_review_active": pa.bool_(),
         "used_copilot_code_review_passive": pa.bool_(),
         "ai_credits_used": pa.float64(),
+        "used_chat": pa.bool_(),
+        "used_agent": pa.bool_(),
+        "used_cli": pa.bool_(),
+        "used_copilot_app": pa.bool_(),
+        "used_copilot_coding_agent": pa.bool_(),
+        "used_copilot_cloud_agent": pa.bool_(),
+        "cli_request_count": pa.int64(),
+        "app_request_count": pa.int64(),
+        "cli_prompt_count": pa.int64(),
+        "app_prompt_count": pa.int64(),
     }
     table = pa.table(
         {name: pa.array([r.get(name) for r in rows], type=kind)
