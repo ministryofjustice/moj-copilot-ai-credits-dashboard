@@ -59,8 +59,32 @@ jobs:
           category: snyk-python
 
       - name: Fail on findings
+        id: fail_build
         if: steps.scan.outcome == 'failure'
         run: exit 1
+
+      - name: Prepare Slack webhook
+        if: failure() && steps.fail_build.outcome == 'failure' && (github.event_name == 'schedule' || github.event_name == 'push')
+        id: slack_webhook
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.COAT_NOTIFICATIONS_SLACK_WEBHOOK }}
+        run: |
+          url=$(printf '%s' "${SLACK_WEBHOOK_URL}" | tr -d '[:space:]"')
+          echo "::add-mask::${url}"
+          echo "url=${url}" >> "${GITHUB_OUTPUT}"
+
+      - name: Slack CVE Alert
+        if: failure() && steps.fail_build.outcome == 'failure' && (github.event_name == 'schedule' || github.event_name == 'push')
+        id: slack_cve_alert
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
+        with:
+          webhook-type: incoming-webhook
+          webhook: ${{ steps.slack_webhook.outputs.url }}
+          payload: |
+            {
+              "repository": "${{ github.repository }}",
+              "run_id": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
 
   snyk-container:
     name: Snyk Container
@@ -99,8 +123,32 @@ jobs:
           category: snyk-container
 
       - name: Fail on findings
+        id: fail_build
         if: steps.scan.outcome == 'failure'
         run: exit 1
+
+      - name: Prepare Slack webhook
+        if: failure() && steps.fail_build.outcome == 'failure' && (github.event_name == 'schedule' || github.event_name == 'push')
+        id: slack_webhook
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.COAT_NOTIFICATIONS_SLACK_WEBHOOK }}
+        run: |
+          url=$(printf '%s' "${SLACK_WEBHOOK_URL}" | tr -d '[:space:]"')
+          echo "::add-mask::${url}"
+          echo "url=${url}" >> "${GITHUB_OUTPUT}"
+
+      - name: Slack CVE Alert
+        if: failure() && steps.fail_build.outcome == 'failure' && (github.event_name == 'schedule' || github.event_name == 'push')
+        id: slack_cve_alert
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
+        with:
+          webhook-type: incoming-webhook
+          webhook: ${{ steps.slack_webhook.outputs.url }}
+          payload: |
+            {
+              "repository": "${{ github.repository }}",
+              "run_id": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
 
   snyk-code:
     name: Snyk Code
@@ -136,5 +184,29 @@ jobs:
           category: snyk-code
 
       - name: Fail on findings
+        id: fail_build
         if: steps.scan.outcome == 'failure'
         run: exit 1
+
+      - name: Prepare Slack webhook
+        if: failure() && steps.fail_build.outcome == 'failure' && (github.event_name == 'schedule' || github.event_name == 'push')
+        id: slack_webhook
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.COAT_NOTIFICATIONS_SLACK_WEBHOOK }}
+        run: |
+          url=$(printf '%s' "${SLACK_WEBHOOK_URL}" | tr -d '[:space:]"')
+          echo "::add-mask::${url}"
+          echo "url=${url}" >> "${GITHUB_OUTPUT}"
+
+      - name: Slack CVE Alert
+        if: failure() && steps.fail_build.outcome == 'failure' && (github.event_name == 'schedule' || github.event_name == 'push')
+        id: slack_cve_alert
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c # v3.0.3
+        with:
+          webhook-type: incoming-webhook
+          webhook: ${{ steps.slack_webhook.outputs.url }}
+          payload: |
+            {
+              "repository": "${{ github.repository }}",
+              "run_id": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            }
