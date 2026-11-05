@@ -12,7 +12,10 @@ def _client():
 def test_robots_txt_asks_crawlers_to_stay_out():
     resp = _client().get("/robots.txt")
     assert resp.status_code == 200
-    assert "Disallow: /" in resp.get_data(as_text=True)
+    assert resp.mimetype == "text/plain"
+    # Exact match: any extra rule (e.g. Disallow: /admin/) would advertise private paths.
+    lines = [line for line in resp.get_data(as_text=True).splitlines() if line.strip()]
+    assert lines == ["User-agent: *", "Disallow: /"]
 
 
 def test_an_unknown_address_shows_the_404_page():
