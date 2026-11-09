@@ -18,8 +18,6 @@ jobs:
   snyk-python:
     name: Snyk Python
     runs-on: ubuntu-latest
-    env:
-      PROJECT_NAME: moj-copilot-ai-credits-dashboard
     permissions:
       actions: read
       contents: read
@@ -44,7 +42,7 @@ jobs:
       - name: Scan Python dependencies
         id: scan
         continue-on-error: true
-        run: snyk test --severity-threshold=high --fail-on=upgradable --file=Pipfile --project-name=${{ env.PROJECT_NAME }} --sarif-file-output=snyk-python.sarif
+        run: snyk test --severity-threshold=high --fail-on=upgradable --file=Pipfile --sarif-file-output=snyk-python.sarif
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
 
