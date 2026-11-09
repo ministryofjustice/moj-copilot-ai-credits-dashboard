@@ -89,6 +89,8 @@ jobs:
   snyk-container:
     name: Snyk Container
     runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: moj-copilot-ai-credits-dashboard
     permissions:
       actions: read
       contents: read
@@ -98,7 +100,7 @@ jobs:
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
 
       - name: Build image
-        run: docker build --tag "${{ github.sha }}" .
+        run: docker build --tag "${IMAGE_NAME}:scan" .
 
       - name: Scan container image
         id: scan
@@ -107,8 +109,8 @@ jobs:
         env:
           SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
         with:
-          image: ${{ github.sha }}
-          args: --file=Dockerfile --severity-threshold=high --fail-on=upgradable
+          image: ${{ env.IMAGE_NAME }}:scan
+          args: --file=Dockerfile --severity-threshold=high --fail-on=upgradable --project-name=${{ env.IMAGE_NAME }}
 
       - name: Check for SARIF file
         id: sarif
