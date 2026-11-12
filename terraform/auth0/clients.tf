@@ -72,8 +72,8 @@ resource "auth0_client" "auth0_terraform_provider" {
 }
 
 resource "auth0_client_credentials" "auth0_terraform_provider" {
-  authentication_method    = "client_secret_post"
-  client_id                = auth0_client.auth0_terraform_provider.client_id
+  authentication_method = "client_secret_post"
+  client_id             = auth0_client.auth0_terraform_provider.client_id
 }
 
 resource "auth0_client_grant" "auth0_terraform_provider_client_grant" {
@@ -147,8 +147,8 @@ resource "auth0_client" "auth0_actions_management_client" {
 }
 
 resource "auth0_client_credentials" "auth0_actions_management_client" {
-  authentication_method    = "client_secret_post"
-  client_id                = auth0_client.auth0_actions_management_client.client_id
+  authentication_method = "client_secret_post"
+  client_id             = auth0_client.auth0_actions_management_client.client_id
 }
 
 resource "auth0_client_grant" "auth0_actions_management_client_grant" {
@@ -233,6 +233,6 @@ resource "auth0_client" "copilot_credits" {
 }
 
 resource "auth0_client_credentials" "copilot_credits" {
-  authentication_method    = "client_secret_post"
-  client_id                = auth0_client.copilot_credits.client_id
+  authentication_method = "client_secret_post"
+  client_id             = auth0_client.copilot_credits.client_id
 }

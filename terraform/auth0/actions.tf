@@ -16,13 +16,13 @@ resource "auth0_action_module" "validate_github_profile" {
 }
 
 resource "auth0_action" "enforce_github_identity" {
-  code               = templatefile("${path.module}/actions_code/enforce_github_itdentity.js", {
+  code = templatefile("${path.module}/actions_code/enforce_github_itdentity.js", {
     uri_namespace = "https://${var.webapp_domain}",
-    environment = var.environment
+    environment   = var.environment
   })
-  deploy             = true
-  name               = "Enforce GitHub Identity"
-  runtime            = "node22"
+  deploy  = true
+  name    = "Enforce GitHub Identity"
+  runtime = "node22"
 
   supported_triggers {
     id      = "post-login"
@@ -45,7 +45,7 @@ resource "auth0_action" "enforce_github_identity" {
   }
 
   secrets_wo_version = 1
-  
+
   secrets_wo {
     name  = "AUTH0_DOMAIN"
     value = var.auth0_domain
