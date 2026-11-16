@@ -2,7 +2,6 @@ FROM python:3.12.13-alpine3.22
 
 LABEL maintainer="cloud-optimisation-and-accountability <CloudOptimisationandAccountabilityTeam@justice.gov.uk>"
 
-
 # Install system dependencies
 RUN apk add --no-cache --no-progress \
   libffi-dev \
