@@ -177,7 +177,7 @@ resource "auth0_client" "copilot_credits" {
   cross_origin_loc                                     = null
   custom_login_page                                    = null
   custom_login_page_on                                 = true
-  description                                          = null
+  description                                          = "MoJ CoPilot AI Credits dashboard (Terraform-managed)"
   encryption_key                                       = null
   form_template                                        = null
   grant_types                                          = ["authorization_code", "implicit", "refresh_token", "client_credentials"]
